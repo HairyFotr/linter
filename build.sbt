@@ -6,3 +6,7 @@ libraryDependencies <++= (scalaVersion) { (scalaVer) =>
     "com.novocode"             % "junit-interface" % "0.7"    % "test"
   )
 }
+
+scalacOptions in console in Compile <+= (packageBin in Compile) map { pluginJar =>
+  "-Xplugin:"+pluginJar
+}
