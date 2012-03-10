@@ -1,0 +1,4 @@
+<plugin>
+  <name>linter</name>
+  <classname>com.foursquare.lint.LinterPlugin</classname>
+</plugin>
