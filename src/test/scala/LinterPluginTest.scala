@@ -97,9 +97,9 @@ class LinterPluginTest extends SpecsMatchers {
 
   @Test
   def testUnsafeEquals(): Unit = {
-    val msg = Some("Unsafe ==")
+    val msg = Some("Calling == on values of incompatible types.")
 
-    check(""" "foo" == "bar" """)
+    // Should warn
     check("Nil == None", msg)
     check("""{
       val x: List[Int] = Nil
@@ -107,6 +107,8 @@ class LinterPluginTest extends SpecsMatchers {
       x == y
     }""", msg)
 
+    // Should compile
+    check(""" "foo" == "bar" """)
     check("""{
       val x: List[Int] = Nil
       val y: List[Int] = Nil

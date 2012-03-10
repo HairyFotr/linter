@@ -30,11 +30,49 @@ class LinterPlugin(val global: Global) extends Plugin {
     }
 
     class LinterTraverser(unit: CompilationUnit) extends Traverser {
-      override def traverse(tree: Tree): Unit = tree match {
+      import definitions.{AnyClass, OptionClass, SeqClass}
 
-        // ADD YOUR EXTRA TYPE CHECKS HERE
-        // ADD YOUR EXTRA TYPE CHECKS HERE
-        // ADD YOUR EXTRA TYPE CHECKS HERE
+      val JavaConversionsModule: Symbol =
+        definitions.getModule("scala.collection.JavaConversions")
+
+      val SeqLikeClass: Symbol =
+        definitions.getClass("scala.collection.SeqLike")
+
+      val SeqLikeContains: Symbol =
+        SeqLikeClass.info.member(newTermName("contains"))
+
+      val AnyEquals: Symbol =
+        AnyClass.info.member(newTermName("$eq$eq"))
+
+      val AnyRefEquals: Symbol =
+        AnyRefClass.info.member(newTermName("$eq$eq"))
+
+      val GetMethod = newTermName("get")
+
+      val EqualsMethod = newTermName("$eq$eq")
+
+      def isSubtype(x: Tree, y: Tree): Boolean = {
+        x.tpe.widen <:< y.tpe.widen
+      }
+
+      def methodImplements(method: Symbol, target: Symbol): Boolean = {
+        method == target || method.allOverriddenSymbols.contains(target)
+      }
+
+      override def traverse(tree: Tree): Unit = tree match {
+        case Apply(s @ Select(lhs, EqualsMethod), List(rhs)) if !(isSubtype(lhs, rhs) || isSubtype(rhs, lhs)) =>
+          unit.warning(s.pos, "Calling == on values of incompatible types.")
+
+        case Import(t, selectors) if selectors.exists(_.name == global.nme.WILDCARD) && t.symbol == JavaConversionsModule =>
+          unit.warning(t.pos, "Conversions in scala.collection.JavaConversions._ are dangerous.")
+
+        case a @ Apply(s, _) if methodImplements(s.symbol, SeqLikeContains) =>
+          unit.warning(s.pos, "SeqLike.contains takes an Any instead of an element of the collection type.")
+
+        case node @ Select(q, GetMethod) if q.symbol.isSubClass(OptionClass) =>
+          if (!node.pos.source.path.contains("src/test")) {
+            unit.warning(node.pos, "Calling .get on Option will throw an exception if the Option is None.")
+          }
 
         case _ =>
           super.traverse(tree)
