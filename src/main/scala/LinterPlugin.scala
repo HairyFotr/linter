@@ -66,7 +66,9 @@ class LinterPlugin(val global: Global) extends Plugin {
         case Import(t, selectors) if selectors.exists(_.name == global.nme.WILDCARD) && t.symbol == JavaConversionsModule =>
           unit.warning(t.pos, "Conversions in scala.collection.JavaConversions._ are dangerous.")
 
-        case a @ Apply(s, _) if methodImplements(s.symbol, SeqLikeContains) =>
+        case a @ Apply(s@Select(seq, _), p)
+          if methodImplements(s.symbol, SeqLikeContains) &&
+             !(p.head.tpe <:< seq.tpe.typeArgs.head) =>
           unit.warning(s.pos, "SeqLike.contains takes an Any instead of an element of the collection type.")
 
         case node @ Select(q, GetMethod) if q.symbol.isSubClass(OptionClass) =>
