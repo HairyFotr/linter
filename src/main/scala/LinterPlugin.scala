@@ -73,7 +73,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           if methodImplements(s.symbol, SeqLikeContains)
           && !(p.head.tpe <:< SeqLikeA.asSeenFrom(seq.tpe, SeqLikeClass)) =>
 
-          unit.warning(s.pos, "SeqLike.contains takes an Any instead of an element of the collection type.")
+          unit.warning(s.pos, "SeqLike[%s].contains(%s) will probably return false." format(SeqLikeA.asSeenFrom(seq.tpe, SeqLikeClass), p.head.tpe))
 
         case node @ Select(q, GetMethod) if q.symbol.isSubClass(OptionClass) =>
           if (!node.pos.source.path.contains("src/test")) {

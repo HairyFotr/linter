@@ -68,7 +68,7 @@ class LinterPluginTest extends SpecsMatchers {
 
   @Test
   def testHasVersusContains(): Unit = {
-    val msg = Some("SeqLike.contains takes an Any instead of an element of the collection type.")
+    val msg = Some("SeqLike[Int].contains(java.lang.String(\"foo\")) will probably return false.")
 
     check("""val x = List(4); x.contains("foo")""", msg)
 
