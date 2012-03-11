@@ -41,6 +41,9 @@ class LinterPlugin(val global: Global) extends Plugin {
       val SeqLikeContains: Symbol =
         SeqLikeClass.info.member(newTermName("contains"))
 
+      val SeqLikeA: Type =
+        SeqLikeClass.tpe.typeArgs.head
+
       val AnyEquals: Symbol =
         AnyClass.info.member(newTermName("$eq$eq"))
 
@@ -66,8 +69,11 @@ class LinterPlugin(val global: Global) extends Plugin {
         case Import(t, selectors) if selectors.exists(_.name == global.nme.WILDCARD) && t.symbol == JavaConversionsModule =>
           unit.warning(t.pos, "Conversions in scala.collection.JavaConversions._ are dangerous.")
 
-        case a @ Apply(s, _) if methodImplements(s.symbol, SeqLikeContains) =>
-          unit.warning(s.pos, "SeqLike.contains takes an Any instead of an element of the collection type.")
+        case a @ Apply(s@Select(seq, _), p)
+          if methodImplements(s.symbol, SeqLikeContains)
+          && !(p.head.tpe <:< SeqLikeA.asSeenFrom(seq.tpe, SeqLikeClass)) =>
+
+          unit.warning(s.pos, "SeqLike[%s].contains(%s) will probably return false." format(SeqLikeA.asSeenFrom(seq.tpe, SeqLikeClass), p.head.tpe))
 
         case node @ Select(q, GetMethod) if q.symbol.isSubClass(OptionClass) =>
           if (!node.pos.source.path.contains("src/test")) {
