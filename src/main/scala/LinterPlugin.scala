@@ -67,8 +67,9 @@ class LinterPlugin(val global: Global) extends Plugin {
           unit.warning(t.pos, "Conversions in scala.collection.JavaConversions._ are dangerous.")
 
         case a @ Apply(s@Select(seq, _), p)
-          if methodImplements(s.symbol, SeqLikeContains) &&
-             !(p.head.tpe <:< seq.tpe.typeArgs.head) =>
+          if methodImplements(s.symbol, SeqLikeContains)
+          && !(p.head.tpe <:< SeqLikeClass.tpe.typeArgs.head.asSeenFrom(seq.tpe, SeqLikeClass)) =>
+
           unit.warning(s.pos, "SeqLike.contains takes an Any instead of an element of the collection type.")
 
         case node @ Select(q, GetMethod) if q.symbol.isSubClass(OptionClass) =>
