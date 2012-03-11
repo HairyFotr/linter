@@ -41,6 +41,9 @@ class LinterPlugin(val global: Global) extends Plugin {
       val SeqLikeContains: Symbol =
         SeqLikeClass.info.member(newTermName("contains"))
 
+      val SeqLikeA: Type =
+        SeqLikeClass.tpe.typeArgs.head
+
       val AnyEquals: Symbol =
         AnyClass.info.member(newTermName("$eq$eq"))
 
@@ -68,7 +71,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
         case a @ Apply(s@Select(seq, _), p)
           if methodImplements(s.symbol, SeqLikeContains)
-          && !(p.head.tpe <:< SeqLikeClass.tpe.typeArgs.head.asSeenFrom(seq.tpe, SeqLikeClass)) =>
+          && !(p.head.tpe <:< SeqLikeA.asSeenFrom(seq.tpe, SeqLikeClass)) =>
 
           unit.warning(s.pos, "SeqLike.contains takes an Any instead of an element of the collection type.")
 
