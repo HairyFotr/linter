@@ -34,6 +34,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       val JavaConversionsModule: Symbol = definitions.getModule("scala.collection.JavaConversions")
       val SeqLikeClass: Symbol = definitions.getClass("scala.collection.SeqLike")
       val SeqLikeContains: Symbol = SeqLikeClass.info.member(newTermName("contains"))
+      val OptionGet: Symbol = OptionClass.info.member(nme.get)
 
       def SeqMemberType(seenFrom: Type): Type = {
         SeqLikeClass.tpe.typeArgs.head.asSeenFrom(seenFrom, SeqLikeClass)
@@ -66,7 +67,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           val warnMsg = "SeqLike[%s].contains(%s) will probably return false."
           unit.warning(contains.pos, warnMsg.format(SeqMemberType(seq.tpe), target.tpe.widen))
 
-        case get @ Select(option, nme.get) if option.symbol.isSubClass(OptionClass) =>
+        case get @ Select(_, nme.get) if methodImplements(get.symbol, OptionGet) =>
           if (!get.pos.source.path.contains("src/test")) {
             unit.warning(get.pos, "Calling .get on Option will throw an exception if the Option is None.")
           }

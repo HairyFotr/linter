@@ -82,10 +82,13 @@ class LinterPluginTest extends SpecsMatchers {
   def testNoOptionGet(): Unit = {
     val msg = Some("Calling .get on Option will throw an exception if the Option is None.")
 
+    check("""Option(10).get""", msg)
     check("""val x: Option[Int] = None ; x.get""", msg)
     check("""val x: Option[Int] = Some(3); x.get""", msg)
     check("""val x = None ; x.get""", msg)
     check("""val x = Some(3) ; x.get""", msg)
+
+    check("""Map(1 -> "1", 2 -> "2").get(1)""")
   }
 
   @Test
