@@ -68,7 +68,7 @@ class LinterPluginTest extends SpecsMatchers {
 
   @Test
   def testHasVersusContains(): Unit = {
-    val msg = Some("SeqLike[Int].contains(java.lang.String(\"foo\")) will probably return false.")
+    val msg = Some("SeqLike[Int].contains(java.lang.String) will probably return false.")
 
     check("""val x = List(4); x.contains("foo")""", msg)
 
@@ -97,7 +97,7 @@ class LinterPluginTest extends SpecsMatchers {
 
   @Test
   def testUnsafeEquals(): Unit = {
-    val msg = Some("Calling == on values of incompatible types.")
+    val msg = Some("Comparing with ==")
 
     // Should warn
     check("Nil == None", msg)

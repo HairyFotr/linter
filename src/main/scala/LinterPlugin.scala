@@ -15,7 +15,6 @@ class LinterPlugin(val global: Global) extends Plugin {
 
   private object LinterComponent extends PluginComponent {
     import global._
-    import global.definitions._
 
     val global = LinterPlugin.this.global
 
@@ -30,29 +29,15 @@ class LinterPlugin(val global: Global) extends Plugin {
     }
 
     class LinterTraverser(unit: CompilationUnit) extends Traverser {
-      import definitions.{AnyClass, OptionClass, SeqClass}
+      import definitions.{AnyClass, ObjectClass, Object_==, OptionClass, SeqClass}
 
-      val JavaConversionsModule: Symbol =
-        definitions.getModule("scala.collection.JavaConversions")
+      val JavaConversionsModule: Symbol = definitions.getModule("scala.collection.JavaConversions")
+      val SeqLikeClass: Symbol = definitions.getClass("scala.collection.SeqLike")
+      val SeqLikeContains: Symbol = SeqLikeClass.info.member(newTermName("contains"))
 
-      val SeqLikeClass: Symbol =
-        definitions.getClass("scala.collection.SeqLike")
-
-      val SeqLikeContains: Symbol =
-        SeqLikeClass.info.member(newTermName("contains"))
-
-      val SeqLikeA: Type =
-        SeqLikeClass.tpe.typeArgs.head
-
-      val AnyEquals: Symbol =
-        AnyClass.info.member(newTermName("$eq$eq"))
-
-      val AnyRefEquals: Symbol =
-        AnyRefClass.info.member(newTermName("$eq$eq"))
-
-      val GetMethod = newTermName("get")
-
-      val EqualsMethod = newTermName("$eq$eq")
+      def SeqMemberType(seenFrom: Type): Type = {
+        SeqLikeClass.tpe.typeArgs.head.asSeenFrom(seenFrom, SeqLikeClass)
+      }
 
       def isSubtype(x: Tree, y: Tree): Boolean = {
         x.tpe.widen <:< y.tpe.widen
@@ -62,22 +47,28 @@ class LinterPlugin(val global: Global) extends Plugin {
         method == target || method.allOverriddenSymbols.contains(target)
       }
 
+      def isGlobalImport(selector: ImportSelector): Boolean = {
+        selector.name == nme.WILDCARD && selector.renamePos == -1
+      }
+
       override def traverse(tree: Tree): Unit = tree match {
-        case Apply(s @ Select(lhs, EqualsMethod), List(rhs)) if !(isSubtype(lhs, rhs) || isSubtype(rhs, lhs)) =>
-          unit.warning(s.pos, "Calling == on values of incompatible types.")
+        case Apply(eqeq @ Select(lhs, nme.EQ), List(rhs))
+            if methodImplements(eqeq.symbol, Object_==) && !(isSubtype(lhs, rhs) || isSubtype(rhs, lhs)) =>
+          val warnMsg = "Comparing with == on instances of different types (%s, %s) will probably return false."
+          unit.warning(eqeq.pos, warnMsg.format(lhs.tpe.widen, rhs.tpe.widen))
 
-        case Import(t, selectors) if selectors.exists(_.name == global.nme.WILDCARD) && t.symbol == JavaConversionsModule =>
-          unit.warning(t.pos, "Conversions in scala.collection.JavaConversions._ are dangerous.")
+        case Import(pkg, selectors)
+            if pkg.symbol == JavaConversionsModule && selectors.exists(isGlobalImport) =>
+          unit.warning(pkg.pos, "Conversions in scala.collection.JavaConversions._ are dangerous.")
 
-        case a @ Apply(s@Select(seq, _), p)
-          if methodImplements(s.symbol, SeqLikeContains)
-          && !(p.head.tpe <:< SeqLikeA.asSeenFrom(seq.tpe, SeqLikeClass)) =>
+        case Apply(contains @ Select(seq, _), List(target))
+            if methodImplements(contains.symbol, SeqLikeContains) && !(target.tpe <:< SeqMemberType(seq.tpe)) =>
+          val warnMsg = "SeqLike[%s].contains(%s) will probably return false."
+          unit.warning(contains.pos, warnMsg.format(SeqMemberType(seq.tpe), target.tpe.widen))
 
-          unit.warning(s.pos, "SeqLike[%s].contains(%s) will probably return false." format(SeqLikeA.asSeenFrom(seq.tpe, SeqLikeClass), p.head.tpe))
-
-        case node @ Select(q, GetMethod) if q.symbol.isSubClass(OptionClass) =>
-          if (!node.pos.source.path.contains("src/test")) {
-            unit.warning(node.pos, "Calling .get on Option will throw an exception if the Option is None.")
+        case get @ Select(option, nme.get) if option.symbol.isSubClass(OptionClass) =>
+          if (!get.pos.source.path.contains("src/test")) {
+            unit.warning(get.pos, "Calling .get on Option will throw an exception if the Option is None.")
           }
 
         case _ =>
