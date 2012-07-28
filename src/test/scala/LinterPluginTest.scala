@@ -111,6 +111,13 @@ class LinterPluginTest extends SpecsMatchers {
 
     check("import scala.collection.JavaConversions._;", msg)
   }
+  
+  @Test
+  def testAnyWildcardImport(): Unit = {
+    val msg = Some("Wildcard imports should be avoided.  Favor import selector clauses.")
+    
+    check("import org.specs._;", msg)
+  }
 
   @Test
   def testUnsafeEquals(): Unit = {
