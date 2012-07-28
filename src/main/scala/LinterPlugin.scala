@@ -25,7 +25,39 @@ class LinterPlugin(val global: Global) extends Plugin {
 
   val name = "linter"
   val description = ""
-  val components = List[PluginComponent](LinterComponent)
+  val components = List[PluginComponent](PreTyperComponent, LinterComponent)
+
+  private object PreTyperComponent extends PluginComponent {
+    import global._
+
+    val global = LinterPlugin.this.global
+
+    override val runsAfter = List("parser")
+
+    val phaseName = "linter-parsed"
+
+    override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
+      override def apply(unit: global.CompilationUnit): Unit = {
+        new PreTyperTraverser(unit).traverse(unit.body)
+      }
+    }
+
+    class PreTyperTraverser(unit: CompilationUnit) extends Traverser {
+      import scala.tools.nsc.symtab.Flags.IMPLICIT
+
+      override def traverse(tree: Tree): Unit = {
+        tree match {
+          case DefDef(Modifiers(flags, _, _, _), name, _, _, TypeTree(), _) => {
+            if ((flags & IMPLICIT) != 0)
+              unit.warning(tree.pos, "implicit method %s needs explicit return type" format name)
+          }
+          case _ => {}
+        }
+        super.traverse(tree)
+      }
+    }
+  }
+
 
   private object LinterComponent extends PluginComponent {
     import global._
@@ -34,7 +66,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
     override val runsAfter = List("typer")
 
-    val phaseName = "linter"
+    val phaseName = "linter-typed"
 
     override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
       override def apply(unit: global.CompilationUnit): Unit = {
