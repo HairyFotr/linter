@@ -3,11 +3,19 @@
 This is a compiler plugin that adds additional lint checks to protect against sharp corners
 in the Scala compiler and standard libraries.
 
-It's a work in progress.
+It's a work in progress.  For an overview of writing compiler plugins, see http://www.scala-lang.org/node/140
 
 ## Usage
 
-Add it as a compiler plugin in your project, or run `sbt console` in this project to see it in action.
+Add it as a compiler plugin in your project by editing your build.sbt file.  For example, once published:
+
+    addCompilerPlugin("com.foursquare.lint" %% "linter" % "x.y.z")
+
+Or, until published:
+
+    scalacOptions += "-Xplugin:..path-to-jar../linter.jar"
+
+Optionally, run `sbt console` in this project to see it in action.
 
 ## Currently suported warnings
 
@@ -33,6 +41,13 @@ Add it as a compiler plugin in your project, or run `sbt console` in this projec
            import scala.collection.JavaConversions._
                                    ^
 
+### Any and all wildcard imports
+
+    scala> import scala.collection.JavaConversions._
+    <console>:10: warning: Wildcard imports should be avoided.
+           import scala.reflect.generic._
+
+
 ### Calling `Option#get`
 
     scala> Option(1).get
@@ -50,7 +65,8 @@ Add it as a compiler plugin in your project, or run `sbt console` in this projec
 
 Feel free to implement these, or add your own ideas. Pull requests welcome!
 
-* Warn on wildcard imports (either all with whitelist, or blacklist)
+* Modularize the wildcard import warnings like the "Avoid Star Import" configuration of checkstyle
+ (http://checkstyle.sourceforge.net/config_imports.html)
 * Require explicit `override` whenever a method is being overwritten
 * Implicit methods should always have explicit return types
 * Expressions spanning multiple lines should be enclosed in parentheses

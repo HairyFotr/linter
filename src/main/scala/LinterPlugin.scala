@@ -65,7 +65,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       def isGlobalImport(selector: ImportSelector): Boolean = {
         selector.name == nme.WILDCARD && selector.renamePos == -1
       }
-
+      
       override def traverse(tree: Tree): Unit = tree match {
         case Apply(eqeq @ Select(lhs, nme.EQ), List(rhs))
             if methodImplements(eqeq.symbol, Object_==) && !(isSubtype(lhs, rhs) || isSubtype(rhs, lhs)) =>
@@ -75,6 +75,10 @@ class LinterPlugin(val global: Global) extends Plugin {
         case Import(pkg, selectors)
             if pkg.symbol == JavaConversionsModule && selectors.exists(isGlobalImport) =>
           unit.warning(pkg.pos, "Conversions in scala.collection.JavaConversions._ are dangerous.")
+        
+        case Import(pkg, selectors)
+            if selectors.exists(isGlobalImport) =>
+          unit.warning(pkg.pos, "Wildcard imports should be avoided.  Favor import selector clauses.")
 
         case Apply(contains @ Select(seq, _), List(target))
             if methodImplements(contains.symbol, SeqLikeContains) && !(target.tpe <:< SeqMemberType(seq.tpe)) =>
