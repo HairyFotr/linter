@@ -122,6 +122,9 @@ class LinterPlugin(val global: Global) extends Plugin {
             unit.warning(get.pos, "Calling .get on Option will throw an exception if the Option is None.")
           }
 
+        case get @ Literal(Constant(null)) =>
+          unit.warning(get.pos, "should not use null literal")
+
         case _ =>
           super.traverse(tree)
       }

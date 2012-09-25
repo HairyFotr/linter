@@ -148,4 +148,9 @@ class LinterPluginTest extends SpecsMatchers {
       x == "bar"
     }""")
   }
+
+  @Test
+  def testNull(): Unit = {
+    check("""val a = null""", Some("should not use null literal"))
+  }
 }
