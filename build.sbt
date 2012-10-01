@@ -10,3 +10,9 @@ libraryDependencies <++= (scalaVersion) { (scalaVer) =>
 scalacOptions in console in Compile <+= (packageBin in Compile) map { pluginJar =>
   "-Xplugin:"+pluginJar
 }
+
+scalaVersion := "2.9.2"
+
+name := "linter"
+
+organization := "com.foursquare.lint"
