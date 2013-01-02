@@ -46,7 +46,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
       override def traverse(tree: Tree): Unit = {
         tree match {
-          case DefDef(Modifiers(flags, _, _, _), name, _, _, TypeTree(), _) => {
+          case DefDef(Modifiers(flags, _, _), name, _, _, TypeTree(), _) => {
             if ((flags & IMPLICIT) != 0)
               unit.warning(tree.pos, "implicit method %s needs explicit return type" format name)
           }
@@ -76,8 +76,8 @@ class LinterPlugin(val global: Global) extends Plugin {
     class LinterTraverser(unit: CompilationUnit) extends Traverser {
       import definitions.{AnyClass, ObjectClass, Object_==, OptionClass, SeqClass}
 
-      val JavaConversionsModule: Symbol = definitions.getModule("scala.collection.JavaConversions")
-      val SeqLikeClass: Symbol = definitions.getClass("scala.collection.SeqLike")
+      val JavaConversionsModule: Symbol = definitions.getModule(newTermName("scala.collection.JavaConversions"))
+      val SeqLikeClass: Symbol = definitions.getClass(newTermName("scala.collection.SeqLike"))
       val SeqLikeContains: Symbol = SeqLikeClass.info.member(newTermName("contains"))
       val OptionGet: Symbol = OptionClass.info.member(nme.get)
 
