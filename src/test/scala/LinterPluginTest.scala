@@ -153,4 +153,9 @@ class LinterPluginTest extends SpecsMatchers {
   def testNull(): Unit = {
     check("""val a = null""", Some("should not use null literal"))
   }
+
+  @Test
+  def testCaseClassNull(): Unit = {
+    check("""case class A()""")
+  }
 }
