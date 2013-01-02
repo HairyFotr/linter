@@ -16,7 +16,6 @@
 
 package com.foursquare.lint
 
-import scala.reflect.generic.Flags
 import scala.tools.nsc.{Global, Phase}
 import scala.tools.nsc.plugins.{Plugin, PluginComponent}
 
