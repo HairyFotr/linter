@@ -19,6 +19,7 @@ package com.foursquare.lint
 import org.junit.{Before, Test}
 import org.specs2.matcher.{StandardMatchResults, JUnitMustMatchers}
 import tools.nsc.interpreter.ReplGlobal
+import util.matching.Regex
 
 class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   var linterPlugin: LinterPlugin = null
@@ -70,12 +71,12 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   val compiler = new Compiler
 
-  def check(code: String, expectedError: Option[String] = None) {
+  def check(code: String, expectedError: Option[Regex] = None) {
     // Either they should both be None or the expected error should be a
     // substring of the actual error.
     (expectedError, compiler.compileAndLint(code)) must beLike {
       case (None, None) => ok
-      case (Some(exp), Some(act)) if act.contains(exp) => ok
+      case (Some(exp), Some(act)) if exp.findFirstIn(act).isDefined => ok
     }
   }
 
@@ -86,7 +87,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def testHasVersusContains(): Unit = {
-    val msg = Some("SeqLike[Int].contains(java.lang.String) will probably return false.")
+    val msg = Some("""SeqLike\[Int\].contains\(.*String\) will probably return false.""".r)
 
     check( """val x = List(4); x.contains("foo")""", msg)
 
@@ -98,7 +99,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def testNoOptionGet(): Unit = {
-    val msg = Some("Calling .get on Option will throw an exception if the Option is None.")
+    val msg = Some("Calling .get on Option will throw an exception if the Option is None.".r)
 
     check( """Option(10).get""", msg)
     check( """val x: Option[Int] = None ; x.get""", msg)
@@ -111,21 +112,21 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def testJavaConversionsImport(): Unit = {
-    val msg = Some("Conversions in scala.collection.JavaConversions._ are dangerous.")
+    val msg = Some("Conversions in scala.collection.JavaConversions._ are dangerous.".r)
 
     check("import scala.collection.JavaConversions._;", msg)
   }
 
   @Test
   def testAnyWildcardImport(): Unit = {
-    val msg = Some("Wildcard imports should be avoided.  Favor import selector clauses.")
+    val msg = Some("Wildcard imports should be avoided.  Favor import selector clauses.".r)
 
-    check("import org.specs._;", msg)
+    check("import collection._;", msg)
   }
 
   @Test
   def testUnsafeEquals(): Unit = {
-    val msg = Some("Comparing with ==")
+    val msg = Some("Comparing with ==".r)
 
     // Should warn
     check("Nil == None", msg)
@@ -155,7 +156,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def testNull(): Unit = {
-    check( """val a = null""", Some("should not use null literal"))
+    check( """val a = null""", Some("should not use null literal".r))
   }
 
   @Test
