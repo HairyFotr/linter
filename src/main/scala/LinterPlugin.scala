@@ -122,7 +122,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           }
 
         case get @ Literal(Constant(null)) =>
-          unit.warning(get.pos, "should not use null literal")
+          unit.warning(get.pos, "Using null is considered dangerous.")
 
         case equalsNull@Apply(Select(_, nme.EQ), List(Literal(Constant(null)))) =>
 

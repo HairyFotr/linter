@@ -156,7 +156,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def testNull(): Unit = {
-    check( """val a = null""", Some("should not use null literal".r))
+    check( """val a = null""", Some("Using null is considered dangerous.".r))
   }
 
   @Test
