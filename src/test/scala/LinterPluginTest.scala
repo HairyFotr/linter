@@ -18,8 +18,8 @@ package com.foursquare.lint
 
 import org.junit.{Before, Test}
 import org.specs2.matcher.{StandardMatchResults, JUnitMustMatchers}
-import tools.nsc.interpreter.ReplGlobal
 import util.matching.Regex
+import collection.mutable
 
 class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   var linterPlugin: LinterPlugin = null
@@ -28,7 +28,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
     import java.io.{PrintWriter, StringWriter}
     import scala.io.Source
-    import scala.tools.nsc.{Global, Settings}
+    import scala.tools.nsc.Settings
     import scala.tools.nsc.interpreter.{IMain, Results}
     import scala.tools.nsc.reporters.Reporter
 
@@ -47,14 +47,11 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     private val interpreter = new IMain(settings, new PrintWriter(stringWriter)) {
       override protected def newCompiler(settings: Settings, reporter: Reporter) = {
         settings.outputDirs setSingleOutput virtualDirectory
-        new Global(settings, reporter) with ReplGlobal {
-          override protected def computeInternalPhases() {
-            super.computeInternalPhases
-            linterPlugin = new LinterPlugin(this)
-            for (phase <- linterPlugin.components)
-              phasesSet += phase
-          }
-        }
+        val compiler = super.newCompiler(settings, reporter)
+        linterPlugin = new LinterPlugin(compiler)
+        for (phase <- linterPlugin.components)
+          compiler.asInstanceOf[ {def phasesSet: mutable.HashSet[tools.nsc.SubComponent]}].phasesSet += phase
+        compiler
       }
     }
 
@@ -87,7 +84,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def testHasVersusContains(): Unit = {
-    val msg = Some("""SeqLike\[Int\].contains\(.*String\) will probably return false.""".r)
+    val msg = Some( """SeqLike\[Int\].contains\(.*String\) will probably return false.""".r)
 
     check( """val x = List(4); x.contains("foo")""", msg)
 

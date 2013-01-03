@@ -46,8 +46,8 @@ class LinterPlugin(val global: Global) extends Plugin {
 
       override def traverse(tree: Tree): Unit = {
         tree match {
-          case DefDef(Modifiers(flags, _, _), name, _, _, TypeTree(), _) => {
-            if ((flags & IMPLICIT) != 0)
+          case DefDef(m:Modifiers, name, _, _, TypeTree(), _) => {
+            if ((m.flags & IMPLICIT) != 0)
               unit.warning(tree.pos, "implicit method %s needs explicit return type" format name)
           }
           case _ => {}
