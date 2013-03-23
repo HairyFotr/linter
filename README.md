@@ -36,7 +36,7 @@ Optionally, run `sbt console` in this project to see it in action.
     <console>:29: warning: Comparing with == on instances of different types (object Nil, object None) will probably return false.
                   Nil == None
                       ^
-    scala> a == 0.4
+    scala> val a = 0.1; a == 0.4
     <console>:9: warning: Exact comparison of floating point values is potentially unsafe.
                   a == 0.4
                     ^
@@ -71,6 +71,11 @@ Optionally, run `sbt console` in this project to see it in action.
                   100 / (1+1 - 2)
                       ^
 
+### Unnecessary if statement
+scala> val a,b = 5; if(a == b && b > 5) true else false
+<console>:9: warning: Remove the if and just use the condition: this.a.==(this.b).&&(this.b.>(5))
+        if(a == b && b > 5) true else false
+        ^
 
 ## Future Work
 

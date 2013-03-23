@@ -131,11 +131,17 @@ class LinterPlugin(val global: Global) extends Plugin {
         case get @ Select(_, nme.get) if methodImplements(get.symbol, OptionGet) => 
           unit.warning(tree.pos, "Calling .get on Option will throw an exception if the Option is None.")
 
+        // Removes null warning for """case class A()""" (see unapply AST of such case class)
         case If(Apply(Select(_, nme.EQ), List(Literal(Constant(null)))), Literal(Constant(false)), Literal(Constant(true))) =>
-          // Removes null warning for """case class A()""" (see unapply AST of such case class)
         case Literal(Constant(null)) =>
           unit.warning(tree.pos, "Using null is considered dangerous.")
 
+        //TODO: Can I get the unprocessed condition string?
+        case If(cond, Literal(Constant(true)), Literal(Constant(false))) =>
+          unit.warning(tree.pos, "Remove the if and just use the condition: "+cond)
+        case If(cond, Literal(Constant(false)), Literal(Constant(true))) =>
+          unit.warning(tree.pos, "Remove the if and just use the negated condition: !("+cond+")")
+        
         // cannot check double/float, as typer will automatically translate it to Infinity
         case divByZero @ Apply(Select(rcvr, nme.DIV), List(Literal(Constant(0))))
           if (rcvr.tpe <:< definitions.ByteClass.tpe
