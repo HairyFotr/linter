@@ -78,18 +78,18 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
 
   @Before
-  def forceCompilerInit(): Unit = {
+  def forceCompilerInit() {
     check( """1 + 1""", None)
   }
 
   @Test
-  def testFromFile(): Unit = {
+  def testFromFile() {
     check( """scala.io.Source.fromFile("README.md")""", None)
     check( """scala.io.Source.fromFile("README.md").mkString""", Some("You should close the file stream after use.".r))
   }
 
   @Test
-  def testHasVersusContains(): Unit = {
+  def testHasVersusContains() {
     val msg = Some( """List\[Int\].contains\(.*String\) will probably return false.""".r)
 
     check( """val x = List(4); x.contains("foo")""", msg)
@@ -101,7 +101,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
 
   @Test
-  def testNoOptionGet(): Unit = {
+  def testNoOptionGet() {
     val msg = Some("Calling .get on Option will throw an exception if the Option is None.".r)
 
     check( """Option(10).get""", msg)
@@ -114,21 +114,21 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
 
   @Test
-  def testJavaConversionsImport(): Unit = {
+  def testJavaConversionsImport() {
     val msg = Some("Conversions in scala.collection.JavaConversions._ are dangerous.".r)
 
     check("import scala.collection.JavaConversions._;", msg)
   }
 
   @Test
-  def testAnyWildcardImport(): Unit = {
+  def testAnyWildcardImport() {
     val msg = Some("Wildcard imports should be avoided. Favor import selector clauses.".r)
 
     check("import collection._;", msg)
   }
 
   @Test
-  def testUnsafeEquals(): Unit = {
+  def testUnsafeEquals() {
     val msg = Some("Comparing with ==".r)
 
     // Should warn
@@ -158,22 +158,22 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
 
   @Test
-  def testNull(): Unit = {
+  def testNull() {
     check( """val a = null""", Some("Using null is considered dangerous.".r))
   }
 
   @Test
-  def testCaseClassNull(): Unit = {
+  def testCaseClassNull() {
     check( """case class A()""")
   }
 
   @Test
-  def testCaseClassFloat(): Unit = {
+  def testCaseClassFloat() {
     check( """case class A(a: Float)""")
   }
 
   @Test
-  def testUselessIf(): Unit = {
+  def testUselessIf() {
     check( """val a,b = 5; if(a == b && b > 5) true else false""", Some(".+Remove the if and just use the condition.+".r))
     check( """val a,b = 5; if(a == b && b > 5) false else true""", Some(".+Remove the if and just use the negated condition.+".r))
   }

@@ -102,6 +102,7 @@ Optionally, run `sbt console` in this project to see it in action.
 ## Future Work
 
 * Add more warnings
+* Add more tests, report false positives
 * Pick and choose which warnings you want
 * Choose whether they should be warnings or errors
 
