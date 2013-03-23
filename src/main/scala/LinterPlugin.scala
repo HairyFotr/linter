@@ -106,13 +106,13 @@ class LinterPlugin(val global: Global) extends Plugin {
       }
       
       override def traverse(tree: Tree): Unit = tree match {
-        case fromFile @ Select(aa, bb) if aa.toString startsWith "scala.io.Source.fromFile" =>
+        case Select(fromFile, _) if fromFile.toString startsWith "scala.io.Source.fromFile" => //TODO: Too hacky :)
           val warnMsg = "You should close the file stream after use."
           unit.warning(fromFile.pos, warnMsg)
 
-        case Apply(eqeq @ Select(lhs, nme.EQ), List(rhs)) if isSubtype(lhs, DoubleClass.tpe) || isSubtype(lhs, FloatClass.tpe) || isSubtype(rhs, DoubleClass.tpe) || isSubtype(rhs, FloatClass.tpe) =>
+        case Apply(Select(lhs, nme.EQ), List(rhs)) if isSubtype(lhs, DoubleClass.tpe) || isSubtype(lhs, FloatClass.tpe) || isSubtype(rhs, DoubleClass.tpe) || isSubtype(rhs, FloatClass.tpe) =>
           val warnMsg = "Exact comparison of floating point values is potentially unsafe."
-          unit.warning(eqeq.pos, warnMsg)
+          unit.warning(tree.pos, warnMsg)
           
         case Apply(eqeq @ Select(lhs, nme.EQ), List(rhs)) if methodImplements(eqeq.symbol, Object_==) && !isSubtype(lhs, rhs) && !isSubtype(rhs, lhs) =>
           val warnMsg = "Comparing with == on instances of different types (%s, %s) will probably return false."
@@ -125,17 +125,16 @@ class LinterPlugin(val global: Global) extends Plugin {
           unit.warning(pkg.pos, "Wildcard imports should be avoided. Favor import selector clauses.")
 
         case Apply(contains @ Select(seq, _), List(target)) if methodImplements(contains.symbol, SeqLikeContains) && !(target.tpe <:< SeqMemberType(seq.tpe)) =>
-          val warnMsg = "SeqLike[%s].contains(%s) will probably return false."
-          unit.warning(contains.pos, warnMsg.format(SeqMemberType(seq.tpe), target.tpe.widen))
+          val warnMsg = "%s.contains(%s) will probably return false."
+          unit.warning(contains.pos, warnMsg.format(seq.tpe.widen, target.tpe.widen))
 
         case get @ Select(_, nme.get) if methodImplements(get.symbol, OptionGet) => 
-          unit.warning(get.pos, "Calling .get on Option will throw an exception if the Option is None.")
+          unit.warning(tree.pos, "Calling .get on Option will throw an exception if the Option is None.")
 
-        case get @ Literal(Constant(null)) =>
-          unit.warning(get.pos, "Using null is considered dangerous.")
-
-        case equalsNull @ Apply(Select(_, nme.EQ), List(Literal(Constant(null)))) =>
-          unit.warning(equalsNull.pos, "Using null is considered dangerous.")
+        case Literal(Constant(null)) =>
+          unit.warning(tree.pos, "Using null is considered dangerous.")
+        case Apply(Select(_, nme.EQ), List(Literal(Constant(null)))) => // Removes null warning for """case class A()"""
+          
 
         // cannot check double/float, as typer will automatically translate it to Infinity
         case divByZero @ Apply(Select(rcvr, nme.DIV), List(Literal(Constant(0))))

@@ -83,8 +83,14 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
 
   @Test
+  def testFromFile(): Unit = {
+    check( """scala.io.Source.fromFile("README.md")""", None)
+    check( """scala.io.Source.fromFile("README.md").mkString""", Some("You should close the file stream after use.".r))
+  }
+
+  @Test
   def testHasVersusContains(): Unit = {
-    val msg = Some( """SeqLike\[Int\].contains\(.*String\) will probably return false.""".r)
+    val msg = Some( """List\[Int\].contains\(.*String\) will probably return false.""".r)
 
     check( """val x = List(4); x.contains("foo")""", msg)
 
@@ -116,7 +122,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def testAnyWildcardImport(): Unit = {
-    val msg = Some("Wildcard imports should be avoided.  Favor import selector clauses.".r)
+    val msg = Some("Wildcard imports should be avoided. Favor import selector clauses.".r)
 
     check("import collection._;", msg)
   }
