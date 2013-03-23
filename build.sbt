@@ -13,7 +13,7 @@ scalacOptions in console in Compile <+= (packageBin in Compile) map { pluginJar 
   "-Xplugin:"+pluginJar
 }
 
-scalaVersion := "2.10.0"
+scalaVersion := "2.10.1"
 
 crossScalaVersions <<= scalaVersion { scalaVersion => Seq(scalaVersion, "2.9.2") }
 

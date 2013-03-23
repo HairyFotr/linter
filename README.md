@@ -19,12 +19,28 @@ Optionally, run `sbt console` in this project to see it in action.
 
 ## Currently suported warnings
 
+### Using `scala.io.Source.fromFile` inline
+    scala> io.Source.fromFile(".gitignore").mkString
+    <console>:8: warning: You should close the file stream after use.
+                  io.Source.fromFile("README.md").mkString
+                                                   ^
+                                                   
+### Implicit methods without an explicit return type
+    scala> implicit def int2string(a:Int) = a.toString
+    <console>:8: warning: Implicit method int2string needs explicit return type
+           implicit def int2string(a:Int) = a.toString
+                        ^
+
 ### Unsafe `==`
 
     scala> Nil == None
     <console>:29: warning: Comparing with == on instances of different types (object Nil, object None) will probably return false.
                   Nil == None
                       ^
+    scala> a == 0.1
+    <console>:9: warning: Exact comparison of floating point values is unsafe.
+                  a == 0.3
+                    ^
 
 ### Unsafe `contains`
 
@@ -32,7 +48,6 @@ Optionally, run `sbt console` in this project to see it in action.
     <console>:29: warning: SeqLike[Int].contains(java.lang.String) will probably return false.
                   List(1, 2, 3).contains("4")
                                 ^
-
 
 ### Wildcard import from `scala.collection.JavaConversions`
 
@@ -68,7 +83,6 @@ Feel free to implement these, or add your own ideas. Pull requests welcome!
 * Modularize the wildcard import warnings like the "Avoid Star Import" configuration of checkstyle
  (http://checkstyle.sourceforge.net/config_imports.html)
 * Require explicit `override` whenever a method is being overwritten
-* Implicit methods should always have explicit return types
 * Expressions spanning multiple lines should be enclosed in parentheses
 * Unused method argument warnings
 * Warn on unrestricted catch clauses (`case e => ...`)
