@@ -43,7 +43,7 @@ Optionally, run `sbt console` in this project to see it in action.
 
 ### Unsafe `contains`
     scala> List(1, 2, 3).contains("4")
-    <console>:29: warning: SeqLike[Int].contains(java.lang.String) will probably return false.
+    <console>:29: warning: List[Int].contains(String) will probably return false.
                   List(1, 2, 3).contains("4")
                                 ^
 
