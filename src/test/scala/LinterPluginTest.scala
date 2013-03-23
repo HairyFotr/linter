@@ -168,6 +168,11 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
 
   @Test
+  def testCaseClassFloat(): Unit = {
+    check( """case class A(a: Float)""")
+  }
+
+  @Test
   def testUselessIf(): Unit = {
     check( """val a,b = 5; if(a == b && b > 5) true else false""", Some(".+Remove the if and just use the condition.+".r))
     check( """val a,b = 5; if(a == b && b > 5) false else true""", Some(".+Remove the if and just use the negated condition.+".r))

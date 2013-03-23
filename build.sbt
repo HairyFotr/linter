@@ -20,3 +20,9 @@ crossScalaVersions <<= scalaVersion { scalaVersion => Seq(scalaVersion, "2.9.2")
 name := "linter"
 
 organization := "com.foursquare.lint"
+
+//Well, if we're gonna do static analysis, why not see what the compiler already does ;)
+
+scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-Xlint")
+
+scalacOptions ++= Seq("-Ywarn-adapted-args", "-Ywarn-all", "-Ywarn-dead-code", "-Ywarn-inaccessible", "-Ywarn-nullary-override", "-Ywarn-nullary-unit", "-Ywarn-value-discard")

@@ -111,8 +111,9 @@ class LinterPlugin(val global: Global) extends Plugin {
           unit.warning(fromFile.pos, warnMsg)
 
         case Apply(Select(lhs, nme.EQ), List(rhs)) if isSubtype(lhs, DoubleClass.tpe) || isSubtype(lhs, FloatClass.tpe) || isSubtype(rhs, DoubleClass.tpe) || isSubtype(rhs, FloatClass.tpe) =>
-          val warnMsg = "Exact comparison of floating point values is potentially unsafe."
-          unit.warning(tree.pos, warnMsg)
+          //TODO: Fix false positive for """case class A(a: Float)"""
+          //val warnMsg = "Exact comparison of floating point values is potentially unsafe."
+          //unit.warning(tree.pos, warnMsg)
           
         case Apply(eqeq @ Select(lhs, nme.EQ), List(rhs)) if methodImplements(eqeq.symbol, Object_==) && !isSubtype(lhs, rhs) && !isSubtype(rhs, lhs) =>
           val warnMsg = "Comparing with == on instances of different types (%s, %s) will probably return false."
@@ -122,7 +123,8 @@ class LinterPlugin(val global: Global) extends Plugin {
           unit.warning(pkg.pos, "Conversions in scala.collection.JavaConversions._ are dangerous.")
         
         case Import(pkg, selectors) if selectors.exists(isGlobalImport) =>
-          unit.warning(pkg.pos, "Wildcard imports should be avoided. Favor import selector clauses.")
+          //TODO: Too much noise - maybe if would be useful if told us non-IDE users which classes we're using
+          //unit.warning(pkg.pos, "Wildcard imports should be avoided. Favor import selector clauses.")
 
         case Apply(contains @ Select(seq, _), List(target)) if methodImplements(contains.symbol, SeqLikeContains) && !(target.tpe <:< SeqMemberType(seq.tpe)) =>
           val warnMsg = "%s.contains(%s) will probably return false."
@@ -131,17 +133,54 @@ class LinterPlugin(val global: Global) extends Plugin {
         case get @ Select(_, nme.get) if methodImplements(get.symbol, OptionGet) => 
           unit.warning(tree.pos, "Calling .get on Option will throw an exception if the Option is None.")
 
-        // Removes null warning for """case class A()""" (see unapply AST of such case class)
         case If(Apply(Select(_, nme.EQ), List(Literal(Constant(null)))), Literal(Constant(false)), Literal(Constant(true))) =>
+          // Removes both the null warning and if check for """case class A()""" ... (x$0.==(null) - see unapply AST of such case class)
         case Literal(Constant(null)) =>
-          unit.warning(tree.pos, "Using null is considered dangerous.")
+          //TODO: Too much noise - limit in some way
+          //unit.warning(tree.pos, "Using null is considered dangerous.")
+
+        case Match(Literal(Constant(a)), _) =>
+          unit.warning(tree.pos, "Pattern matching on a constant value "+a+".")
+
+        case Match(pat, cases) if pat.tpe.toString != "Any @unchecked" && cases.size >= 2 =>
+          //TODO: "Any @unchecked" seems to happen on the matching structures of actors - and they all return true :)
+          case class EqCheck(streak: Int, tree: CaseDef)
+          var curr = EqCheck(1, cases.head)
+          var last = cases.head
+          def printStreak(s: EqCheck) {
+            if(s.streak == cases.size) {
+              unit.warning(tree.pos, "All "+cases.size+" cases will return "+cases.head.body+", regardless of pattern value") 
+            } else if(s.streak > 1) {
+              unit.warning(s.tree.body.pos, s.streak+" neighbouring cases will return "+s.tree.body+", and should be merged.")   
+            }
+          }
+          
+          for(c <- cases.tail) {
+            if(c.body equalsStructure last.body) {
+              curr = EqCheck(curr.streak+1, c)
+            } else {
+              printStreak(curr)
+              curr = EqCheck(1, c)
+            }
+            last = c
+          }
+
+          printStreak(curr)
 
         //TODO: Can I get the unprocessed condition string?
         case If(cond, Literal(Constant(true)), Literal(Constant(false))) =>
-          unit.warning(tree.pos, "Remove the if and just use the condition: "+cond)
+          unit.warning(cond.pos, "Remove the if and just use the condition: "+cond)
         case If(cond, Literal(Constant(false)), Literal(Constant(true))) =>
-          unit.warning(tree.pos, "Remove the if and just use the negated condition: !("+cond+")")
-        
+          unit.warning(cond.pos, "Remove the if and just use the negated condition: !("+cond+")")
+        //case If(cond, Literal(Constant(a: Any)), Literal(Constant(b: Any))) if a == b =>
+        case If(cond, a, b) if a equalsStructure b =>
+          unit.warning(cond.pos, "Result will be "+a+" regardless of condition.")
+
+        case If(cond @ Literal(Constant(a: Boolean)), _, _) => 
+          //TODO: try to figure out things like (false && a > 5 && ...) (btw, this works if a is a final val)
+          val warnMsg = "This condition will always be "+a+"."
+          unit.warning(cond.pos, warnMsg)
+
         // cannot check double/float, as typer will automatically translate it to Infinity
         case divByZero @ Apply(Select(rcvr, nme.DIV), List(Literal(Constant(0))))
           if (rcvr.tpe <:< definitions.ByteClass.tpe

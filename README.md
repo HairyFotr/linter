@@ -70,12 +70,34 @@ Optionally, run `sbt console` in this project to see it in action.
     <console>:8: warning: Literal division by zero.
                   100 / (1+1 - 2)
                       ^
+### Pattern matching checks
+    scala> a match { case 3 => println("hello") case 4 => println("hello") case 5 => println("hello") case _ => println("how low") }
+    <console>:10: warning: 3 neighbouring cases will return scala.this.Predef.println("hello"), and should be merged.
+            a match { case 3 => println("hello") case 4 => println("hello") case 5 => println("hello") case _ => println("how low") }
+                                                                                             ^
+    scala> 5 match { case 3 => "hello"; case _ => "hi" }
+    <console>:8: warning: Pattern matching on a constant value 5.
+                  5 match { case 3 => "hello"; case _ => "hi" }
+                    ^
 
-### Unnecessary if statement
-    scala> val a,b = 5; if(a == b && b > 5) true else false
+### If statement checks
+    scala> if(b > 4) (1+1,a) else (2,a); if(b < 4) Set(1,a) else Set(1,a);
+    <console>:9: warning: Result will be scala.Tuple2.apply[Int, Int](2, this.a) regardless of condition.
+                  val a,b = 5; if(b > 4) (1+1,a) else (2,a);;
+                                    ^
+    <console>:11: warning: Result will be scala.this.Predef.Set.apply[Int](1, this.a) regardless of condition.
+            if(b < 4) Set(1,a) else Set(1,a);
+                 ^
+
+    scala> if(a == b && b > 5) true else false
     <console>:9: warning: Remove the if and just use the condition: this.a.==(this.b).&&(this.b.>(5))
             if(a == b && b > 5) true else false
             ^
+
+    scala> if(1 > 5) 7 else 8
+    <console>:8: warning: This condition will always be false.
+                  if(1 > 5) 7 else 8
+                       ^
 
 ## Future Work
 
