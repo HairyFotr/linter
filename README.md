@@ -72,10 +72,10 @@ Optionally, run `sbt console` in this project to see it in action.
                       ^
 
 ### Unnecessary if statement
-scala> val a,b = 5; if(a == b && b > 5) true else false
-<console>:9: warning: Remove the if and just use the condition: this.a.==(this.b).&&(this.b.>(5))
-        if(a == b && b > 5) true else false
-        ^
+    scala> val a,b = 5; if(a == b && b > 5) true else false
+    <console>:9: warning: Remove the if and just use the condition: this.a.==(this.b).&&(this.b.>(5))
+            if(a == b && b > 5) true else false
+            ^
 
 ## Future Work
 
