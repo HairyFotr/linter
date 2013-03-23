@@ -19,8 +19,8 @@ Optionally, run `sbt console` in this project to see it in action.
 
 ## Currently suported warnings
 
-### Using `scala.io.Source.fromFile` inline
-    scala> io.Source.fromFile(".gitignore").mkString
+### Using `scala.io.Source.fromFile` without closing file
+    scala> io.Source.fromFile("README.md").mkString
     <console>:8: warning: You should close the file stream after use.
                   io.Source.fromFile("README.md").mkString
                                                    ^
@@ -32,43 +32,45 @@ Optionally, run `sbt console` in this project to see it in action.
                         ^
 
 ### Unsafe `==`
-
     scala> Nil == None
     <console>:29: warning: Comparing with == on instances of different types (object Nil, object None) will probably return false.
                   Nil == None
                       ^
-    scala> a == 0.1
-    <console>:9: warning: Exact comparison of floating point values is unsafe.
-                  a == 0.3
+    scala> a == 0.4
+    <console>:9: warning: Exact comparison of floating point values is potentially unsafe.
+                  a == 0.4
                     ^
 
 ### Unsafe `contains`
-
     scala> List(1, 2, 3).contains("4")
     <console>:29: warning: SeqLike[Int].contains(java.lang.String) will probably return false.
                   List(1, 2, 3).contains("4")
                                 ^
 
 ### Wildcard import from `scala.collection.JavaConversions`
-
     scala> import scala.collection.JavaConversions._
     <console>:29: warning: Conversions in scala.collection.JavaConversions._ are dangerous.
            import scala.collection.JavaConversions._
                                    ^
 
 ### Any and all wildcard imports
-
-    scala> import scala.collection.JavaConversions._
-    <console>:10: warning: Wildcard imports should be avoided.
-           import scala.reflect.generic._
-
+    scala> import scala.collection.mutable._
+    <console>:7: warning: Wildcard imports should be avoided. Favor import selector clauses.
+           import scala.collection.mutable._
+                                   ^
 
 ### Calling `Option#get`
-
     scala> Option(1).get
     <console>:29: warning: Calling .get on Option will throw an exception if the Option is None.
                   Option(1).get
                             ^
+                            
+### Literal division by zero
+    scala> 100 / (1+1 - 2)
+    <console>:8: warning: Literal division by zero.
+                  100 / (1+1 - 2)
+                      ^
+
 
 ## Future Work
 

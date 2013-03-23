@@ -134,8 +134,22 @@ class LinterPlugin(val global: Global) extends Plugin {
         case get @ Literal(Constant(null)) =>
           unit.warning(get.pos, "Using null is considered dangerous.")
 
-        case equalsNull@Apply(Select(_, nme.EQ), List(Literal(Constant(null)))) =>
+        case equalsNull @ Apply(Select(_, nme.EQ), List(Literal(Constant(null)))) =>
           unit.warning(equalsNull.pos, "Using null is considered dangerous.")
+
+        // cannot check double/float, as typer will automatically translate it to Infinity
+        case divByZero @ Apply(Select(rcvr, nme.DIV), List(Literal(Constant(0))))
+          if (rcvr.tpe <:< definitions.ByteClass.tpe
+            ||rcvr.tpe <:< definitions.ShortClass.tpe
+            ||rcvr.tpe <:< definitions.IntClass.tpe
+            ||rcvr.tpe <:< definitions.LongClass.tpe) =>
+          unit.warning(divByZero.pos, "Literal division by zero.")
+        case divByZero @ Apply(Select(rcvr, nme.MOD), List(Literal(Constant(0))))
+          if (rcvr.tpe <:< definitions.ByteClass.tpe
+            ||rcvr.tpe <:< definitions.ShortClass.tpe
+            ||rcvr.tpe <:< definitions.IntClass.tpe
+            ||rcvr.tpe <:< definitions.LongClass.tpe) => 
+          unit.warning(divByZero.pos, "Literal division by zero.")
 
         case _ =>
           super.traverse(tree)
