@@ -131,10 +131,10 @@ class LinterPlugin(val global: Global) extends Plugin {
         case get @ Select(_, nme.get) if methodImplements(get.symbol, OptionGet) => 
           unit.warning(tree.pos, "Calling .get on Option will throw an exception if the Option is None.")
 
+        case If(Apply(Select(_, nme.EQ), List(Literal(Constant(null)))), Literal(Constant(false)), Literal(Constant(true))) =>
+          // Removes null warning for """case class A()""" (see unapply AST of such case class)
         case Literal(Constant(null)) =>
           unit.warning(tree.pos, "Using null is considered dangerous.")
-        case Apply(Select(_, nme.EQ), List(Literal(Constant(null)))) => // Removes null warning for """case class A()"""
-          
 
         // cannot check double/float, as typer will automatically translate it to Infinity
         case divByZero @ Apply(Select(rcvr, nme.DIV), List(Literal(Constant(0))))

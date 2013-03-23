@@ -91,3 +91,4 @@ Feel free to implement these, or add your own ideas. Pull requests welcome!
 * Traversable#head, Traversable#last, Traversable#maxBy
 * Warn on shadowing variables, especially those of the same type
 * Warn on inexhaustive pattern matching
+* Boolean function parameters should be named (`func("arg1", force = true)`)
