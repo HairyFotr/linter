@@ -1,3 +1,5 @@
+scalaVersion := "2.10.1"
+
 libraryDependencies <++= (scalaVersion) { (scalaVersion) =>
   Seq(
     "org.scala-lang"           % "scala-compiler"  % scalaVersion,
@@ -13,18 +15,16 @@ scalacOptions in console in Compile <+= (packageBin in Compile) map { pluginJar 
   "-Xplugin:"+pluginJar
 }
 
-scalaVersion := "2.10.1"
-
-crossScalaVersions <<= scalaVersion { scalaVersion => Seq(scalaVersion, "2.9.2") }
-
 name := "linter"
 
 organization := "com.foursquare.lint"
+
+crossScalaVersions <<= scalaVersion { scalaVersion => Seq(scalaVersion, "2.9.3") }
 
 publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
 
 //Well, if we're gonna do static analysis, why not see what the compiler already does ;)
 
-scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-Xlint")
+scalacOptions ++= Seq("-unchecked", "-deprecation", "-Xlint")
 
-scalacOptions ++= Seq("-Ywarn-adapted-args", "-Ywarn-all", "-Ywarn-dead-code", "-Ywarn-inaccessible", "-Ywarn-nullary-override", "-Ywarn-nullary-unit", "-Ywarn-value-discard")
+scalacOptions ++= Seq("-Ywarn-all", "-Ywarn-dead-code", "-Ywarn-inaccessible", "-Ywarn-nullary-override", "-Ywarn-nullary-unit", "-Ywarn-value-discard")
