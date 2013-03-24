@@ -7,13 +7,17 @@ It's a work in progress.  For an overview of writing compiler plugins, see http:
 
 ## Usage
 
-Add it as a compiler plugin in your project by editing your build.sbt file.  For example, once published:
+Add it as a compiler plugin in your project by editing your build.sbt file.
 
-    addCompilerPlugin("com.foursquare.lint" %% "linter" % "x.y.z")
+This fork of linter is published in a github repo:
 
-Or, until published:
+    resolvers += "linter" at "http://hairyfotr.github.com/linteRepo/releases"
 
-    scalacOptions += "-Xplugin:..path-to-jar../linter.jar"
+    addCompilerPlugin("com.foursquare.lint" %% "linter" % "0.1-SNAPSHOT")
+
+Or, if you're testing your local version:
+
+    scalacOptions += "-Xplugin:<path-to-jar>.jar"
 
 Optionally, run `sbt console` in this project to see it in action.
 
