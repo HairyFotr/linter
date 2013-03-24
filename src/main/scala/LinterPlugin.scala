@@ -149,7 +149,8 @@ class LinterPlugin(val global: Global) extends Plugin {
           var last = cases.head
           def printStreak(s: EqCheck) {
             if(s.streak == cases.size) {
-              unit.warning(tree.pos, "All "+cases.size+" cases will return "+cases.head.body+", regardless of pattern value") 
+              //This one always turns out to be a false positive
+              //unit.warning(tree.pos, "All "+cases.size+" cases will return "+cases.head.body+", regardless of pattern value") 
             } else if(s.streak > 1) {
               unit.warning(s.tree.body.pos, s.streak+" neighbouring cases will return "+s.tree.body+", and should be merged.")   
             }
