@@ -21,6 +21,8 @@ name := "linter"
 
 organization := "com.foursquare.lint"
 
+publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
+
 //Well, if we're gonna do static analysis, why not see what the compiler already does ;)
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-Xlint")
