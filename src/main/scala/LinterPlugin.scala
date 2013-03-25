@@ -144,9 +144,8 @@ class LinterPlugin(val global: Global) extends Plugin {
 
         case Match(pat, cases) if pat.tpe.toString != "Any @unchecked" && cases.size >= 2 =>
           //TODO: "Any @unchecked" seems to happen on the matching structures of actors - and they all return true :)
+          //TODO: This handles multiple rules already - clean it up.
           case class EqCheck(streak: Int, tree: CaseDef)
-          var curr = EqCheck(1, cases.head)
-          var last = cases.head
           def printStreak(s: EqCheck) {
             if(s.streak == cases.size) {
               //This one always turns out to be a false positive
@@ -156,6 +155,17 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
           }
           
+          var curr = EqCheck(1, cases.head)
+          var last = cases.head
+          var someCase, noneCase, _Case = false
+          val (someCaseReg, noneCaseReg, _CaseReg) = ("Some[\\[].*[\\]]", "None[.]type", "Option[\\[].*[\\]]") //TODO: Hacky hack hack -_-, sorry
+          def checkRegs(caseTree: CaseDef) {
+            val caseStr = caseTree.pat.tpe.toString
+            someCase |= (caseStr matches someCaseReg)
+            noneCase |= (caseStr matches noneCaseReg)
+            _Case |= (caseStr matches _CaseReg)  
+          }
+          checkRegs(last)
           for(c <- cases.tail) {
             if(c.body equalsStructure last.body) {
               curr = EqCheck(curr.streak+1, c)
@@ -164,9 +174,14 @@ class LinterPlugin(val global: Global) extends Plugin {
               curr = EqCheck(1, c)
             }
             last = c
+            checkRegs(last)
           }
 
           printStreak(curr)
+          
+          if(cases.size == 2 && ((someCase || _Case) && (noneCase || _Case) && (noneCase || someCase))) {
+            unit.warning(tree.pos, "There are probably better ways of handling an Option (see: http://blog.tmorris.net/posts/scalaoption-cheat-sheet/)")
+          }
 
         //TODO: Can I get the unprocessed condition string?
         case If(cond, Literal(Constant(true)), Literal(Constant(false))) =>

@@ -83,6 +83,10 @@ Optionally, run `sbt console` in this project to see it in action.
     <console>:8: warning: Pattern matching on a constant value 5.
                   5 match { case 3 => "hello"; case _ => "hi" }
                     ^
+    scala> val a = Option(""); a match { case Some(x) => x case _ => null }
+    <console>:10: warning: There are probably better ways of handling an Option (see: http://blog.tmorris.net/posts/scalaoption-cheat-sheet/)
+            a match { case Some(x) => x case _ => null }
+              ^
 
 ### If statement checks
     scala> if(b > 4) (1+1,a) else (2,a); if(b < 4) Set(1,a) else Set(1,a);
