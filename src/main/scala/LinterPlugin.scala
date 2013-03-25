@@ -157,13 +157,16 @@ class LinterPlugin(val global: Global) extends Plugin {
           
           var curr = EqCheck(1, cases.head)
           var last = cases.head
-          var someCase, noneCase, _Case = false
-          val (someCaseReg, noneCaseReg, _CaseReg) = ("Some[\\[].*[\\]]", "None[.]type", "Option[\\[].*[\\]]") //TODO: Hacky hack hack -_-, sorry
+          var someCase, noneCase, _Case, trueOrFalseCase = false
+          val (someCaseReg, noneCaseReg, _CaseReg, trueOrFalseReg) = ("Some[\\[].*[\\]]", "None[.]type", "Option[\\[].*[\\]]", "Boolean[(](true|false)[)]") //TODO: Hacky hack hack -_-, sorry
           def checkRegs(caseTree: CaseDef) {
-            val caseStr = caseTree.pat.tpe.toString
-            someCase |= (caseStr matches someCaseReg)
-            noneCase |= (caseStr matches noneCaseReg)
-            _Case |= (caseStr matches _CaseReg)  
+            val caseStr = caseTree.pat.toString
+            val caseTypeStr = caseTree.pat.tpe.toString
+            //println((caseStr, caseTypeStr))
+            someCase |= (caseTypeStr matches someCaseReg)
+            noneCase |= (caseTypeStr matches noneCaseReg)
+            _Case |= (caseTypeStr matches _CaseReg) // this one handles Option, not general _ 
+            trueOrFalseCase |= (caseTypeStr matches trueOrFalseReg)  
           }
           checkRegs(last)
           for(c <- cases.tail) {
@@ -179,8 +182,13 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           printStreak(curr)
           
-          if(cases.size == 2 && ((someCase || _Case) && (noneCase || _Case) && (noneCase || someCase))) {
-            unit.warning(tree.pos, "There are probably better ways of handling an Option (see: http://blog.tmorris.net/posts/scalaoption-cheat-sheet/)")
+          if(cases.size == 2) {
+            if ((someCase || _Case) && (noneCase || _Case) && (noneCase || someCase)) {
+              //This rule could be detected better from the type of the pat...
+              unit.warning(tree.pos, "There are probably better ways of handling an Option. (see: http://blog.tmorris.net/posts/scalaoption-cheat-sheet/)")
+            } else if (trueOrFalseCase) {
+              unit.warning(tree.pos, "This is probably better written as an if statement.")
+            }
           }
 
         //TODO: Can I get the unprocessed condition string?

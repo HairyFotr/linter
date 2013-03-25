@@ -87,6 +87,10 @@ Optionally, run `sbt console` in this project to see it in action.
     <console>:10: warning: There are probably better ways of handling an Option (see: http://blog.tmorris.net/posts/scalaoption-cheat-sheet/)
             a match { case Some(x) => x case _ => null }
               ^
+    scala> val a = true; a match { case true => 0 case false => 1 }
+    <console>:9: warning: This is probably better written as an if statement.
+            a match { case true => null  case false => null }
+              ^
 
 ### If statement checks
     scala> if(b > 4) (1+1,a) else (2,a); if(b < 4) Set(1,a) else Set(1,a);
