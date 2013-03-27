@@ -3,25 +3,23 @@
 This is a compiler plugin that adds additional lint checks to protect against sharp corners
 in the Scala compiler and standard libraries.
 
-It's a work in progress.  For an overview of writing compiler plugins, see http://www.scala-lang.org/node/140
+It's a work in progress. For an overview of writing compiler plugins, see http://www.scala-lang.org/node/140
 
 ## Usage
 
-Add it as a compiler plugin in your project by editing your build.sbt file.
-
-This fork of linter is published in a github repo:
+Add it as a compiler plugin in your project by editing your build.sbt file:
 
     resolvers += "linter" at "http://hairyfotr.github.com/linteRepo/releases"
 
     addCompilerPlugin("com.foursquare.lint" %% "linter" % "0.1-SNAPSHOT")
 
-Or, if you're testing your local version:
+Or, if you're working with a local version:
 
     scalacOptions += "-Xplugin:<path-to-jar>.jar"
 
 Optionally, run `sbt console` in this project to see it in action.
 
-## Currently suported warnings
+## Currently supported warnings
 
 ### Using `scala.io.Source.fromFile` without closing file
     scala> io.Source.fromFile("README.md").mkString
@@ -34,6 +32,12 @@ Optionally, run `sbt console` in this project to see it in action.
     <console>:8: warning: Implicit method int2string needs explicit return type
            implicit def int2string(a:Int) = a.toString
                         ^
+
+### Unused method argument warnings
+    scala> def func(b: Int, c: String, d: String) = b+c
+    <console>:7: warning: Parameter d is not used in method func
+           def func(b: Int, c: String, d: String) = b+c
+               ^
 
 ### Unsafe `==`
     scala> Nil == None
@@ -93,13 +97,10 @@ Optionally, run `sbt console` in this project to see it in action.
               ^
 
 ### If statement checks
-    scala> if(b > 4) (1+1,a) else (2,a); if(b < 4) Set(1,a) else Set(1,a);
-    <console>:9: warning: Result will be scala.Tuple2.apply[Int, Int](2, this.a) regardless of condition.
-                  val a,b = 5; if(b > 4) (1+1,a) else (2,a);;
+    scala> val a,b = 5; if(b > 4) (1+1,a) else (2,a)
+    <console>:9: warning: Result will always be scala.Tuple2.apply[Int, Int](2, this.a) regardless of condition.
+                  val a,b = 5; if(b > 4) (1+1,a) else (2,a)
                                     ^
-    <console>:11: warning: Result will be scala.this.Predef.Set.apply[Int](1, this.a) regardless of condition.
-            if(b < 4) Set(1,a) else Set(1,a);
-                 ^
 
     scala> if(a == b && b > 5) true else false
     <console>:9: warning: Remove the if and just use the condition: this.a.==(this.b).&&(this.b.>(5))
@@ -126,7 +127,6 @@ Feel free to implement these, or add your own ideas. Pull requests welcome!
  (http://checkstyle.sourceforge.net/config_imports.html)
 * Require explicit `override` whenever a method is being overwritten
 * Expressions spanning multiple lines should be enclosed in parentheses
-* Unused method argument warnings
 * Warn on unrestricted catch clauses (`case e => ...`)
 * Traversable#head, Traversable#last, Traversable#maxBy
 * Warn on shadowing variables, especially those of the same type

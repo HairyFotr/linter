@@ -48,9 +48,21 @@ class LinterPlugin(val global: Global) extends Plugin {
 
       override def traverse(tree: Tree) {
         tree match {
-          case DefDef(m: Modifiers, name, _, _, TypeTree(), _) => {
-            if ((m.flags & IMPLICIT) != 0)
-              unit.warning(tree.pos, "Implicit method %s needs explicit return type" format name)
+          case DefDef(m: Modifiers, name, _, valDefs, TypeTree(), block) => {
+            if((m.flags & IMPLICIT) != 0) unit.warning(tree.pos, "Implicit method %s needs explicit return type" format name)
+            
+            val vals = valDefs.flatten.map(_.name.toString).toBuffer
+            val used = collection.mutable.Buffer[String]()
+            //println(block)
+            
+            tree foreach { case i @ Ident(a) if vals contains i.name.toString => used += a.toString case _ => }
+            
+            val unused = vals -- used
+            unused.size match {
+              case 0 =>
+              case 1 => unit.warning(tree.pos, "Parameter %s is not used in method %s" format (unused.mkString(", "), name))
+              case _ => unit.warning(tree.pos, "Parameters (%s) are not used in method %s" format (unused.mkString(", "), name))
+            }
           }
           case _ => 
         }
