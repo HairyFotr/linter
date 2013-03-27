@@ -170,6 +170,10 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   def testCaseClassFloat() {
     check( """case class A(a: Float)""")
   }
+  @Test
+  def testClass() {
+    check( """class A(a: Float, b: String)""")
+  }
 
   @Test
   def testIfChecks() {
