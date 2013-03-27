@@ -90,12 +90,8 @@ class LinterPlugin(val global: Global) extends Plugin {
         SeqLikeClass.tpe.typeArgs.head.asSeenFrom(seenFrom, SeqLikeClass)
       }
 
-      def isSubtype(x: Tree, y: Tree): Boolean = {
-        x.tpe.widen <:< y.tpe.widen
-      }
-      def isSubtype(x: Tree, y: Type): Boolean = {
-        x.tpe.widen <:< y.widen
-      }
+      def isSubtype(x: Tree, y: Tree): Boolean = { x.tpe.widen <:< y.tpe.widen }
+      def isSubtype(x: Tree, y: Type): Boolean = { x.tpe.widen <:< y.widen }
 
       def methodImplements(method: Symbol, target: Symbol): Boolean = {
         method == target || method.allOverriddenSymbols.contains(target)
@@ -106,7 +102,8 @@ class LinterPlugin(val global: Global) extends Plugin {
       }
       
       override def traverse(tree: Tree): Unit = tree match {
-        case Select(fromFile, _) if fromFile.toString startsWith "scala.io.Source.fromFile" => //TODO: Too hacky :)
+        case Select(fromFile, _) if fromFile.toString startsWith "scala.io.Source.fromFile" =>
+        //TODO: Too hacky detection, also doesn't actually check if you close it - just that you don't use it as a oneliner
           val warnMsg = "You should close the file stream after use."
           unit.warning(fromFile.pos, warnMsg)
 
@@ -139,66 +136,79 @@ class LinterPlugin(val global: Global) extends Plugin {
           //TODO: Too much noise - limit in some way
           //unit.warning(tree.pos, "Using null is considered dangerous.")
 
-        case Match(Literal(Constant(a)), _) =>
-          unit.warning(tree.pos, "Pattern matching on a constant value "+a+".")
+        case Match(Literal(Constant(a)), cases) =>
+          //TODO: figure this, and similar if rules, for some types of val x = Literal(Constant(...)) declarations
+          
+          var returnVal = //try to detect what it'll return
+            cases 
+              .map { ca => (ca.pat, ca.body) } 
+              .find { case (Literal(Constant(c)), _) => c == a; case _ => false}
+              .map { _._2 } 
+              .orElse { if(cases.last.pat.toString == "_") Some(cases.last.body) else None } 
+              .map { s => " will always return " + s }
+              .getOrElse("")
+          
+          unit.warning(tree.pos, "Pattern matching on a constant value " + a + returnVal + ".")
 
         case Match(pat, cases) if pat.tpe.toString != "Any @unchecked" && cases.size >= 2 =>
-          //TODO: "Any @unchecked" seems to happen on the matching structures of actors - and they all return true :)
-          //TODO: This handles multiple rules already - clean it up.
-          case class EqCheck(streak: Int, tree: CaseDef)
-          def printStreak(s: EqCheck) {
-            if(s.streak == cases.size) {
-              //This one always turns out to be a false positive
-              //unit.warning(tree.pos, "All "+cases.size+" cases will return "+cases.head.body+", regardless of pattern value") 
-            } else if(s.streak > 1) {
-              unit.warning(s.tree.body.pos, s.streak+" neighbouring cases will return "+s.tree.body+", and should be merged.")   
-            }
-          }
-          
-          var curr = EqCheck(1, cases.head)
-          var last = cases.head
-          var someCase, noneCase, _Case, trueOrFalseCase = false
-          val (someCaseReg, noneCaseReg, _CaseReg, trueOrFalseReg) = ("Some[\\[].*[\\]]", "None[.]type", "Option[\\[].*[\\]]", "Boolean[(](true|false)[)]") //TODO: Hacky hack hack -_-, sorry
-          def checkRegs(caseTree: CaseDef) {
+          //"Any @unchecked" seems to happen on the matching structures of actors - and all cases return true :)
+
+          //Checking if matching on Option or Boolean
+          var optionCase, booleanCase = false
+          val (optionCaseReg, booleanCaseReg) = ("(Some[\\[].*[\\]]|None[.]type)", "Boolean[(](true|false)[)]") //TODO: Hacky hack hack -_-, sorry
+          def checkCase(caseTree: CaseDef) {
             val caseStr = caseTree.pat.toString
             val caseTypeStr = caseTree.pat.tpe.toString
             //println((caseStr, caseTypeStr))
-            someCase |= (caseTypeStr matches someCaseReg)
-            noneCase |= (caseTypeStr matches noneCaseReg)
-            _Case |= (caseTypeStr matches _CaseReg) // this one handles Option, not general _ 
-            trueOrFalseCase |= (caseTypeStr matches trueOrFalseReg)  
-          }
-          checkRegs(last)
-          for(c <- cases.tail) {
-            if(c.body equalsStructure last.body) {
-              curr = EqCheck(curr.streak+1, c)
-            } else {
-              printStreak(curr)
-              curr = EqCheck(1, c)
-            }
-            last = c
-            checkRegs(last)
-          }
 
-          printStreak(curr)
+            optionCase |= (caseTypeStr matches optionCaseReg)
+            booleanCase |= (caseTypeStr matches booleanCaseReg)  
+          }
+          def printCaseWarning() {
+            if(cases.size == 2) {
+              if(optionCase) {
+                unit.warning(tree.pos, "There are probably better ways of handling an Option. (see: http://blog.tmorris.net/posts/scalaoption-cheat-sheet/)")
+              } else if(booleanCase) {
+                unit.warning(tree.pos, "This is probably better written as an if statement.")
+              }
+            }
+          }
           
-          if(cases.size == 2) {
-            if ((someCase || _Case) && (noneCase || _Case) && (noneCase || someCase)) {
-              //This rule could be detected better from the type of the pat...
-              unit.warning(tree.pos, "There are probably better ways of handling an Option. (see: http://blog.tmorris.net/posts/scalaoption-cheat-sheet/)")
-            } else if (trueOrFalseCase) {
-              unit.warning(tree.pos, "This is probably better written as an if statement.")
+          //Checking for duplicate case bodies
+          case class Streak(streak: Int, tree: CaseDef)
+          var streak = Streak(0, cases.head)
+          def checkStreak(c: CaseDef) {
+            if(c.body equalsStructure streak.tree.body) {
+              streak = Streak(streak.streak + 1, c)
+            } else {
+              printStreakWarning()
+              streak = Streak(1, c)
+            }
+          }
+          def printStreakWarning() {
+            if(streak.streak == cases.size) {
+              //This one always turns out to be a false positive, I mean, noone is _that_ weird :)
+              //unit.warning(tree.pos, "All "+cases.size+" cases will return "+cases.head.body+", regardless of pattern value") 
+            } else if(streak.streak > 1) {
+              unit.warning(streak.tree.body.pos, streak.streak+" neighbouring cases will return "+streak.tree.body+", and should be merged.")
             }
           }
 
-        //TODO: Can I get the unprocessed condition string?
+          for(c <- cases) {
+            checkCase(c)
+            checkStreak(c)
+          }
+
+          printStreakWarning()
+          printCaseWarning()
+
         case If(cond, Literal(Constant(true)), Literal(Constant(false))) =>
+          //TODO: Can I get the unprocessed condition string?
           unit.warning(cond.pos, "Remove the if and just use the condition: "+cond)
         case If(cond, Literal(Constant(false)), Literal(Constant(true))) =>
           unit.warning(cond.pos, "Remove the if and just use the negated condition: !("+cond+")")
-        //case If(cond, Literal(Constant(a: Any)), Literal(Constant(b: Any))) if a == b =>
         case If(cond, a, b) if a equalsStructure b =>
-          unit.warning(cond.pos, "Result will be "+a+" regardless of condition.")
+          unit.warning(cond.pos, "Result will always be "+a+" regardless of condition.")
 
         case If(cond @ Literal(Constant(a: Boolean)), _, _) => 
           //TODO: try to figure out things like (false && a > 5 && ...) (btw, this works if a is a final val)

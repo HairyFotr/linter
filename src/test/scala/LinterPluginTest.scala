@@ -79,13 +79,13 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Before
   def forceCompilerInit() {
-    check( """1 + 1""", None)
+    check( """1 + 1""")
   }
 
   @Test
   def testFromFile() {
-    check( """scala.io.Source.fromFile("README.md")""", None)
     check( """scala.io.Source.fromFile("README.md").mkString""", Some("You should close the file stream after use.".r))
+    check( """scala.io.Source.fromFile("README.md")""")
   }
 
   @Test
@@ -95,9 +95,9 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     check( """val x = List(4); x.contains("foo")""", msg)
 
     // Set and Map have type-safe contains methods so we don't want to warn on
-    // those.
-    check( """val x = Set(4); x.contains(3)""", None)
-    check( """val x = Map(4 -> 5); x.contains(3)""", None)
+    // those. 
+    check( """val x = Set(4); x.contains(3)""")
+    check( """val x = Map(4 -> 5); x.contains(3)""")
   }
 
   @Test
@@ -166,16 +166,108 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   def testCaseClassNull() {
     check( """case class A()""")
   }
-
   @Test
   def testCaseClassFloat() {
     check( """case class A(a: Float)""")
   }
 
   @Test
-  def testUselessIf() {
-    check( """val a,b = 5; if(a == b && b > 5) true else false""", Some(".+Remove the if and just use the condition.+".r))
-    check( """val a,b = 5; if(a == b && b > 5) false else true""", Some(".+Remove the if and just use the negated condition.+".r))
+  def testIfChecks() {
+    val msg = Some("Remove the if ".r)
+    check( """
+      val a,b = 5
+      if(a == b && b > 5) 
+        true 
+      else 
+        false""", msg)
+        
+    check( """
+      val a,b = 5
+      if(a != b && b > 5)
+        false
+      else
+        true""", msg)
   }
+  @Test
+  def testIfChecks2() {
+    val msg = Some("""Result will always be""".r)
+    check( """
+      val a,b = 10
+      if(b > 4)
+        (1+1,a) 
+      else
+        (2,a)""", msg)
+        
+    check( """
+      val a,b = 4
+      if(b > 4)
+        (1+1,a) 
+      else if(b > 7)
+        (2,a)""")
+  }
+  @Test
+  def testIfChecks3() {
+    check( """if(1 > 5) 7 else 8""", Some("This condition will always be false.".r))
+    check( """if(1 < 5) 7 else 8""", Some("This condition will always be true.".r))
+  }
+
+  @Test
+  def testCaseChecks() {
+    val msg = Some("""[0-9]+ neighbouring cases will return .+ and should be merged.""".r)
+    check( """
+      val a = 7
+      a match { 
+        case 3 => println("hello") 
+        case 4 => println("hello") 
+        case 5 => println("hello") 
+        case _ => println("how low") 
+      }""", msg)
+    
+    check( """
+      val a = 7;
+      a match { 
+        case 3 => println("hello1")
+        case 4 => println("hello2")
+        case 5 => println("hello3")
+        case _ => println("how low")
+      }""")
+  }
+  @Test
+  def testCaseChecks2() {
+    check( """
+      5 match {
+        case 3 => "hello"
+        case _ => "hi"
+      }""", Some("""Pattern matching on a constant value""".r))
+    
+    //Negative case now, but could be positive in the future
+    //check( """val a = 5; a match { case 3 => "hello"; case _ => "hi" }""", Some("""Pattern matching on a constant value""").r)
+    
+    check( """
+      var a = 5
+      a match {
+        case 3 => "hello";
+        case _ => "hi"
+      }""")
+  }
+  @Test
+  def testCaseChecks3() {
+    check( """
+      val a = Option("")
+      a match {
+        case Some(x) => x
+        case _ => null
+      }""", Some("""There are probably better ways of handling an Option""".r))
+  }
+  @Test
+  def testCaseChecks4() {
+    check( """
+      val a = true;
+      a match {
+        case true => 0
+        case false => 1
+      }""", Some("""This is probably better written as an if statement.""".r))
+  }
+
 
 }
