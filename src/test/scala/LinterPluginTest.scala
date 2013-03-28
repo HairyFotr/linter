@@ -284,7 +284,14 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def implicitRetType() {
-    check( """implicit def int2string(a:Int) = a.toString""", Some("""needs explicit return type""".r))
+    check( """
+      import scala.language.implicitConversions
+      implicit def int2string(a: Int) = a.toString
+    """, Some("""needs explicit return type""".r))
+    check( """
+      import scala.language.implicitConversions
+      implicit def int2string(a: Int): String = a.toString
+    """)
   }
 
   @Test
@@ -294,5 +301,26 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     check( """def func(a:Int) = a""")
   }
 
+  @Test
+  def duplicatedStringLiterals() {
+    check( """
+      val a = "hh"
+      val b = "hh"
+      val c = "hh"
+      val d = "hh"
+      val e = "hh"
+    """, Some("""String literal""".r))
+
+    //TODO: can't reproduce right now, but parts of a string interpolation get flagged by mistake
+    check( """
+      val a = "hh"
+      val b = "${a}hh"
+      val c = " ${a}hh"
+      val d = "  ${a}hh"
+      val e = "  ${a}hh"
+    """)
+
+  }
+  
 
 }

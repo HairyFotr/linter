@@ -58,7 +58,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 
                 //println(mods)
                 
-                unused.size match {
+                unused.size match { //TODO: scalaz is a good codebase for finding interesting false positives
                   case 0 =>
                   case 1 => unit.warning(tree.pos, "Parameter %s is not used in method %s" format (unused.mkString(", "), name))
                   case _ => unit.warning(tree.pos, "Parameters (%s) are not used in method %s" format (unused.mkString(", "), name))
@@ -66,7 +66,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               }
             }
 
-            //if(mods.hasFlag(IMPLICIT) && typeTree.isEmpty) unit.warning(tree.pos, "Implicit method %s needs explicit return type" format name)
+            if(mods.hasFlag(IMPLICIT) && typeTree.isEmpty) unit.warning(tree.pos, "Implicit method %s needs explicit return type" format name)
           case _ => 
         }
         super.traverse(tree)
@@ -92,6 +92,9 @@ class LinterPlugin(val global: Global) extends Plugin {
 
     class LinterTraverser(unit: CompilationUnit) extends Traverser {
       import definitions.{AnyClass, ObjectClass, Object_==, OptionClass, SeqClass}
+      
+      val stringLiteralCount = collection.mutable.HashMap[String, Int]().withDefaultValue(0)
+      val stringLiteralExceptions = Set("", " ")
 
       val JavaConversionsModule: Symbol = definitions.getModule(newTermName("scala.collection.JavaConversions"))
       val SeqLikeClass: Symbol = definitions.getClass(newTermName("scala.collection.SeqLike"))
@@ -151,7 +154,15 @@ class LinterPlugin(val global: Global) extends Plugin {
         case Literal(Constant(null)) =>
           //TODO: Too much noise - limit in some way
           //unit.warning(tree.pos, "Using null is considered dangerous.")
+        case Literal(Constant(str: String)) =>
+          //TODO: String interpolation gets broken down into parts and causes false positives
+          val threshold = 4
 
+          stringLiteralCount(str) += 1
+          if(stringLiteralCount(str) == threshold && !(stringLiteralExceptions.contains(str))) {
+            unit.warning(tree.pos, """String literal """"+str+"""" appears multiple times.""")
+          }
+          
         case Match(Literal(Constant(a)), cases) =>
           //TODO: figure this, and similar if rules, for some types of val x = Literal(Constant(...)) declarations
           
