@@ -145,6 +145,12 @@ class LinterPlugin(val global: Global) extends Plugin {
           val warnMsg = "%s.contains(%s) will probably return false."
           unit.warning(contains.pos, warnMsg.format(seq.tpe.widen, target.tpe.widen))
 
+        //case Select(iasInstanceOf, b) if iasInstanceOf.toString matches ".*[ia]sInstanceOf[\\[].*[\\]].*" =>
+        case Apply(iasInstanceOf, b) if iasInstanceOf.toString matches ".*[ia]sInstanceOf[\\[].*[\\]].*" =>
+          //TODO: too hacky, also only works if there's further chaining :/
+          //TODO: maybe detect useless casts? (types already match)
+          unit.warning(tree.pos, "Avoid using isInstanceOf/asInstanceOf methods.")
+
         case get @ Select(_, nme.get) if methodImplements(get.symbol, OptionGet) => 
           unit.warning(tree.pos, "Calling .get on Option will throw an exception if the Option is None.")
           //TODO: if(x.isDefined) func(x.get) / if(x.isEmpty) ... else func(x.get) are false positives

@@ -73,6 +73,12 @@ Optionally, run `sbt console` in this project to see it in action.
                   Option(1).get
                             ^
                             
+### Repeated string literal
+    scala> val e = List("hh","hh","hh","hh","hh","hh")
+    <console>:7: warning: String literal "hh" appears multiple times.
+           val e = List("hh","hh","hh","hh","hh","hh")
+                                       ^
+
 ### Literal division by zero
     scala> 100 / (1+1 - 2)
     <console>:8: warning: Literal division by zero.
