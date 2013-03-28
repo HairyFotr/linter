@@ -44,28 +44,29 @@ class LinterPlugin(val global: Global) extends Plugin {
     }
 
     class PreTyperTraverser(unit: CompilationUnit) extends Traverser {
-      import scala.tools.nsc.symtab.Flags.IMPLICIT
+      import scala.tools.nsc.symtab.Flags.{IMPLICIT, OVERRIDE}
 
       override def traverse(tree: Tree) {
         tree match {
-          case DefDef(m: Modifiers, name, _, valDefs, TypeTree(), block) => {
-            if((m.flags & IMPLICIT) != 0) unit.warning(tree.pos, "Implicit method %s needs explicit return type" format name)
-            
-            if(name.toString != "<init>") {
-              val vals = valDefs.flatten.map(_.name.toString).toBuffer
-              val used = collection.mutable.Buffer[String]()
-              //println(block)
-              
-              tree foreach { case i @ Ident(a) if vals contains i.name.toString => used += a.toString case _ => }
-              
-              val unused = vals -- used
-              unused.size match {
-                case 0 =>
-                case 1 => unit.warning(tree.pos, "Parameter %s is not used in method %s" format (unused.mkString(", "), name))
-                case _ => unit.warning(tree.pos, "Parameters (%s) are not used in method %s" format (unused.mkString(", "), name))
+          case DefDef(mods: Modifiers, name, _, valDefs, typeTree, block) =>
+            if(name.toString != "<init>" && !block.isEmpty && !mods.hasFlag(OVERRIDE)) {
+              //Get the vals, except the implicit ones
+              val vals = valDefs.flatMap(_.filterNot(_.mods.hasFlag(IMPLICIT))).map(_.name.toString).toBuffer
+              if(!(name.toString == "main" && vals.size == 1 && vals.head == "args")) { // filter main method
+                val used = for(Ident(name) <- tree if vals contains name.toString) yield name.toString
+                val unused = vals -- used
+                
+                //println(mods)
+                
+                unused.size match {
+                  case 0 =>
+                  case 1 => unit.warning(tree.pos, "Parameter %s is not used in method %s" format (unused.mkString(", "), name))
+                  case _ => unit.warning(tree.pos, "Parameters (%s) are not used in method %s" format (unused.mkString(", "), name))
+                }
               }
             }
-          }
+
+            //if(mods.hasFlag(IMPLICIT) && typeTree.isEmpty) unit.warning(tree.pos, "Implicit method %s needs explicit return type" format name)
           case _ => 
         }
         super.traverse(tree)
@@ -143,6 +144,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
         case get @ Select(_, nme.get) if methodImplements(get.symbol, OptionGet) => 
           unit.warning(tree.pos, "Calling .get on Option will throw an exception if the Option is None.")
+          //TODO: if(x.isDefined) func(x.get) / if(x.isEmpty) ... else func(x.get) are false positives
 
         case If(Apply(Select(_, nme.EQ), List(Literal(Constant(null)))), Literal(Constant(false)), Literal(Constant(true))) =>
           // Removes both the null warning and if check for """case class A()""" ... (x$0.==(null) - see unapply AST of such case class)
@@ -165,7 +167,8 @@ class LinterPlugin(val global: Global) extends Plugin {
           unit.warning(tree.pos, "Pattern matching on a constant value " + a + returnVal + ".")
 
         case Match(pat, cases) if pat.tpe.toString != "Any @unchecked" && cases.size >= 2 =>
-          //"Any @unchecked" seems to happen on the matching structures of actors - and all cases return true :)
+          //"Any @unchecked" seems to happen on the matching structures of actors - and all cases return true
+          //TODO: there seems to be more of this - see failing test for Futures in testCaseChecks
 
           //Checking if matching on Option or Boolean
           var optionCase, booleanCase = false
@@ -201,7 +204,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           }
           def printStreakWarning() {
             if(streak.streak == cases.size) {
-              //This one always turns out to be a false positive, I mean, noone is _that_ weird :)
+              //This one always turns out to be a false positive
               //unit.warning(tree.pos, "All "+cases.size+" cases will return "+cases.head.body+", regardless of pattern value") 
             } else if(streak.streak > 1) {
               unit.warning(streak.tree.body.pos, streak.streak+" neighbouring cases will return "+streak.tree.body+", and should be merged.")
@@ -226,6 +229,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
         case If(cond @ Literal(Constant(a: Boolean)), _, _) => 
           //TODO: try to figure out things like (false && a > 5 && ...) (btw, this works if a is a final val)
+          //TODO: there are people still doing breakable { while
           val warnMsg = "This condition will always be "+a+"."
           unit.warning(cond.pos, warnMsg)
 

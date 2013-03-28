@@ -235,6 +235,14 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
         case 5 => println("hello3")
         case _ => println("how low")
       }""")
+
+    check( """
+      import scala.concurrent._
+      import ExecutionContext.Implicits.global
+      import scala.util.{Failure,Success}
+      future { 1+1 } andThen { case Success(a) => println("win") case Failure(s) => println("fail") }
+    """)
+
   }
   @Test
   def testCaseChecks2() {
@@ -271,6 +279,19 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
         case true => 0
         case false => 1
       }""", Some("""This is probably better written as an if statement.""".r))
+  }
+
+
+  @Test
+  def implicitRetType() {
+    check( """implicit def int2string(a:Int) = a.toString""", Some("""needs explicit return type""".r))
+  }
+
+  @Test
+  def redundantParameters() {
+    check( """def func(a:Int, b:Int) = a""", Some("""not used in method""".r))
+    check( """def func(a:Int)(implicit b:Int) = a""")
+    check( """def func(a:Int) = a""")
   }
 
 
