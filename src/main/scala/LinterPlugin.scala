@@ -18,13 +18,14 @@ package com.foursquare.lint
 
 import scala.tools.nsc.{Global, Phase}
 import scala.tools.nsc.plugins.{Plugin, PluginComponent}
+import scala.tools.nsc.symtab.Flags.{IMPLICIT, OVERRIDE, MUTABLE, CASE}
 
 class LinterPlugin(val global: Global) extends Plugin {
   import global._
 
   val name = "linter"
   val description = ""
-  val components = List[PluginComponent](PreTyperComponent, LinterComponent)
+  val components = List[PluginComponent](PreTyperComponent, LinterComponent, AfterLinterComponent)
   
   override val optionsHelp: Option[String] = Some("  -P:linter No options yet, just letting you know I'm here")
 
@@ -44,10 +45,20 @@ class LinterPlugin(val global: Global) extends Plugin {
     }
 
     class PreTyperTraverser(unit: CompilationUnit) extends Traverser {
-      import scala.tools.nsc.symtab.Flags.{IMPLICIT, OVERRIDE}
-
       override def traverse(tree: Tree) {
         tree match {
+          //The fact that I don't track the whole chain means false negatives.
+          case ValDef(m: Modifiers, varName, TypeTree(), value) if(m.hasFlag(MUTABLE)) =>
+            varDecls += varName.toString.trim
+            //println("vardecl |"+varName.toString.trim+"|")
+          case Apply(Select(a, assign), _) if varDecls.contains(assign.toString.dropRight(4)) => 
+            val varName = assign.toString.dropRight(4)
+            varAssigns += varName.toString
+            //println("varassign |"+varName+"|")
+          case Assign(Ident(varName), _) =>
+            varAssigns += varName.toString
+            //println("varassign2 |"+varName+"|")
+            
           case DefDef(mods: Modifiers, name, _, valDefs, typeTree, block) =>
             if(name.toString != "<init>" && !block.isEmpty && !mods.hasFlag(OVERRIDE)) {
               //Get the vals, except the implicit ones
@@ -75,6 +86,9 @@ class LinterPlugin(val global: Global) extends Plugin {
   }
 
 
+  //used for simple var -> val cases
+  val varDecls,varAssigns = collection.mutable.HashSet[String]() //TermName actually...
+
   private object LinterComponent extends PluginComponent {
     import global._
 
@@ -100,6 +114,10 @@ class LinterPlugin(val global: Global) extends Plugin {
       val SeqLikeClass: Symbol = definitions.getClass(newTermName("scala.collection.SeqLike"))
       val SeqLikeContains: Symbol = SeqLikeClass.info.member(newTermName("contains"))
       val OptionGet: Symbol = OptionClass.info.member(nme.get)
+      
+      val IsInstanceOf = AnyClass.info.member(nme.isInstanceOf_)
+      val AsInstanceOf = AnyClass.info.member(nme.asInstanceOf_)
+      val ToString: Symbol = AnyClass.info.member(nme.toString_)
 
       val DoubleClass: Symbol = definitions.getClass(newTermName("scala.Double"))
       val FloatClass: Symbol = definitions.getClass(newTermName("scala.Float"))
@@ -120,6 +138,19 @@ class LinterPlugin(val global: Global) extends Plugin {
       }
       
       override def traverse(tree: Tree): Unit = tree match {
+        case ValDef(m: Modifiers, varName, TypeTree(), value) if(m.hasFlag(MUTABLE)) =>
+          varDecls += varName.toString.trim
+          //println("vardecl |"+varName.toString.trim+"|")
+        case Apply(Select(a, assign), _) if varDecls.contains(assign.toString.dropRight(4)) => 
+          val varName = assign.toString.dropRight(4)
+          varAssigns += varName.toString
+          //println("varassign |"+varName+"|")
+        case Assign(Ident(varName), _) =>
+          varAssigns += varName.toString
+          //println("varassign2 |"+varName+"|")
+
+        case ClassDef(m: Modifiers, className, _, _) if m.hasFlag(CASE) => // case classes cause false positives...
+
         case Select(fromFile, _) if fromFile.toString startsWith "scala.io.Source.fromFile" =>
         //TODO: Too hacky detection, also doesn't actually check if you close it - just that you don't use it as a oneliner
           val warnMsg = "You should close the file stream after use."
@@ -138,25 +169,25 @@ class LinterPlugin(val global: Global) extends Plugin {
           unit.warning(pkg.pos, "Conversions in scala.collection.JavaConversions._ are dangerous.")
         
         case Import(pkg, selectors) if selectors.exists(isGlobalImport) =>
-          //TODO: Too much noise - maybe if would be useful if told us non-IDE users which classes we're using
+          //TODO: Too much noise - maybe it would be useful to non-IDE if it printed a nice selector import replacement
           //unit.warning(pkg.pos, "Wildcard imports should be avoided. Favor import selector clauses.")
 
         case Apply(contains @ Select(seq, _), List(target)) if methodImplements(contains.symbol, SeqLikeContains) && !(target.tpe <:< SeqMemberType(seq.tpe)) =>
           val warnMsg = "%s.contains(%s) will probably return false."
           unit.warning(contains.pos, warnMsg.format(seq.tpe.widen, target.tpe.widen))
 
-        //case Select(iasInstanceOf, b) if iasInstanceOf.toString matches ".*[ia]sInstanceOf[\\[].*[\\]].*" =>
-        case Apply(iasInstanceOf, b) if iasInstanceOf.toString matches ".*[ia]sInstanceOf[\\[].*[\\]].*" =>
-          //TODO: too hacky, also only works if there's further chaining :/
-          //TODO: maybe detect useless casts? (types already match)
-          unit.warning(tree.pos, "Avoid using isInstanceOf/asInstanceOf methods.")
+        //TODO: false positives in case class A(), and in the interpreter init
+        //case aa @ Apply(a, List(b @ Apply(s @ Select(instanceOf,dd),ee))) if methodImplements(instanceOf.symbol, AsInstanceOf) =>
+        //  println((aa,instanceOf))
+        case instanceOf @ Select(a, func) if methodImplements(instanceOf.symbol, AsInstanceOf) =>   
+          unit.warning(tree.pos, "Avoid using asInstanceOf[T] (use pattern matching, type ascription, etc).")
 
         case get @ Select(_, nme.get) if methodImplements(get.symbol, OptionGet) => 
-          unit.warning(tree.pos, "Calling .get on Option will throw an exception if the Option is None.")
-          //TODO: if(x.isDefined) func(x.get) / if(x.isEmpty) ... else func(x.get) are false positives
+          //TODO: if(x.isDefined) func(x.get) / if(x.isEmpty) ... else func(x.get), etc. are false positives
+          //unit.warning(tree.pos, "Calling .get on Option will throw an exception if the Option is None.")
 
         case If(Apply(Select(_, nme.EQ), List(Literal(Constant(null)))), Literal(Constant(false)), Literal(Constant(true))) =>
-          // Removes both the null warning and if check for """case class A()""" ... (x$0.==(null) - see unapply AST of such case class)
+          // Fixes both the null warning and if check for """case class A()""" ... (x$0.==(null) - see unapply AST of such case class)
         case Literal(Constant(null)) =>
           //TODO: Too much noise - limit in some way
           //unit.warning(tree.pos, "Using null is considered dangerous.")
@@ -266,6 +297,30 @@ class LinterPlugin(val global: Global) extends Plugin {
 
         case _ =>
           super.traverse(tree)
+      }
+    }
+  }
+  
+  private object AfterLinterComponent extends PluginComponent {
+    import global._
+
+    val global = LinterPlugin.this.global
+
+    override val runsAfter = List("linter-typed")
+
+    val phaseName = "linter-typed-after"
+
+    override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
+      override def apply(unit: global.CompilationUnit) {
+        new AfterLinterTraverser(unit).traverse(unit.body)
+      }
+    }
+
+    class AfterLinterTraverser(unit: CompilationUnit) extends Traverser {
+      override def traverse(tree: Tree) {
+        val maybeVals = (varDecls -- varAssigns)
+        if(!maybeVals.isEmpty) unit.warning(tree.pos, "These vars might secretly be vals: grep -rnP --include=*.scala 'var ("+maybeVals.mkString("|")+")'")
+        varDecls.clear
       }
     }
   }

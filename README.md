@@ -73,6 +73,12 @@ Optionally, run `sbt console` in this project to see it in action.
                   Option(1).get
                             ^
                             
+### Using `x.asInstanceOf[T]`
+    scala> val x = "a".asInstanceOf[CharSequence]
+    <console>:7: warning: Avoid using asInstanceOf[T] (use pattern matching, type ascription, etc).
+           val x = "a".asInstanceOf[CharSequence]
+                       ^
+
 ### Repeated string literal
     scala> val e = List("hh","hh","hh","hh","hh","hh")
     <console>:7: warning: String literal "hh" appears multiple times.
@@ -138,3 +144,5 @@ Feel free to implement these, or add your own ideas. Pull requests welcome!
 * Warn on shadowing variables, especially those of the same type
 * Warn on inexhaustive pattern matching
 * Boolean function parameters should be named (`func("arg1", force = true)`)
+* Detect vars, that could easily be vals (no assignments)
+

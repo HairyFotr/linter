@@ -256,7 +256,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     //check( """val a = 5; a match { case 3 => "hello"; case _ => "hi" }""", Some("""Pattern matching on a constant value""").r)
     
     check( """
-      var a = 5
+      val a = 5
       a match {
         case 3 => "hello";
         case _ => "hi"
@@ -311,16 +311,28 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       val e = "hh"
     """, Some("""String literal""".r))
 
-    //TODO: can't reproduce right now, but parts of a string interpolation get flagged by mistake
-    check( """
+    //can't really decide if this is a bug or a feature
+    /*check( """
       val a = "hh"
-      val b = "${a}hh"
-      val c = " ${a}hh"
-      val d = "  ${a}hh"
-      val e = "  ${a}hh"
-    """)
-
+      val b = s"${a}hh"
+      val c = s" ${a}hh"
+      val d = s"  ${a}hh"
+      val e = s"  ${a}hh"
+    """)*/
   }
+  
+  @Test
+  def AsInstanceOf() {
+    check( """
+      val a = "aa"
+      a.replace(a.asInstanceOf[CharSequence], "bb".asInstanceOf[CharSequence])
+    """, Some("""Avoid using asInstanceOf""".r))
+    
+   check( """
+      val a = "aa"
+      a.replace(a: CharSequence, "bb": CharSequence)
+    """)
+   }
   
 
 }
