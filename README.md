@@ -130,6 +130,7 @@ Optionally, run `sbt console` in this project to see it in action.
 * Add more tests, report false positives
 * Pick and choose which warnings you want
 * Choose whether they should be warnings or errors
+* Improve testing by adding larger samples
 
 ### Ideas for new warnings
 
@@ -145,4 +146,4 @@ Feel free to implement these, or add your own ideas. Pull requests welcome!
 * Warn on inexhaustive pattern matching
 * Boolean function parameters should be named (`func("arg1", force = true)`)
 * Detect vars, that could easily be vals (no assignments)
-
+* Warn about using log(1+x),exp(x)-1 instead of log1p(x),expm(x)

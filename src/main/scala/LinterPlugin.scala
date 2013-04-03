@@ -61,13 +61,11 @@ class LinterPlugin(val global: Global) extends Plugin {
             
           case DefDef(mods: Modifiers, name, _, valDefs, typeTree, block) =>
             if(name.toString != "<init>" && !block.isEmpty && !mods.hasFlag(OVERRIDE)) {
-              //Get the vals, except the implicit ones
-              val vals = valDefs.flatMap(_.filterNot(_.mods.hasFlag(IMPLICIT))).map(_.name.toString).toBuffer
-              if(!(name.toString == "main" && vals.size == 1 && vals.head == "args")) { // filter main method
-                val used = for(Ident(name) <- tree if vals contains name.toString) yield name.toString
-                val unused = vals -- used
-                
-                //println(mods)
+              //Get the parameters, except the implicit ones
+              val params = valDefs.flatMap(_.filterNot(_.mods.hasFlag(IMPLICIT))).map(_.name.toString).toBuffer
+              if(!(name.toString == "main" && params.size == 1 && params.head == "args")) { // filter main method
+                val used = for(Ident(name) <- tree if params contains name.toString) yield name.toString
+                val unused = params -- used
                 
                 unused.size match { //TODO: scalaz is a good codebase for finding interesting false positives
                   case 0 =>
@@ -108,7 +106,9 @@ class LinterPlugin(val global: Global) extends Plugin {
       import definitions.{AnyClass, ObjectClass, Object_==, OptionClass, SeqClass}
       
       val stringLiteralCount = collection.mutable.HashMap[String, Int]().withDefaultValue(0)
-      val stringLiteralExceptions = Set("", " ")
+      //some common ones, and some play framework hacks
+      val stringLiteralExceptions = """(\s*|GET|POST|[/]|[.])"""
+      val stringLiteralFileExceptions = Set("routes_routing.scala", "routes_reverseRouting.scala")
 
       val JavaConversionsModule: Symbol = definitions.getModule(newTermName("scala.collection.JavaConversions"))
       val SeqLikeClass: Symbol = definitions.getClass(newTermName("scala.collection.SeqLike"))
@@ -196,7 +196,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           val threshold = 4
 
           stringLiteralCount(str) += 1
-          if(stringLiteralCount(str) == threshold && !(stringLiteralExceptions.contains(str))) {
+          if(stringLiteralCount(str) == threshold && !(stringLiteralFileExceptions.contains(unit.source.toString)) && !(str.matches(stringLiteralExceptions))) {
             unit.warning(tree.pos, """String literal """"+str+"""" appears multiple times.""")
           }
           
