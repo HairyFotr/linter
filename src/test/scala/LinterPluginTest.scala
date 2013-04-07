@@ -194,7 +194,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
   @Test
   def testIfChecks2() {
-    val msg = Some("""Result will always be""".r)
+    val msg = Some("""Both if statement branches have the same structure""".r)
     check( """
       val a,b = 10
       if(b > 4)
@@ -217,7 +217,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def testCaseChecks() {
-    val msg = Some("""[0-9]+ neighbouring cases will return .+ and should be merged.""".r)
+    val msg = Some("""neighbouring cases are identical""".r)
     check( """
       val a = 7
       a match { 
@@ -333,6 +333,21 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       a.replace(a: CharSequence, "bb": CharSequence)
     """)
    }
+
+  @Test
+  def log1p() {
+    val msg = Some("""Use math.log1p instead of math.log""".r)
+
+    check( """
+      val a = 4d
+      math.log(1 + a)
+    """, msg)
+
+    check( """
+      val a = 4d
+      math.log(1d + a)
+    """, msg)
+  }
   
 
 }

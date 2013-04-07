@@ -107,7 +107,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       
       val stringLiteralCount = collection.mutable.HashMap[String, Int]().withDefaultValue(0)
       //some common ones, and some play framework hacks
-      val stringLiteralExceptions = """(\s*|GET|POST|[/]|[.])"""
+      val stringLiteralExceptions = """(\s*|GET|POST|[/.{}()])"""
       val stringLiteralFileExceptions = Set("routes_routing.scala", "routes_reverseRouting.scala")
 
       val JavaConversionsModule: Symbol = definitions.getModule(newTermName("scala.collection.JavaConversions"))
@@ -157,9 +157,12 @@ class LinterPlugin(val global: Global) extends Plugin {
           unit.warning(fromFile.pos, warnMsg)
 
         case Apply(Select(lhs, nme.EQ), List(rhs)) if isSubtype(lhs, DoubleClass.tpe) || isSubtype(lhs, FloatClass.tpe) || isSubtype(rhs, DoubleClass.tpe) || isSubtype(rhs, FloatClass.tpe) =>
-          //TODO: Fix false positive for """case class A(a: Float)"""
           //val warnMsg = "Exact comparison of floating point values is potentially unsafe."
           //unit.warning(tree.pos, warnMsg)
+        case Apply(Select(packageName, log), List(Apply(Select(Literal(const), plus), _)))
+          if packageName.toString == "scala.math.`package`" && log.toString == "log" && plus.toString == "$plus" && (const == Constant(1.0) || const == Constant(1)) => 
+
+          unit.warning(tree.pos, "Use math.log1p instead of math.log for added accuracy.")
           
         case Apply(eqeq @ Select(lhs, nme.EQ), List(rhs)) if methodImplements(eqeq.symbol, Object_==) && !isSubtype(lhs, rhs) && !isSubtype(rhs, lhs) =>
           val warnMsg = "Comparing with == on instances of different types (%s, %s) will probably return false."
@@ -180,7 +183,8 @@ class LinterPlugin(val global: Global) extends Plugin {
         //case aa @ Apply(a, List(b @ Apply(s @ Select(instanceOf,dd),ee))) if methodImplements(instanceOf.symbol, AsInstanceOf) =>
         //  println((aa,instanceOf))
         case instanceOf @ Select(a, func) if methodImplements(instanceOf.symbol, AsInstanceOf) =>   
-          unit.warning(tree.pos, "Avoid using asInstanceOf[T] (use pattern matching, type ascription, etc).")
+          //TODO: too much noise, maybe detect when it's completely unnecessary
+          //unit.warning(tree.pos, "Avoid using asInstanceOf[T] (use pattern matching, type ascription, etc).")
 
         case get @ Select(_, nme.get) if methodImplements(get.symbol, OptionGet) => 
           //TODO: if(x.isDefined) func(x.get) / if(x.isEmpty) ... else func(x.get), etc. are false positives
@@ -188,15 +192,18 @@ class LinterPlugin(val global: Global) extends Plugin {
 
         case If(Apply(Select(_, nme.EQ), List(Literal(Constant(null)))), Literal(Constant(false)), Literal(Constant(true))) =>
           // Fixes both the null warning and if check for """case class A()""" ... (x$0.==(null) - see unapply AST of such case class)
+
         case Literal(Constant(null)) =>
           //TODO: Too much noise - limit in some way
           //unit.warning(tree.pos, "Using null is considered dangerous.")
         case Literal(Constant(str: String)) =>
           //TODO: String interpolation gets broken down into parts and causes false positives
+          //TODO: some quick benchmark showed string literals are actually more optimized than almost anything else, even final vals
           val threshold = 4
 
           stringLiteralCount(str) += 1
           if(stringLiteralCount(str) == threshold && !(stringLiteralFileExceptions.contains(unit.source.toString)) && !(str.matches(stringLiteralExceptions))) {
+            //unit.warning(tree.pos, unit.source.path.toString)
             unit.warning(tree.pos, """String literal """"+str+"""" appears multiple times.""")
           }
           
@@ -232,7 +239,8 @@ class LinterPlugin(val global: Global) extends Plugin {
           def printCaseWarning() {
             if(cases.size == 2) {
               if(optionCase) {
-                unit.warning(tree.pos, "There are probably better ways of handling an Option. (see: http://blog.tmorris.net/posts/scalaoption-cheat-sheet/)")
+                //TODO: too much noise, and some cases are perfectly fine - try detecting all the exact cases from link
+                //unit.warning(tree.pos, "There are probably better ways of handling an Option. (see: http://blog.tmorris.net/posts/scalaoption-cheat-sheet/)")
               } else if(booleanCase) {
                 unit.warning(tree.pos, "This is probably better written as an if statement.")
               }
@@ -255,7 +263,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               //This one always turns out to be a false positive
               //unit.warning(tree.pos, "All "+cases.size+" cases will return "+cases.head.body+", regardless of pattern value") 
             } else if(streak.streak > 1) {
-              unit.warning(streak.tree.body.pos, streak.streak+" neighbouring cases will return "+streak.tree.body+", and should be merged.")
+              unit.warning(streak.tree.body.pos, streak.streak+" neighbouring cases are identical, and could be merged.")
             }
           }
 
@@ -269,17 +277,23 @@ class LinterPlugin(val global: Global) extends Plugin {
 
         case If(cond, Literal(Constant(true)), Literal(Constant(false))) =>
           //TODO: Can I get the unprocessed condition string?
-          unit.warning(cond.pos, "Remove the if and just use the condition: "+cond)
+          unit.warning(cond.pos, "Remove the if and just use the condition.")
         case If(cond, Literal(Constant(false)), Literal(Constant(true))) =>
-          unit.warning(cond.pos, "Remove the if and just use the negated condition: !("+cond+")")
+          unit.warning(cond.pos, "Remove the if and just use the negated condition.")
         case If(cond, a, b) if a equalsStructure b =>
-          unit.warning(cond.pos, "Result will always be "+a+" regardless of condition.")
+          unit.warning(cond.pos, "Both if statement branches have the same structure.")
 
         case If(cond @ Literal(Constant(a: Boolean)), _, _) => 
           //TODO: try to figure out things like (false && a > 5 && ...) (btw, this works if a is a final val)
           //TODO: there are people still doing breakable { while
           val warnMsg = "This condition will always be "+a+"."
           unit.warning(cond.pos, warnMsg)
+        case Apply(Select(Literal(Constant(false)), term), _) if term.toString == "$amp$amp" =>
+          val warnMsg = "This part of boolean statement will always be false."
+          unit.warning(tree.pos, warnMsg)
+        case Apply(Select(Literal(Constant(true)), term), _) if term.toString == "$bar$bar" =>
+          val warnMsg = "This part of boolean statement will always be true."
+          unit.warning(tree.pos, warnMsg)
 
         // cannot check double/float, as typer will automatically translate it to Infinity
         case divByZero @ Apply(Select(rcvr, nme.DIV), List(Literal(Constant(0))))

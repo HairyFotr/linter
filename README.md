@@ -9,7 +9,7 @@ It's a work in progress. For an overview of writing compiler plugins, see http:/
 
 Add it as a compiler plugin in your project by editing your build.sbt file:
 
-    resolvers += "linter" at "http://hairyfotr.github.com/linteRepo/releases"
+    resolvers += "linter" at "http://hairyfotr.github.io/linteRepo/releases"
 
     addCompilerPlugin("com.foursquare.lint" %% "linter" % "0.1-SNAPSHOT")
 
@@ -90,6 +90,13 @@ Optionally, run `sbt console` in this project to see it in action.
     <console>:8: warning: Literal division by zero.
                   100 / (1+1 - 2)
                       ^
+                      
+### Using `log(1 + a)` instead of `log1p(1 + a)`
+scala> val a = 4d; math.log(1 + a)
+<console>:10: warning: Use math.log1p instead of math.log for added accuracy.
+        math.log(1 + a)
+                ^
+
 ### Pattern matching checks
     scala> a match { case 3 => println("hello") case 4 => println("hello") case 5 => println("hello") case _ => println("how low") }
     <console>:10: warning: 3 neighbouring cases will return scala.this.Predef.println("hello"), and should be merged.
