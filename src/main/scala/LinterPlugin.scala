@@ -289,10 +289,10 @@ class LinterPlugin(val global: Global) extends Plugin {
           val warnMsg = "This condition will always be "+a+"."
           unit.warning(cond.pos, warnMsg)
         case Apply(Select(Literal(Constant(false)), term), _) if term.toString == "$amp$amp" =>
-          val warnMsg = "This part of boolean statement will always be false."
+          val warnMsg = "This part of boolean expression will always be false."
           unit.warning(tree.pos, warnMsg)
         case Apply(Select(Literal(Constant(true)), term), _) if term.toString == "$bar$bar" =>
-          val warnMsg = "This part of boolean statement will always be true."
+          val warnMsg = "This part of boolean expression will always be true."
           unit.warning(tree.pos, warnMsg)
 
         // cannot check double/float, as typer will automatically translate it to Infinity

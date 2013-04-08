@@ -92,10 +92,10 @@ Optionally, run `sbt console` in this project to see it in action.
                       ^
                       
 ### Using `log(1 + a)` instead of `log1p(1 + a)`
-scala> val a = 4d; math.log(1 + a)
-<console>:10: warning: Use math.log1p instead of math.log for added accuracy.
-        math.log(1 + a)
-                ^
+    scala> val a = 4d; math.log(1 + a)
+    <console>:10: warning: Use math.log1p instead of math.log for added accuracy.
+            math.log(1 + a)
+                    ^
 
 ### Pattern matching checks
     scala> a match { case 3 => println("hello") case 4 => println("hello") case 5 => println("hello") case _ => println("how low") }
