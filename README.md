@@ -91,7 +91,7 @@ Optionally, run `sbt console` in this project to see it in action.
                   100 / (1+1 - 2)
                       ^
                       
-### Using `log(1 + a)` instead of `log1p(1 + a)`
+### Using `log(1 + a)` instead of `log1p(a)`
     scala> val a = 4d; math.log(1 + a)
     <console>:10: warning: Use math.log1p instead of math.log for added accuracy.
             math.log(1 + a)
