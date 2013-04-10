@@ -155,7 +155,21 @@ class LinterPlugin(val global: Global) extends Plugin {
         //TODO: Too hacky detection, also doesn't actually check if you close it - just that you don't use it as a oneliner
           val warnMsg = "You should close the file stream after use."
           unit.warning(fromFile.pos, warnMsg)
+          
+        case Apply(Select(Literal(const), func), params) if params.size == 1 && (func.toString matches "[$](greater|less|eq)([$]eq)?") && (params.head match { case Literal(_) => false case _ => true })  =>
+          unit.warning(tree.pos, "You are using Yoda conditions") // http://www.codinghorror.com/blog/2012/07/new-programming-jargon.html :)
 
+        case Apply(Select(Literal(Constant(s: String)), func), params) =>
+          func.toString match {
+            case "$plus"|"equals"|"$eq$eq"|"toCharArray" => //false positives            
+            case "length" => unit.warning(tree.pos, "Taking the size of a constant string")
+            case _        => unit.warning(tree.pos, "Processing a constant string")
+          }
+          
+        case Select(Apply(Select(predef, augmentString), List(Literal(Constant(s: String)))), size)
+          if predef.toString == "scala.this.Predef" && augmentString.toString == "augmentString" && size.toString == "size" => 
+          unit.warning(tree.pos, "Taking the size of a constant string")
+          
         case Apply(Select(lhs, nme.EQ), List(rhs)) if isSubtype(lhs, DoubleClass.tpe) || isSubtype(lhs, FloatClass.tpe) || isSubtype(rhs, DoubleClass.tpe) || isSubtype(rhs, FloatClass.tpe) =>
           //val warnMsg = "Exact comparison of floating point values is potentially unsafe."
           //unit.warning(tree.pos, warnMsg)
@@ -242,6 +256,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 //TODO: too much noise, and some cases are perfectly fine - try detecting all the exact cases from link
                 //unit.warning(tree.pos, "There are probably better ways of handling an Option. (see: http://blog.tmorris.net/posts/scalaoption-cheat-sheet/)")
               } else if(booleanCase) {
+                //TODO: case something => ... case _ => ... is also an if in a lot of cases
                 unit.warning(tree.pos, "This is probably better written as an if statement.")
               }
             }
@@ -294,6 +309,36 @@ class LinterPlugin(val global: Global) extends Plugin {
         case Apply(Select(Literal(Constant(true)), term), _) if term.toString == "$bar$bar" =>
           val warnMsg = "This part of boolean expression will always be true."
           unit.warning(tree.pos, warnMsg)
+          
+        case If(_, If(_, body, Literal(Constant(()))), Literal(Constant(()))) =>
+          unit.warning(tree.pos, "These two ifs can be merged")
+        
+        case Apply(Select(New(java_math_BigDecimal), nme.CONSTRUCTOR), List(Literal(Constant(d: Double)))) 
+          if java_math_BigDecimal.toString == "java.math.BigDecimal" =>
+          unit.warning(tree.pos, "Possible loss of precision - use a string constant")
+          
+        case Block(block, last) if { //TODO: var v; ...non v related stuff...; v = 4 <-- this is the same thing, really
+          ((block :+ last) zip ((block :+ last).tail)) exists { 
+            case (ValDef(modifiers, id1, _, _), Assign(id2, _)) if id1.toString == id2.toString =>
+              unit.warning(id2.pos, "Assignment right after declaration is most likely a bug (unless you side-effect like a boss)")
+              true
+            //TODO: move to def analysis - this is only for those blocks
+            //case (_, l @ Return(_)) if l eq last =>
+            //  unit.warning(l.pos, "Scala has implicit return, so you don't need 'return'")
+            //  true              
+            case (v @ ValDef(modifiers, id1, _, _), l @ Ident(id2)) if id1.toString == id2.toString && (l eq last) =>
+              unit.warning(v.pos, "You don't need that temp variable.")
+              true
+            case (Assign(id1, _), Assign(id2, _)) if id1.toString == id2.toString =>
+              unit.warning(id1.pos, "Two subsequent assigns are most likely a bug (unless you side-effect like a boss)")
+              true
+            case (s1, s2) if s1 equalsStructure s2 =>
+              unit.warning(s1.pos, "You're doing the exact same thing twice.")
+              true
+            case _ =>
+              false 
+          }
+        } => // lololololololol
 
         // cannot check double/float, as typer will automatically translate it to Infinity
         case divByZero @ Apply(Select(rcvr, nme.DIV), List(Literal(Constant(0))))
@@ -333,7 +378,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     class AfterLinterTraverser(unit: CompilationUnit) extends Traverser {
       override def traverse(tree: Tree) {
         val maybeVals = (varDecls -- varAssigns)
-        if(!maybeVals.isEmpty) unit.warning(tree.pos, "These vars might secretly be vals: grep -rnP --include=*.scala 'var ("+maybeVals.mkString("|")+")'")
+        if(!maybeVals.isEmpty) unit.warning(tree.pos, "[experimental] These vars might secretly be vals: grep -rnP --include=*.scala 'var ("+maybeVals.mkString("|")+")'")
         varDecls.clear
       }
     }
