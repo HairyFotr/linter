@@ -58,6 +58,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Assign(Ident(varName), _) =>
             varAssigns += varName.toString
             //println("varassign2 |"+varName+"|")
+            //TODO: += and the like seem to not be detected
             
           case DefDef(mods: Modifiers, name, _, valDefs, typeTree, block) =>
             if(name.toString != "<init>" && !block.isEmpty && !mods.hasFlag(OVERRIDE)) {
@@ -313,6 +314,12 @@ class LinterPlugin(val global: Global) extends Plugin {
         case If(_, If(_, body, Literal(Constant(()))), Literal(Constant(()))) =>
           unit.warning(tree.pos, "These two ifs can be merged")
         
+        case Apply(Select(Select(scala_package, _BigDecimal), apply), List(Literal(Constant(d:Double))))
+          if scala_package.toString == "scala.`package`" && _BigDecimal.toString == "BigDecimal" && apply.toString == "apply" =>
+          unit.warning(tree.pos, "Possible loss of precision - use a string constant")
+        case Apply(Select(math_BigDecimal, apply_valueOf), List(Literal(Constant(d:Double)))) 
+          if math_BigDecimal.toString.endsWith("math.BigDecimal") && (apply_valueOf.toString matches "apply|valueOf") =>
+          unit.warning(tree.pos, "Possible loss of precision - use a string constant")
         case Apply(Select(New(java_math_BigDecimal), nme.CONSTRUCTOR), List(Literal(Constant(d: Double)))) 
           if java_math_BigDecimal.toString == "java.math.BigDecimal" =>
           unit.warning(tree.pos, "Possible loss of precision - use a string constant")
@@ -378,7 +385,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     class AfterLinterTraverser(unit: CompilationUnit) extends Traverser {
       override def traverse(tree: Tree) {
         val maybeVals = (varDecls -- varAssigns)
-        if(!maybeVals.isEmpty) unit.warning(tree.pos, "[experimental] These vars might secretly be vals: grep -rnP --include=*.scala 'var ("+maybeVals.mkString("|")+")'")
+        if(!maybeVals.isEmpty) unit.warning(tree.pos, "[experimental] These vars might secretly be vals: grep -rnP --include=*.scala 'var ([(][^)]*)?("+maybeVals.mkString("|")+")'")
         varDecls.clear
       }
     }
