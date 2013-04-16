@@ -28,3 +28,5 @@ publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
 scalacOptions ++= Seq("-unchecked", "-Xlint")
 
 scalacOptions ++= Seq("-Ywarn-all", "-Ywarn-dead-code", "-Ywarn-inaccessible", "-Ywarn-nullary-override", "-Ywarn-nullary-unit", "-Ywarn-value-discard")
+
+//scalacOptions += "-Xplugin:../linteRepo/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar"

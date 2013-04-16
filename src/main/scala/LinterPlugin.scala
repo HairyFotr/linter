@@ -114,6 +114,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       val JavaConversionsModule: Symbol = definitions.getModule(newTermName("scala.collection.JavaConversions"))
       val SeqLikeClass: Symbol = definitions.getClass(newTermName("scala.collection.SeqLike"))
       val SeqLikeContains: Symbol = SeqLikeClass.info.member(newTermName("contains"))
+      val SeqLikeApply: Symbol = SeqLikeClass.info.member(newTermName("apply"))
       val OptionGet: Symbol = OptionClass.info.member(nme.get)
       
       val IsInstanceOf = AnyClass.info.member(nme.isInstanceOf_)
@@ -232,7 +233,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Match(Literal(Constant(a)), cases) =>
             //TODO: figure this, and similar if rules, for some types of val x = Literal(Constant(...)) declarations
             
-            var returnVal = //try to detect what it'll return
+            val returnVal = //try to detect what it'll return
               cases 
                 .map { ca => (ca.pat, ca.body) } 
                 .find { case (Literal(Constant(c)), _) => c == a; case _ => false}
@@ -348,7 +349,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               //case (_, l @ Return(_)) if l eq last =>
               //  unit.warning(l.pos, "Scala has implicit return, so you don't need 'return'")
               //  true              
-              case (v @ ValDef(modifiers, id1, _, _), l @ Ident(id2)) if id1.toString == id2.toString && (l eq last) =>
+              case (v @ ValDef(_, id1, _, _), l @ Ident(id2)) if id1.toString == id2.toString && (l eq last) =>
                 unit.warning(v.pos, "You don't need that temp variable.")
                 true
               case (Assign(id1, _), Assign(id2, _)) if id1.toString == id2.toString =>
@@ -365,18 +366,38 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
           } => // lololololololol
 
+          case Apply(TypeApply(Select(Apply(Select(Apply(Select(scala_Predef, intWrapper), List(Literal(Constant(low: Int)))), to_until), List(Literal(Constant(high: Int)))), foreach_map), _), List(Function(List(ValDef(_, param, _, _)), Block(block, last)))) if (foreach_map.toString matches "foreach|map") && (to_until.toString matches "to|until") && {
+            //TODO: learn to compute simple constant expressions (i + 1), etc
+            
+            def traverseFor(tree: Tree) {
+              tree match {
+                case pos @ Apply(Select(_, op), List(Ident(divisor))) if (op == nme.DIV || op == nme.MOD) && divisor.toString == param.toString && low <= 0 && high >= (if(to_until.toString == "until") 1 else 0) => 
+                  unit.warning(pos.pos, "During this loop you will likely divide by zero.")
+                  
+                case pos @ Apply(Select(seq, apply), List(index)) 
+                  if methodImplements(pos.symbol, SeqLikeApply) && index.toString == param.toString && low < 0 =>
+                  unit.warning(pos.pos, "During this loop you will likely use a negative index for a collection.")
+                
+                case _ => tree.children.foreach(traverseFor)
+              }
+            }
+            
+            (block :+ last).foreach(traverseFor)
+            
+            false
+          } => //
+
+          case pos @ Apply(Select(seq, apply), List(Literal(Constant(index: Int)))) 
+            if methodImplements(pos.symbol, SeqLikeApply) && index < 0 =>
+            unit.warning(pos.pos, "Using a negative index for a collection.")
+
           // cannot check double/float, as typer will automatically translate it to Infinity
-          case divByZero @ Apply(Select(rcvr, nme.DIV), List(Literal(Constant(0))))
-            if (rcvr.tpe <:< definitions.ByteClass.tpe
+          case divByZero @ Apply(Select(rcvr, op), List(Literal(Constant(0))))
+            if (op == nme.DIV || op == nme.MOD) 
+              &&(rcvr.tpe <:< definitions.ByteClass.tpe
               ||rcvr.tpe <:< definitions.ShortClass.tpe
               ||rcvr.tpe <:< definitions.IntClass.tpe
               ||rcvr.tpe <:< definitions.LongClass.tpe) =>
-            unit.warning(divByZero.pos, "Literal division by zero.")
-          case divByZero @ Apply(Select(rcvr, nme.MOD), List(Literal(Constant(0))))
-            if (rcvr.tpe <:< definitions.ByteClass.tpe
-              ||rcvr.tpe <:< definitions.ShortClass.tpe
-              ||rcvr.tpe <:< definitions.IntClass.tpe
-              ||rcvr.tpe <:< definitions.LongClass.tpe) => 
             unit.warning(divByZero.pos, "Literal division by zero.")
 
           case _ =>
