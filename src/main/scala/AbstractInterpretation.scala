@@ -223,13 +223,13 @@ class AbstractInterpretation(val global: Global) {
         case If(condExpr, t, f) => 
           //println("in")
           //println(vals);
-          val backupVals = vals.map(a=> a)
+          val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
           
-          vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr)))
+          vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr))).withDefaultValue(Values.empty)
           //println(vals)
           t.foreach(traverseFor)
 
-          vals = backupVals.map(a => (a._1, a._2.applyInverseCond(condExpr)))
+          vals = backupVals.map(a => (a._1, a._2.applyInverseCond(condExpr))).withDefaultValue(Values.empty)
           //println(vals)
           f.foreach(traverseFor)
           
