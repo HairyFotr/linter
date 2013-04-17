@@ -367,60 +367,210 @@ class LinterPlugin(val global: Global) extends Plugin {
           } => // lololololololol
 
           case Apply(TypeApply(Select(Apply(Select(Apply(Select(scala_Predef, intWrapper), List(Literal(Constant(low: Int)))), to_until), List(Literal(Constant(high: Int)))), foreach_map), _), List(Function(List(ValDef(_, param, _, _)), Block(block, last)))) if (foreach_map.toString matches "foreach|map") && (to_until.toString matches "to|until") && {
+          
+            object Values {
+              lazy val empty = new Values()
+              def apply(low: Int, high: Int, name: String): Values = new Values(name = name, ranges = Set((low, high)))
+              def apply(i: Int, name: String = ""): Values = new Values(name = name, values = Set(i))
+            }
+            class Values(
+                val ranges: Set[(Int, Int)] = Set[(Int, Int)](),
+                val values: Set[Int] = Set[Int](),
+                val name: String = ""
+              ) {
+              //TODO implement interval tree
+              //println(this)
+             
+              def contains(i: Int) = (values contains i) || (ranges exists { case (low, high) => i >= low && i <= high })
+              def apply(i: Int) = contains(i)
+              def exists(func: Int => Boolean) = (values exists func) || (ranges exists { case (low, high) => Range(low, high+1) exists func })
+              //def forAll(func: Int => Boolean) = (values forAll func) || (ranges forAll { case (low, high) => Range(low, high+1) forAll func })
+              
+              def addRange(low: Int, high: Int): Values = new Values(ranges + (if(low > high) (high, low) else (low, high)), values, name)
+              def addValue(i: Int): Values = new Values(ranges, values + i, name)
+              def addSet(s: Set[Int]): Values = new Values(ranges, values ++ s, name)
+              
+              def isEmpty = this.size == 0
+              def isValue = this.size == 1
+              def getValue = if(isValue) values.head else throw new Exception()
 
-            //TODO: extend with more functions... and TEST TEST TEST TEST
-            def computeInterval(tree: Tree, currInterval: Option[(Int, Int)] = None): Option[(Int, Int)] = {
-              val result: Option[(Int, Int)] = tree match {
-                case Ident(termName) if termName.toString == param.toString => currInterval
+              def dropValue(i: Int): Values = new Values(
+                ranges.flatMap { case (low, high) =>
+                  if(i > low && i < high) List((low,i-1), (i+1,high)) else
+                  if(i == low && i < high) List((low+1,high)) else
+                  if(i > low && i == high) List((low,high-1)) else
+                  if(i == low && i == high) Nil else
+                  List((low, high))
+                }, 
+                values - i,
+                name)
 
-                case Select(expr, nme.UNARY_-) => 
-                  computeInterval(expr, currInterval).map { case (low, high) => (-low, -high) }
-                
-                case Apply(Select(scala_math_package, abs), List(expr)) if scala_math_package.toString == "scala.math.`package`" && abs.toString == "abs" => //TODO: scala and java abs
-                  computeInterval(expr, currInterval).map { case (low, high) => (if(low >= 0) low else 0, math.max(math.abs(low), math.abs(high))) }
-
-                case Apply(Select(expr, op), List(Literal(Constant(value: Int)))) => 
-                  Option((computeInterval(expr, currInterval), op, value) match {
-                    case (Some((low, high)), nme.ADD, value) => (low + value, high + value)
-                    case (Some((low, high)), nme.SUB, value) => (low - value, high - value)
-                    case (Some((low, high)), nme.MUL, value) => (low * value, high * value)
-                    case (Some((low, high)), nme.DIV, value) if value != 0 => (low / value, high / value)
-                    case _ => null
-                  })
-                case Apply(Select(Literal(Constant(value: Int)), op), List(expr)) =>
-                  Option((value, op, computeInterval(expr, currInterval)) match {
-                    case (value, nme.ADD, Some((low, high))) => (value + low, value + high)
-                    case (value, nme.SUB, Some((low, high))) => (value - low, value - high)
-                    case (value, nme.MUL, Some((low, high))) => (value * low, value * high)
-                    case (value, nme.DIV, Some((low, high))) if low != 0 && high != 0 => (value / low, value / high)
-                    case _ => null
-                  })
-                
-                case Apply(Select(expr1, op), List(expr2)) => 
-                  Option((computeInterval(expr1, currInterval), op, computeInterval(expr2, currInterval)) match {
-                    case (Some((low1, high1)), nme.ADD, Some((low2, high2))) => (low1 + low2, high1 + high2)
-                    case (Some((low1, high1)), nme.SUB, Some((low2, high2))) => (low1 - low2, high1 - high2)
-                    case (Some((low1, high1)), nme.MUL, Some((low2, high2))) => (low1 * low2, high1 * high2)
-                    case (Some((low1, high1)), nme.DIV, Some((low2, high2))) if low2 != 0 && high2 != 0 => (low1 / low2, high1 / high2)
-                    case _ => null
-                  })
-
-                case _ => None
+              def map(func: Int => Int): Values = {
+                new Values(
+                  ranges
+                    .map { case (low, high) => (func(low), func(high)) }
+                    .map { case (low, high) if low > high => (high, low); case (low, high) => (low, high) },
+                  values
+                    .map(func))
               }
               
-              result map { 
-                case (low, high) if(low <= high) => (low, high) 
-                case (low, high) if(low > high)  => (high, low) }
+              def isUsed(t: Tree, name: String): Boolean = t match { //TODO: there are possible errors, but we're returning empty anyways :)
+                //case List(a) if a.toString == name => true
+                case a if a.toString == name => true
+                //case List() => false
+                case a =>
+                  t.foreach(st => if(st != t && isUsed(st, name)) return true)
+                  false
+              }
+              def applyCond(condExpr: Tree) = {
+                if(!isUsed(condExpr, this.name)) this else condExpr match {
+                  //TODO: grouping with && ||, etc
+                  case Apply(Select(Ident(v), op), List(Literal(Constant(value: Int)))) if v.toString == this.name => 
+                    op match { //TODO: warn if some condition can never be true
+                      case a if a.toString == "$bang$eq" => if(this.exists(a => a == value)) this.dropValue(value) else Values.empty 
+                      case a if a.toString == "$eq$eq" => if(this.exists(a => a == value)) Values(value) else Values.empty 
+                      case nme.GT => new Values(
+                          ranges.flatMap { case orig @ (low, high) => if(low > value) Some(orig) else if(high > value) Some((value+1, high)) else None },
+                          values.filter { a => a > value },
+                          this.name)
+                      case nme.GE => new Values(
+                          ranges.flatMap { case orig @ (low, high) => if(low >= value) Some(orig) else if(high >= value) Some((value, high)) else None },
+                          values.filter { a => a >= value },
+                          this.name)
+                      case nme.LT => new Values(
+                          ranges.flatMap { case orig @ (low, high) => if(high < value) Some(orig) else if(low < value) Some((low, value-1)) else None },
+                           values.filter { a => a < value },
+                          this.name)
+                      case nme.LE => new Values(
+                          ranges.flatMap { case orig @ (low, high) => if(high <= value) Some(orig) else if(low <= value) Some((low, value)) else None },
+                          values.filter { a => a <= value },
+                          this.name)
+                      case _ => Values.empty
+                    }
+                  case _ => Values.empty
+                }
+              }
+              def applyInverseCond(condExpr: Tree) = { //TODO: wow, really... copy paste?
+                if(!isUsed(condExpr, this.name)) this else condExpr match {
+                  //TODO: grouping with && ||, etc
+                  case Apply(Select(Ident(v), op), List(Literal(Constant(value: Int)))) if v.toString == this.name => 
+                    op match { //TODO: warn if some condition can never be true
+                      case a if a.toString == "$eq$eq" => if(this.exists(a => a == value)) this.dropValue(value) else Values.empty 
+                      case a if a.toString == "$bang$eq" => if(this.exists(a => a == value)) Values(value) else Values.empty 
+                      case nme.LE => new Values(
+                          ranges.flatMap { case orig @ (low, high) => if(low > value) Some(orig) else if(high > value) Some((value+1, high)) else None },
+                          values.filter { a => a > value },
+                          this.name)
+                      case nme.LT => new Values(
+                          ranges.flatMap { case orig @ (low, high) => if(low >= value) Some(orig) else if(high >= value) Some((value, high)) else None },
+                          values.filter { a => a >= value },
+                          this.name)
+                      case nme.GE => new Values(
+                          ranges.flatMap { case orig @ (low, high) => if(high < value) Some(orig) else if(low < value) Some((low, value-1)) else None },
+                           values.filter { a => a < value },
+                          this.name)
+                      case nme.GT => new Values(
+                          ranges.flatMap { case orig @ (low, high) => if(high <= value) Some(orig) else if(low <= value) Some((low, value)) else None },
+                          values.filter { a => a <= value },
+                          this.name)
+                      case _ => Values.empty
+                    }
+                  case _ => Values.empty
+                }
+              }
+              
+              def applyUnary(op: Name): Values = op match { 
+                case nme.UNARY_- => this.map(a=> -a)
+                case abs if abs.toString == "abs" =>
+                  new Values(
+                    ranges
+                      .map { case (low, high) => (if(low > 0) low else 0, math.max(math.abs(low), math.abs(high))) }
+                      .map { case (low, high) if low > high => (high, low); case (low, high) => (low, high) },
+                    values.map(a => math.abs(a)))
+                case _ => Values.empty
+              }
+              def apply(op: Name)(right: Values): Values = {
+                val left = this
+                
+                val func: (Int, Int) => Int = op match {
+                    case nme.ADD => _ + _
+                    case nme.SUB => _ - _
+                    case nme.MUL => _ * _
+                    case nme.DIV if right.isValue && right.getValue != 0 => _ / _
+                    case _ => return Values.empty
+                }
+                
+                val a = if(left.isEmpty || right.isEmpty) {
+                  Values.empty
+                } else if(left.isValue && right.isValue) {
+                  Values(func(left.getValue, right.getValue))
+                } else if(!left.isValue && right.isValue) {
+                  left.map(a => func(a, right.getValue))
+                } else if(left.isValue && !right.isValue) {
+                  right.map(a => func(left.getValue, a))
+                } else {
+                  Values.empty //TODO: join ranges, but be afraid of the explosion :)
+                }
+                
+                a
+              }
+              
+              //approximate
+              def size: Int = values.size + ranges.foldLeft(0)((acc, range) => acc + (range._2 - range._1) + 1)
+              
+              override def toString: String = "Values("+(if(name.size > 0) name+")(" else "")+(values.map(_.toString) ++ ranges.map(a => a._1+"-"+a._2)).mkString(",")+")"
+            }
+            
+            var vals = collection.mutable.HashMap[String, Values](
+              param.toString -> (if(to_until.toString == "to") Values(low, high, param.toString) else Values(low, high-1, param.toString))
+            ).withDefaultValue(Values.empty)
+
+            //TODO: extend with more functions... and TEST TEST TEST TEST
+            def computeExpr(tree: Tree, curr: Values = Values.empty): Values = {
+              tree match {
+                case Literal(Constant(value: Int)) => Values(value)
+                case Ident(termName) => vals(termName.toString)
+                
+                case Select(expr, op) => computeExpr(expr, curr).applyUnary(op)
+                
+                case Apply(Select(scala_math_package, abs), List(expr)) if scala_math_package.toString == "scala.math.`package`" && abs.toString == "abs" => //TODO: scala and java abs
+                  computeExpr(expr, curr).applyUnary(abs)
+
+                case Apply(Select(expr1, op), List(expr2)) =>
+                  (computeExpr(expr1, curr))(op)(computeExpr(expr2, curr))
+                
+                case _ => Values.empty
+              }
             }
             
             def traverseFor(tree: Tree) {
               tree match {
-                case pos @ Apply(Select(_, op), List(expr)) if (op == nme.DIV || op == nme.MOD) && (computeInterval(expr, Some((low, high - (if(to_until.toString == "until") 1 else 0)))).exists { case (low, high) => low <= 0 && high >= 0 }) => 
+                case ValDef(m: Modifiers, valName, TypeTree(), Literal(Constant(a: Int))) if(!m.hasFlag(MUTABLE)) =>
+                  //println(valName.toString)
+                  vals += valName.toString -> Values(a, valName.toString)
+                
+                case If(condExpr, t, f) => 
+                  //println("in")
+                  //println(vals);
+                  val backupVals = vals.map(a=> a)
+                  
+                  vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr)))
+                  //println(vals)
+                  t.foreach(traverseFor)
+
+                  vals = backupVals.map(a => (a._1, a._2.applyInverseCond(condExpr)))
+                  //println(vals)
+                  f.foreach(traverseFor)
+                  
+                  vals = backupVals
+                  //println("out")
+
+                case pos @ Apply(Select(_, op), List(expr)) if (op == nme.DIV || op == nme.MOD) && (computeExpr(expr).exists { a => a == 0 }) => 
                   unit.warning(pos.pos, "During this loop you will likely divide by zero.")
 
                 case pos @ Apply(Select(seq, apply), List(indexExpr)) 
-                  if methodImplements(pos.symbol, SeqLikeApply) && (computeInterval(indexExpr, Some((low, high - (if(to_until.toString == "until") 1 else 0)))).exists { case (low, high) => low < 0 }) =>
-                  println(computeInterval(indexExpr, Some((low, high - (if(to_until.toString == "until") 1 else 0)))))
+                  if methodImplements(pos.symbol, SeqLikeApply) && (computeExpr(indexExpr).exists { a => a < 0 }) =>
+                  //println(computeExpr(indexExpr))
                   unit.warning(pos.pos, "During this loop you will likely use a negative index for a collection.")
                 
                 case _ => tree.children.foreach(traverseFor)
