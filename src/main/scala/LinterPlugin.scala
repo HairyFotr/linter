@@ -138,7 +138,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       def isGlobalImport(selector: ImportSelector): Boolean = {
         selector.name == nme.WILDCARD && selector.renamePos == -1
       }
-      
+
       override def traverse(tree: Tree) { 
         tree match {
           case ValDef(m: Modifiers, varName, TypeTree(), value) if(m.hasFlag(MUTABLE)) =>
@@ -367,15 +367,60 @@ class LinterPlugin(val global: Global) extends Plugin {
           } => // lololololololol
 
           case Apply(TypeApply(Select(Apply(Select(Apply(Select(scala_Predef, intWrapper), List(Literal(Constant(low: Int)))), to_until), List(Literal(Constant(high: Int)))), foreach_map), _), List(Function(List(ValDef(_, param, _, _)), Block(block, last)))) if (foreach_map.toString matches "foreach|map") && (to_until.toString matches "to|until") && {
-            //TODO: learn to compute simple constant expressions (i + 1), etc
+
+            //TODO: extend with more functions... and TEST TEST TEST TEST
+            def computeInterval(tree: Tree, currInterval: Option[(Int, Int)] = None): Option[(Int, Int)] = {
+              val result: Option[(Int, Int)] = tree match {
+                case Ident(termName) if termName.toString == param.toString => currInterval
+
+                case Select(expr, nme.UNARY_-) => 
+                  computeInterval(expr, currInterval).map { case (low, high) => (-low, -high) }
+                
+                case Apply(Select(scala_math_package, abs), List(expr)) if scala_math_package.toString == "scala.math.`package`" && abs.toString == "abs" => //TODO: scala and java abs
+                  computeInterval(expr, currInterval).map { case (low, high) => (if(low >= 0) low else 0, math.max(math.abs(low), math.abs(high))) }
+
+                case Apply(Select(expr, op), List(Literal(Constant(value: Int)))) => 
+                  Option((computeInterval(expr, currInterval), op, value) match {
+                    case (Some((low, high)), nme.ADD, value) => (low + value, high + value)
+                    case (Some((low, high)), nme.SUB, value) => (low - value, high - value)
+                    case (Some((low, high)), nme.MUL, value) => (low * value, high * value)
+                    case (Some((low, high)), nme.DIV, value) if value != 0 => (low / value, high / value)
+                    case _ => null
+                  })
+                case Apply(Select(Literal(Constant(value: Int)), op), List(expr)) =>
+                  Option((value, op, computeInterval(expr, currInterval)) match {
+                    case (value, nme.ADD, Some((low, high))) => (value + low, value + high)
+                    case (value, nme.SUB, Some((low, high))) => (value - low, value - high)
+                    case (value, nme.MUL, Some((low, high))) => (value * low, value * high)
+                    case (value, nme.DIV, Some((low, high))) if low != 0 && high != 0 => (value / low, value / high)
+                    case _ => null
+                  })
+                
+                case Apply(Select(expr1, op), List(expr2)) => 
+                  Option((computeInterval(expr1, currInterval), op, computeInterval(expr2, currInterval)) match {
+                    case (Some((low1, high1)), nme.ADD, Some((low2, high2))) => (low1 + low2, high1 + high2)
+                    case (Some((low1, high1)), nme.SUB, Some((low2, high2))) => (low1 - low2, high1 - high2)
+                    case (Some((low1, high1)), nme.MUL, Some((low2, high2))) => (low1 * low2, high1 * high2)
+                    case (Some((low1, high1)), nme.DIV, Some((low2, high2))) if low2 != 0 && high2 != 0 => (low1 / low2, high1 / high2)
+                    case _ => null
+                  })
+
+                case _ => None
+              }
+              
+              result map { 
+                case (low, high) if(low <= high) => (low, high) 
+                case (low, high) if(low > high)  => (high, low) }
+            }
             
             def traverseFor(tree: Tree) {
               tree match {
-                case pos @ Apply(Select(_, op), List(Ident(divisor))) if (op == nme.DIV || op == nme.MOD) && divisor.toString == param.toString && low <= 0 && high >= (if(to_until.toString == "until") 1 else 0) => 
+                case pos @ Apply(Select(_, op), List(expr)) if (op == nme.DIV || op == nme.MOD) && (computeInterval(expr, Some((low, high - (if(to_until.toString == "until") 1 else 0)))).exists { case (low, high) => low <= 0 && high >= 0 }) => 
                   unit.warning(pos.pos, "During this loop you will likely divide by zero.")
-                  
-                case pos @ Apply(Select(seq, apply), List(index)) 
-                  if methodImplements(pos.symbol, SeqLikeApply) && index.toString == param.toString && low < 0 =>
+
+                case pos @ Apply(Select(seq, apply), List(indexExpr)) 
+                  if methodImplements(pos.symbol, SeqLikeApply) && (computeInterval(indexExpr, Some((low, high - (if(to_until.toString == "until") 1 else 0)))).exists { case (low, high) => low < 0 }) =>
+                  println(computeInterval(indexExpr, Some((low, high - (if(to_until.toString == "until") 1 else 0)))))
                   unit.warning(pos.pos, "During this loop you will likely use a negative index for a collection.")
                 
                 case _ => tree.children.foreach(traverseFor)
