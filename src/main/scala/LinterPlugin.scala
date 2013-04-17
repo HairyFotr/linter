@@ -20,6 +20,10 @@ import scala.tools.nsc.{Global, Phase}
 import scala.tools.nsc.plugins.{Plugin, PluginComponent}
 import scala.tools.nsc.symtab.Flags.{IMPLICIT, OVERRIDE, MUTABLE, CASE}
 
+package object global {
+  type GTree = Global#Tree
+  type GUnit = Global#CompilationUnit
+}
 class LinterPlugin(val global: Global) extends Plugin {
   import global._
 
@@ -91,7 +95,7 @@ class LinterPlugin(val global: Global) extends Plugin {
   private object LinterComponent extends PluginComponent {
     import global._
 
-    val global = LinterPlugin.this.global
+    implicit val global = LinterPlugin.this.global
 
     override val runsAfter = List("typer")
 
@@ -366,8 +370,11 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
           } => // lololololololol
 
-          case Apply(TypeApply(Select(Apply(Select(Apply(Select(scala_Predef, intWrapper), List(Literal(Constant(low: Int)))), to_until), List(Literal(Constant(high: Int)))), foreach_map), _), List(Function(List(ValDef(_, param, _, _)), Block(block, last)))) if (foreach_map.toString matches "foreach|map") && (to_until.toString matches "to|until") && {
+          case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, param, _, _)), body))) if (foreach_map.toString matches "foreach|map") && {
           
+          (new AbstractInterpretation(global)).forLoop(forloop, unit)
+          
+          /*
             object Values {
               lazy val empty = new Values()
               def apply(low: Int, high: Int, name: String): Values = new Values(name = name, ranges = Set((low, high)))
@@ -578,6 +585,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
             
             (block :+ last).foreach(traverseFor)
+            */
             
             false
           } => //
@@ -605,7 +613,7 @@ class LinterPlugin(val global: Global) extends Plugin {
   private object AfterLinterComponent extends PluginComponent {
     import global._
 
-    val global = LinterPlugin.this.global
+    implicit val global = LinterPlugin.this.global
 
     override val runsAfter = List("linter-typed")
 
