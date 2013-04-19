@@ -182,12 +182,13 @@ class AbstractInterpretation(val global: Global) {
   }
   
       
+  var vals = collection.mutable.HashMap[String, Values]().withDefaultValue(Values.empty)
   def forLoop(tree: GTree, unit: GUnit) {
     //TODO: actually anything that takes (A <: (a Number) => _), this is awful
     val funcs = "foreach|map|filter(Not)?|exists|find|flatMap|forall|groupBy|count|((drop|take)While)|(min|max)By|partition|span"
 
-    var vals = collection.mutable.HashMap[String, Values]().withDefaultValue(Values.empty)
-
+    val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
+    
     //TODO: extend with more functions... and TEST TEST TEST TEST
     def computeExpr(tree: Tree, curr: Values = Values.empty): Values = {
       tree match {
@@ -195,6 +196,10 @@ class AbstractInterpretation(val global: Global) {
         case Ident(termName) => vals(termName.toString)
         
         case Apply(Select(Apply(Select(scala_Predef, intWrapper), List(Literal(Constant(low: Int)))), to_until), List(Literal(Constant(high: Int)))) if (to_until.toString matches "to|until") =>
+          (if(to_until.toString == "to") Values(low, high, "") else Values(low, high-1, ""))
+
+        case Apply(Select(Apply(Select(scala_Predef, intWrapper), List(expr1)), to_until), List(expr2)) if (to_until.toString matches "to|until") && computeExpr(expr1, curr).isValue && computeExpr(expr2, curr).isValue =>
+          val (low, high) = (computeExpr(expr1, curr).getValue, computeExpr(expr2, curr).getValue)
           (if(to_until.toString == "to") Values(low, high, "") else Values(low, high-1, ""))
 
         case Apply(TypeApply(genApply @ Select(_,_), _), vals) if methodImplements(genApply.symbol, SeqLikeGenApply) =>
@@ -234,6 +239,9 @@ class AbstractInterpretation(val global: Global) {
 
     def traverseFor(tree: GTree) {
       tree match {
+        case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, param, _, _)), body))) =>
+          forLoop(forloop, unit)
+        
         case ValDef(m: Modifiers, valName, TypeTree(), Literal(Constant(a: Int))) if(!m.hasFlag(MUTABLE)) =>
           //println(valName.toString)
           vals += valName.toString -> Values(a, valName.toString)
@@ -241,7 +249,7 @@ class AbstractInterpretation(val global: Global) {
         case ValDef(m: Modifiers, valName, TypeTree(), expr) if(!m.hasFlag(MUTABLE) && !m.hasFlag(LAZY)) && !computeExpr(expr).isEmpty => //&& computeExpr(expr).isValue =>
           //ADD: aliasing... val a = i, where i is an iterator, then 1/i-a is divbyzero
           vals += valName.toString -> computeExpr(expr).addName(valName.toString)
-          println(vals(valName.toString))
+          //println(vals(valName.toString))
         
         case If(condExpr, t, f) => 
           //println("in")
@@ -256,7 +264,7 @@ class AbstractInterpretation(val global: Global) {
           //println(vals)
           f.foreach(traverseFor)
           
-          vals = backupVals
+          vals = backupVals.withDefaultValue(Values.empty)
           //println("out")
 
         case pos @ Apply(Select(_, op), List(expr)) if (op == nme.DIV || op == nme.MOD) && (computeExpr(expr).exists { a => a == 0 }) => 
@@ -272,6 +280,7 @@ class AbstractInterpretation(val global: Global) {
     }
     
     traverseFor(body)
+    vals = backupVals.withDefaultValue(Values.empty)
   }
  
 }
