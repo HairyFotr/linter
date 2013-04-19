@@ -33,8 +33,9 @@ class AbstractInterpretation(val global: Global) {
     def addName(s: String): Values = new Values(ranges, values, s)
     
     def isEmpty = this.size == 0
-    def isValue = this.size == 1
+    def isValue = this.values.size == 1 && this.ranges.size == 0
     def getValue = if(isValue) values.head else throw new Exception()
+    def getValueForce = if(isValue) values.head else if(ranges.size == 1 && this.size == 1) ranges.head._1 else throw new Exception()
 
     def dropValue(i: Int): Values = new Values(
       ranges.flatMap { case (low, high) =>
@@ -132,6 +133,8 @@ class AbstractInterpretation(val global: Global) {
           values.map(a => math.abs(a)))
       case size if (size.toString == "size" || size.toString == "length") && ((this.ranges.size == 1 && this.values.size == 0) || (this.ranges.size == 0 && this.values.size >= 1)) =>
         Values(this.size)
+      case head if (head.toString == "head") && (this.size == 1) => Values(this.getValueForce) //Only works for one element :) 
+      case last if (last.toString == "last") && (this.size == 1) => Values(this.getValueForce) //Only works for one element :)
       case _ => Values.empty
     }
     def apply(op: Name)(right: Values): Values = {
@@ -149,6 +152,7 @@ class AbstractInterpretation(val global: Global) {
           case nme.ASR => _ >> _
           case nme.MOD if right.isValue && right.getValue != 0 => _ % _
           case nme.DIV if right.isValue && right.getValue != 0 => _ / _
+          case a if a.toString == "apply" => _ + _ //Foo, check below
           case _ => return Values.empty
       }
       
@@ -162,7 +166,14 @@ class AbstractInterpretation(val global: Global) {
       } else if(left.isValue && right.isValue) {
         Values(func(left.getValue, right.getValue))
       } else if(!left.isValue && right.isValue) {
-        left.map(a => func(a, right.getValue))
+        if(op.toString == "apply" && ((this.ranges.size == 1 && this.values.size == 0) || (this.ranges.size == 0 && this.values.size >= 1))) {
+          //TODO: if you wanted actual values, you need to save seq type and refactor values from Set to Seq
+          if(this.size == 1) Values(this.getValueForce) else this
+          println(this)
+          this
+        } else {
+          left.map(a => func(a, right.getValue))
+        }
       } else if(left.isValue && !right.isValue) {
         right.map(a => func(left.getValue, a))
       } else {
@@ -219,12 +230,11 @@ class AbstractInterpretation(val global: Global) {
           val (low, high) = (computeExpr(expr1, curr).getValue, computeExpr(expr2, curr).getValue)
           (if(to_until.toString == "to") Values(low, high, "") else Values(low, high-1, ""))
 
-        case Apply(TypeApply(genApply @ Select(_,_), _), vals) if methodImplements(genApply.symbol, SeqLikeGenApply) =>
+        case Apply(TypeApply(genApply @ Select(_,_), _), genVals) if methodImplements(genApply.symbol, SeqLikeGenApply) =>
           //TODO: oh god, this isn't typesafe in any way
-          //ADD: val a = 5, List(a,2,3)
-          val values = vals.map(_.toString).filter(_ matches "-?[0-9]{1,10}").map(_.toInt).toSet
-          //println(values)
-          Values(values, "")
+          //ADD: List(expr,2,3) - save size, even if you can't compute expr
+          val values = genVals.map(v => computeExpr(v))
+          if(values.forall(_.isValue)) Values(values.map(_.getValue).toSet, "") else Values.empty
 
         case Select(expr, op) => computeExpr(expr, curr).applyUnary(op)
         
@@ -232,6 +242,7 @@ class AbstractInterpretation(val global: Global) {
           computeExpr(expr, curr).applyUnary(abs)
 
         case Apply(Select(expr1, op), List(expr2)) =>
+          //println(op)
           (computeExpr(expr1, curr))(op)(computeExpr(expr2, curr))
         
 
