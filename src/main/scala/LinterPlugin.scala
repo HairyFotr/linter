@@ -80,7 +80,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               }
             }
 
-            if(mods.hasFlag(IMPLICIT) && typeTree.isEmpty) unit.warning(tree.pos, "Implicit method %s needs explicit return type" format name)
+            if(mods.hasFlag(IMPLICIT) && typeTree.isEmpty && !(name.toString matches "((i?)to).*|.*To[A-Z].*")) unit.warning(tree.pos, "Implicit method %s needs explicit return type" format name)
           case _ => 
         }
         super.traverse(tree)
@@ -112,7 +112,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       
       val stringLiteralCount = collection.mutable.HashMap[String, Int]().withDefaultValue(0)
       //some common ones, and some play framework hacks
-      val stringLiteralExceptions = """(\s*|GET|POST|[/.{}()])"""
+      val stringLiteralExceptions = """(\s*|GET|POST|[\/.{}(), ?x%+_-]{0,3})"""
       val stringLiteralFileExceptions = Set("routes_routing.scala", "routes_reverseRouting.scala")
 
       val JavaConversionsModule: Symbol = definitions.getModule(newTermName("scala.collection.JavaConversions"))
@@ -281,7 +281,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             case class Streak(streak: Int, tree: CaseDef)
             var streak = Streak(0, cases.head)
             def checkStreak(c: CaseDef) {
-              if(c.body equalsStructure streak.tree.body) {
+              if((c.body equalsStructure streak.tree.body) && !(c.body.children == List())) {
                 streak = Streak(streak.streak + 1, c)
               } else {
                 printStreakWarning()
@@ -372,7 +372,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
           } => // lololololololol
 
-          case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, param, _, _)), body))) if (foreach_map.toString matches "foreach|map") && {
+          case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, param, _, _)), body))) if { //if (foreach_map.toString matches "foreach|map") && {
             (new AbstractInterpretation(global)).forLoop(forloop, unit)
             false
           } => //
