@@ -204,7 +204,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         //TODO: if you wanted actual values, you need to save seq type and refactor values from Set to Seq
         if(left.isSeq && left.actualSize == 1 && left.size == 1 && right.isValue && right.getValueForce == 0) Values(left.getValueForce) else left
       } else if(op.toString == "map") {
-        println(" here")
+        //println(" here")
         right
       } else if(op.toString == "take") {
         if(left.isSeq && left.actualSize != -1 && right.isValue) {
@@ -325,7 +325,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         //println(">        "+vals)
         val out = computeExpr(expr)
         vals = backupVals
-        println(">        "+out)
+        //println(">        "+out)
         out
       
       case a => 
