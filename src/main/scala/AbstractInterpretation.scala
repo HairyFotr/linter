@@ -189,7 +189,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           case nme.ASR => _ >> _
           case nme.MOD if right.isValue && right.getValue != 0 => _ % _
           case nme.DIV if right.isValue && right.getValue != 0 => _ / _
-          case a if a.toString matches "apply|take|drop" => (a: Int, b: Int) => throw new Exception() //Foo, check below
+          case a if a.toString matches "apply|take|drop|map" => (a: Int, b: Int) => throw new Exception() //Foo, check below
           case _ => return Values.empty
       }
       
@@ -201,32 +201,35 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           Values.empty
         }
       } else if(op.toString == "apply") {
-          //TODO: if you wanted actual values, you need to save seq type and refactor values from Set to Seq
-          if(left.isSeq && left.actualSize == 1 && left.size == 1 && right.isValue && right.getValueForce == 0) Values(left.getValueForce) else left
+        //TODO: if you wanted actual values, you need to save seq type and refactor values from Set to Seq
+        if(left.isSeq && left.actualSize == 1 && left.size == 1 && right.isValue && right.getValueForce == 0) Values(left.getValueForce) else left
+      } else if(op.toString == "map") {
+        println(" here")
+        right
       } else if(op.toString == "take") {
-          if(left.isSeq && left.actualSize != -1 && right.isValue) {
-            if(right.getValueForce >= left.actualSize) {
-              unit.warning(treePosHolder.pos, "This take is always unnecessary.")
-              this 
-            } else {
-              if(right.getValueForce <= 0) unit.warning(treePosHolder.pos, "This collection will always be empty.")
-              Values.empty.addName(name).addActualSize(math.max(0, right.getValueForce))
-            }
+        if(left.isSeq && left.actualSize != -1 && right.isValue) {
+          if(right.getValueForce >= left.actualSize) {
+            unit.warning(treePosHolder.pos, "This take is always unnecessary.")
+            this 
           } else {
-            Values.empty
+            if(right.getValueForce <= 0) unit.warning(treePosHolder.pos, "This collection will always be empty.")
+            Values.empty.addName(name).addActualSize(math.max(0, right.getValueForce))
           }
+        } else {
+          Values.empty
+        }
       } else if(op.toString == "drop") {
-          if(left.isSeq && left.actualSize != -1 && right.isValue) {
-            if(right.getValueForce <= 0) {
-              unit.warning(treePosHolder.pos, "This drop is always unnecessary.")
-              this
-            } else {
-              if(left.actualSize-right.getValueForce <= 0) unit.warning(treePosHolder.pos, "This collection will always be empty.")
-              Values.empty.addName(name).addActualSize(math.max(0, left.actualSize-right.getValueForce))
-            }
-          } else { 
-            Values.empty
+        if(left.isSeq && left.actualSize != -1 && right.isValue) {
+          if(right.getValueForce <= 0) {
+            unit.warning(treePosHolder.pos, "This drop is always unnecessary.")
+            this
+          } else {
+            if(left.actualSize-right.getValueForce <= 0) unit.warning(treePosHolder.pos, "This collection will always be empty.")
+            Values.empty.addName(name).addActualSize(math.max(0, left.actualSize-right.getValueForce))
           }
+        } else { 
+          Values.empty
+        }
       } else if(left.isValue && right.isValue) {
         Values(func(left.getValue, right.getValue))
       } else if(!left.isValue && right.isValue) {
@@ -315,6 +318,15 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case Apply(Select(expr1, op), List(expr2)) =>
         //println((op, expr1, expr2, (computeExpr(expr1))(op)(computeExpr(expr2))))
         (computeExpr(expr1))(op)(computeExpr(expr2))
+      
+      case Apply(Apply(TypeApply(Select(valName, map), List(_, _)), List(Function(List(ValDef(mods, paramName, _, EmptyTree)), expr))), _) if(map.toString == "map") => //List(TypeApply(Select(Select(This(newTypeName("immutable")), scala.collection.immutable.List), newTermName("canBuildFrom")), List(TypeTree()))))
+        val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
+        vals += paramName.toString -> computeExpr(valName)
+        //println(">        "+vals)
+        val out = computeExpr(expr)
+        vals = backupVals
+        println(">        "+out)
+        out
       
       case a => 
         //println("computeExpr: "+showRaw( a ));
