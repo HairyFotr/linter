@@ -164,7 +164,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           values.map(a => math.abs(a)))
 
       case size if (size.toString == "size" || size.toString == "length") && (this.actualSize != -1) => Values(this.actualSize)
-      case head_last if (head_last.toString == "head|last") && (this.size == 1) => Values(this.getValueForce) //Only works for one element :)
+      case head_last if (head_last.toString == "head|last") && this.actualSize == 1 && this.size == 1 => Values(this.getValueForce) //Only works for one element :)
       //case tail_init if (tail_init.toString == "tail|init") && this.actualSize != -1 => Values.empty.addActualSize(this.actualSize - 1) //TODO: doesn't work
       case to if (to.toString matches "toArray|toBuffer|toIndexedSeq|toList|toSeq|toTraversable|toVector") => this
       case distinct if (distinct.toString == "distinct") && this.actualSize != -1 => this.addActualSize(this.size) //Will hold, while Set is used for values
@@ -189,7 +189,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           case nme.ASR => _ >> _
           case nme.MOD if right.isValue && right.getValue != 0 => _ % _
           case nme.DIV if right.isValue && right.getValue != 0 => _ / _
-          case a if a.toString == "apply" => (a: Int, b: Int) => throw new Exception() //Foo, check below
+          case a if a.toString matches "apply|take|drop" => (a: Int, b: Int) => throw new Exception() //Foo, check below
           case _ => return Values.empty
       }
       
@@ -203,6 +203,30 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       } else if(op.toString == "apply") {
           //TODO: if you wanted actual values, you need to save seq type and refactor values from Set to Seq
           if(left.isSeq && left.actualSize == 1 && left.size == 1 && right.isValue && right.getValueForce == 0) Values(left.getValueForce) else left
+      } else if(op.toString == "take") {
+          if(left.isSeq && left.actualSize != -1 && right.isValue) {
+            if(right.getValueForce >= left.actualSize) {
+              unit.warning(treePosHolder.pos, "This take is always unnecessary.")
+              this 
+            } else {
+              if(right.getValueForce <= 0) unit.warning(treePosHolder.pos, "This collection will always be empty.")
+              Values.empty.addName(name).addActualSize(math.max(0, right.getValueForce))
+            }
+          } else {
+            Values.empty
+          }
+      } else if(op.toString == "drop") {
+          if(left.isSeq && left.actualSize != -1 && right.isValue) {
+            if(right.getValueForce <= 0) {
+              unit.warning(treePosHolder.pos, "This drop is always unnecessary.")
+              this
+            } else {
+              if(left.actualSize-right.getValueForce <= 0) unit.warning(treePosHolder.pos, "This collection will always be empty.")
+              Values.empty.addName(name).addActualSize(math.max(0, left.actualSize-right.getValueForce))
+            }
+          } else { 
+            Values.empty
+          }
       } else if(left.isValue && right.isValue) {
         Values(func(left.getValue, right.getValue))
       } else if(!left.isValue && right.isValue) {
@@ -244,6 +268,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   
   //TODO: extend with more functions... and TEST TEST TEST TEST
   def computeExpr(tree: Tree): Values = {
+    treePosHolder = tree
     tree match {
       case Literal(Constant(value: Int)) => Values(value)
       case Select(This(typeT), termName) =>
@@ -288,7 +313,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         computeExpr(expr).applyUnary(abs)
 
       case Apply(Select(expr1, op), List(expr2)) =>
-        //println(op)
+        //println((op, expr1, expr2, (computeExpr(expr1))(op)(computeExpr(expr2))))
         (computeExpr(expr1))(op)(computeExpr(expr2))
       
       case a => 
@@ -298,7 +323,10 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   }
       
   var vals = collection.mutable.HashMap[String, Values]().withDefaultValue(Values.empty)
+  var treePosHolder: GTree = null //ugly hack to get position for a few warnings
+  
   def forLoop(tree: GTree) {
+    treePosHolder = tree
     //TODO: actually anything that takes (A <: (a Number) => _), this is awful
     val funcs = "foreach|map|filter(Not)?|exists|find|flatMap|forall|groupBy|count|((drop|take)While)|(min|max)By|partition|span"
 
@@ -337,6 +365,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   }
   def traverse(tree: GTree) {
     if(visitedBlocks(tree)) return else visitedBlocks += tree
+    treePosHolder = tree
     tree match {
       case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, _, _, _)), _))) =>
         forLoop(forloop)
@@ -351,7 +380,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         //ADD: isSeq and actualSize
         val valNameStr = valName.toString.trim
         vals += valNameStr -> computeExpr(expr).addName(valNameStr)
-        //println(vals(valName.toString))
+        println(vals(valName.toString))
       
       case If(condExpr, t, f) => 
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
