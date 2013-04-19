@@ -146,7 +146,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       val abstractInterpretation = new AbstractInterpretation(global, unit)
 
       override def traverse(tree: Tree) { 
-        abstractInterpretation.traverseBlock(tree)
+        //abstractInterpretation.traverseBlock(tree)
         tree match {
           case ValDef(m: Modifiers, varName, TypeTree(), value) if(m.hasFlag(MUTABLE)) =>
             varDecls += varName.toString.trim
@@ -376,6 +376,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           } => // lololololololol
 
 
+          //TODO: I can't figure out how to use class vals - they show up as clazz.this.valName, and I can't f
           case ClassDef(mods, name, tparams, impl) =>
             abstractInterpretation.traverseBlock(impl)
 

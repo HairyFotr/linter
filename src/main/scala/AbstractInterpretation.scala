@@ -81,8 +81,23 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         case Apply(Select(Ident(v), op), List(expr)) if v.toString == this.name && computeExpr(expr).isValue => 
           val value = computeExpr(expr).getValue
           op match {
-            case a if a.toString == "$bang$eq" => if(this.exists(a => a == value)) this.dropValue(value) else { unit.warning(condExpr.pos, "This condition will always hold."); Values.empty }
-            case a if a.toString == "$eq$eq" => if(this.exists(a => a == value)) Values(value) else { unit.warning(condExpr.pos, "This condition will never hold."); Values.empty }
+            case a if a.toString == "$bang$eq" => 
+              if(this.exists(a => a == value)) {
+                val out = this.dropValue(value) 
+                if(out.isEmpty) unit.warning(condExpr.pos, "This condition will never hold.")
+                out
+              } else { 
+                unit.warning(condExpr.pos, "This condition will always hold.")
+                Values.empty
+              }
+            case a if a.toString == "$eq$eq" => 
+              if(this.exists(a => a == value)) {
+                if(this.size == 1) unit.warning(condExpr.pos, "This condition will always hold.")
+                Values(value).addName(name) 
+              } else { 
+                unit.warning(condExpr.pos, "This condition will never hold.")
+                Values.empty
+              }
             case nme.GT => new Values(
                 ranges.flatMap { case orig @ (low, high) => if(low > value) Some(orig) else if(high > value) Some((value+1, high)) else None },
                 values.filter { a => a > value },
@@ -99,7 +114,9 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
                 ranges.flatMap { case orig @ (low, high) => if(high <= value) Some(orig) else if(low <= value) Some((low, value)) else None },
                 values.filter { a => a <= value },
                 this.name)
-            case _ => Values.empty
+            case a => 
+              //println("applyCond: "+showRaw( a ));
+              Values.empty
           }
         case _ => Values.empty.addActualSize(this.actualSize)
       }
@@ -128,7 +145,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
                 ranges.flatMap { case orig @ (low, high) => if(high <= value) Some(orig) else if(low <= value) Some((low, value)) else None },
                 values.filter { a => a <= value },
                 this.name)
-            case _ => Values.empty
+            case _ => 
+              Values.empty
           }
         case _ => Values.empty.addActualSize(this.actualSize)
       }
@@ -228,7 +246,15 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   def computeExpr(tree: Tree): Values = {
     tree match {
       case Literal(Constant(value: Int)) => Values(value)
-      case Ident(termName) => vals(termName.toString)
+      case Select(This(typeT), termName) =>
+        val name = termName.toString
+        val n = (if(name.contains(".this.")) name.substring(name.lastIndexOf(".")+1) else name).trim
+        vals(n)
+        
+      case Ident(termName) => 
+        val name = termName.toString
+        val n = (if(name.contains(".this.")) name.substring(name.lastIndexOf(".")+1) else name).trim
+        vals(n)
       
       case Apply(Select(Apply(Select(scala_Predef, intWrapper), List(Literal(Constant(low: Int)))), to_until), List(Literal(Constant(high: Int)))) if (to_until.toString matches "to|until") =>
         val high2 = if(to_until.toString == "to") high else high-1
@@ -265,7 +291,9 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         //println(op)
         (computeExpr(expr1))(op)(computeExpr(expr2))
       
-      case a => /*println("computeExpr: "+showRaw( a ));*/ Values.empty
+      case a => 
+        //println("computeExpr: "+showRaw( a ));
+        Values.empty
     }
   }
       
@@ -309,8 +337,6 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   }
   def traverse(tree: GTree) {
     if(visitedBlocks(tree)) return else visitedBlocks += tree
-    //if(vals.size > 0) println("in"+tree)
-    //if(vals.size > 0) println("> "+vals);
     tree match {
       case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, _, _, _)), _))) =>
         forLoop(forloop)
@@ -330,7 +356,9 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case If(condExpr, t, f) => 
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
         
+        //println(vals)
         vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr))).withDefaultValue(Values.empty)
+        //println(vals)
         t.foreach(traverse)
 
         vals = backupVals.map(a => (a._1, a._2.applyInverseCond(condExpr))).withDefaultValue(Values.empty)
@@ -353,7 +381,13 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         //println(computeExpr(indexExpr))
         unit.warning(pos.pos, "You will likely use a negative index for a collection here.")
       
-      case _ => tree.children.foreach(traverse)
+      case DefDef(_, _, _, _, _, block) => 
+        traverse(block)
+
+      case a: AbstractInterpretation.this.global.Tree => 
+        //if(vals.size > 0) println("in: "+showRaw(tree))
+        //if(vals.size > 0) println(">   "+vals);
+        tree.children.foreach(traverse)
     }
   }
 }
