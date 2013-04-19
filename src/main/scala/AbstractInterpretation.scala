@@ -22,7 +22,7 @@ class AbstractInterpretation(val global: Global) {
     //TODO implement interval tree
     //println(this)
    
-    def contains(i: Int) = (values contains i) || (ranges exists { case (low, high) => i >= low && i <= high })
+    def contains(i: Int): Boolean = (values contains i) || (ranges exists { case (low, high) => i >= low && i <= high })
     def apply(i: Int) = contains(i)
     def exists(func: Int => Boolean) = (values exists func) || (ranges exists { case (low, high) => Range(low, high+1) exists func })
     //def forAll(func: Int => Boolean) = (values forAll func) || (ranges forAll { case (low, high) => Range(low, high+1) forAll func })
@@ -130,7 +130,7 @@ class AbstractInterpretation(val global: Global) {
             .map { case (low, high) => (if(low > 0) low else 0, math.max(math.abs(low), math.abs(high))) }
             .map { case (low, high) if low > high => (high, low); case (low, high) => (low, high) },
           values.map(a => math.abs(a)))
-      case size if size.toString == "size" && ((this.ranges.size == 1 && this.values.size == 0) || (this.ranges.size == 0 && this.values.size >= 1)) =>
+      case size if (size.toString == "size" || size.toString == "length") && ((this.ranges.size == 1 && this.values.size == 0) || (this.ranges.size == 0 && this.values.size >= 1)) =>
         Values(this.size)
       case _ => Values.empty
     }
@@ -153,7 +153,12 @@ class AbstractInterpretation(val global: Global) {
       }
       
       if(left.isEmpty || right.isEmpty) {
-        Values.empty
+        //ADD: x & 2^n is Set(2^n,0) and stuff like that :)
+        if(left.contains(0) || right.contains(0)) {
+          if(Set(nme.MUL, nme.AND).contains(op)) Values(0) else Values.empty
+        } else {
+          Values.empty
+        }
       } else if(left.isValue && right.isValue) {
         Values(func(left.getValue, right.getValue))
       } else if(!left.isValue && right.isValue) {
@@ -161,7 +166,19 @@ class AbstractInterpretation(val global: Global) {
       } else if(left.isValue && !right.isValue) {
         right.map(a => func(left.getValue, a))
       } else {
-        Values.empty //ADD: join ranges, but be afraid of the explosion :)
+        //ADD: join ranges, but be afraid of the explosion :)
+        if(left eq right) {
+          op match {
+            //case nme.ADD => left.map(a => a+a) //WRONG
+            //case nme.MUL => left.map(a => a*a)
+            case nme.DIV if(!left.contains(0)) => Values(1) //TODO: never gets executed?
+            case nme.SUB | nme.XOR => Values(0)
+            case nme.AND | nme.OR  => left
+            case _ => Values.empty
+          }
+        } else {
+          Values.empty
+        }
       }
     }
     
@@ -269,6 +286,12 @@ class AbstractInterpretation(val global: Global) {
 
         case pos @ Apply(Select(_, op), List(expr)) if (op == nme.DIV || op == nme.MOD) && (computeExpr(expr).exists { a => a == 0 }) => 
           unit.warning(pos.pos, "During this loop you will likely divide by zero.")
+
+        case pos @ Apply(Select(Ident(seq), apply), List(indexExpr)) 
+          if methodImplements(pos.symbol, SeqLikeApply) && vals.contains(seq.toString) && (computeExpr(indexExpr).exists { a => a >= vals(seq.toString).size }) =>
+          //println(seq.toString)
+          //println(computeExpr(indexExpr))
+          unit.warning(pos.pos, "During this loop you will likely use a too large index for a collection.")
 
         case pos @ Apply(Select(seq, apply), List(indexExpr)) 
           if methodImplements(pos.symbol, SeqLikeApply) && (computeExpr(indexExpr).exists { a => a < 0 }) =>
