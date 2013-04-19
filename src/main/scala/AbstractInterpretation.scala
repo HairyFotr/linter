@@ -5,20 +5,23 @@ import scala.tools.nsc.plugins.{Plugin, PluginComponent}
 import scala.tools.nsc.symtab.Flags.{IMPLICIT, OVERRIDE, MUTABLE, CASE, LAZY}
 import com.foursquare.lint.global._
 
-class AbstractInterpretation(val global: Global) {
+class AbstractInterpretation(val global: Global, val unit: GUnit) {
   import global._
 
   object Values {
     lazy val empty = new Values()
-    def apply(low: Int, high: Int, name: String): Values = new Values(name = name, ranges = Set((low, high)))
-    def apply(s: Set[Int], name: String): Values = new Values(name = name, values = s)
+    //def apply(low: Int, high: Int, name: String, isSeq: Boolean, actualSize: Int): Values = new Values(name = name, ranges = Set((low, high)), isSeq = isSeq, actualSize = actualSize)
+    //def apply(s: Set[Int], name: String, isSeq: Boolean, actualSize: Int): Values = new Values(name = name, values = s, isSeq = isSeq, actualSize = actualSize)
     def apply(i: Int, name: String = ""): Values = new Values(name = name, values = Set(i))
   }
   class Values(
       val ranges: Set[(Int, Int)] = Set[(Int, Int)](),
       val values: Set[Int] = Set[Int](),
-      val name: String = ""
+      val name: String = "",
+      val isSeq: Boolean = false,
+      val actualSize: Int = -1
     ) {
+
     //TODO implement interval tree
     //println(this)
    
@@ -27,15 +30,19 @@ class AbstractInterpretation(val global: Global) {
     def exists(func: Int => Boolean) = (values exists func) || (ranges exists { case (low, high) => Range(low, high+1) exists func })
     //def forAll(func: Int => Boolean) = (values forAll func) || (ranges forAll { case (low, high) => Range(low, high+1) forAll func })
     
-    def addRange(low: Int, high: Int): Values = new Values(ranges + (if(low > high) (high, low) else (low, high)), values, name)
-    def addValue(i: Int): Values = new Values(ranges, values + i, name)
-    def addSet(s: Set[Int]): Values = new Values(ranges, values ++ s, name)
-    def addName(s: String): Values = new Values(ranges, values, s)
+    def addRange(low: Int, high: Int): Values = new Values(ranges + (if(low > high) (high, low) else (low, high)), values, name, false, -1)
+    def addValue(i: Int): Values = new Values(ranges, values + i, name, false, -1)
+    def addSet(s: Set[Int]): Values = new Values(ranges, values ++ s, name, false, -1)
+    def addName(s: String): Values = new Values(ranges, values, s, isSeq, actualSize)
+    def addActualSize(s: Int): Values = new Values(ranges, values, name, isSeq, s)
     
     def isEmpty = this.size == 0
     def isValue = this.values.size == 1 && this.ranges.size == 0
     def getValue = if(isValue) values.head else throw new Exception()
     def getValueForce = if(isValue) values.head else if(ranges.size == 1 && this.size == 1) ranges.head._1 else throw new Exception()
+
+    def max = (values ++ ranges.map(_._2)).max
+    def min = (values ++ ranges.map(_._2)).min
 
     def dropValue(i: Int): Values = new Values(
       ranges.flatMap { case (low, high) =>
@@ -57,20 +64,25 @@ class AbstractInterpretation(val global: Global) {
           .map(func))
     }
     
-    def isUsed(t: Tree, name: String): Boolean = t match { //TODO: there are possible errors, but we're returning empty anyways :)
-      //case List(a) if a.toString == name => true
-      case a if a.toString == name => true
-      //case List() => false
-      case a =>
-        t.foreach(st => if(st != t && isUsed(st, name)) return true)
-        false
+    def isUsed(t: Tree, name: String): Boolean = {
+      var used = 0
+      def usedTimes(t: Tree, name: String) { t match { //TODO: there are possible errors, but we're returning empty anyways :)
+        case a if a.toString.drop(name.size) matches "[.](size|length|head|last)" => used -= 1 //ADD: other funcs that don't change a thing
+        case a if a.toString == name => used += 1
+        case a =>
+          t.foreach(st => if(st != t) usedTimes(st, name))
+      }}
+      usedTimes(t, name)
+      //println((name, used))
+      (used > 0)
     }
     def applyCond(condExpr: Tree) = {
       if(!isUsed(condExpr, this.name)) this else condExpr match {
-        case Apply(Select(Ident(v), op), List(Literal(Constant(value: Int)))) if v.toString == this.name => 
+        case Apply(Select(Ident(v), op), List(expr)) if v.toString == this.name && computeExpr(expr).isValue => 
+          val value = computeExpr(expr).getValue
           op match {
-            case a if a.toString == "$bang$eq" => if(this.exists(a => a == value)) this.dropValue(value) else Values.empty 
-            case a if a.toString == "$eq$eq" => if(this.exists(a => a == value)) Values(value) else Values.empty 
+            case a if a.toString == "$bang$eq" => if(this.exists(a => a == value)) this.dropValue(value) else { unit.warning(condExpr.pos, "This condition will always hold."); Values.empty }
+            case a if a.toString == "$eq$eq" => if(this.exists(a => a == value)) Values(value) else { unit.warning(condExpr.pos, "This condition will never hold."); Values.empty }
             case nme.GT => new Values(
                 ranges.flatMap { case orig @ (low, high) => if(low > value) Some(orig) else if(high > value) Some((value+1, high)) else None },
                 values.filter { a => a > value },
@@ -81,7 +93,7 @@ class AbstractInterpretation(val global: Global) {
                 this.name)
             case nme.LT => new Values(
                 ranges.flatMap { case orig @ (low, high) => if(high < value) Some(orig) else if(low < value) Some((low, value-1)) else None },
-                 values.filter { a => a < value },
+                values.filter { a => a < value },
                 this.name)
             case nme.LE => new Values(
                 ranges.flatMap { case orig @ (low, high) => if(high <= value) Some(orig) else if(low <= value) Some((low, value)) else None },
@@ -89,16 +101,17 @@ class AbstractInterpretation(val global: Global) {
                 this.name)
             case _ => Values.empty
           }
-        case _ => Values.empty
+        case _ => Values.empty.addActualSize(this.actualSize)
       }
     }
     def applyInverseCond(condExpr: Tree) = { //TODO: wow, really... copy paste?
       if(!isUsed(condExpr, this.name)) this else condExpr match {
         //ADD: grouping with && ||, etc... replace both sides with with Expr (but test - seems weird)
-        case Apply(Select(Ident(v), op), List(Literal(Constant(value: Int)))) if v.toString == this.name => 
+        case Apply(Select(Ident(v), op), List(expr)) if v.toString == this.name && computeExpr(expr).isValue => 
+          val value = computeExpr(expr).getValue
           op match { //TODO: warn if some condition can never be true
-            case a if a.toString == "$eq$eq" => if(this.exists(a => a == value)) this.dropValue(value) else Values.empty 
-            case a if a.toString == "$bang$eq" => if(this.exists(a => a == value)) Values(value) else Values.empty 
+            case a if a.toString == "$eq$eq" => if(this.exists(a => a == value)) this.dropValue(value) else { Values.empty }
+            case a if a.toString == "$bang$eq" => if(this.exists(a => a == value)) Values(value) else { Values.empty }
             case nme.LE => new Values(
                 ranges.flatMap { case orig @ (low, high) => if(low > value) Some(orig) else if(high > value) Some((value+1, high)) else None },
                 values.filter { a => a > value },
@@ -109,7 +122,7 @@ class AbstractInterpretation(val global: Global) {
                 this.name)
             case nme.GE => new Values(
                 ranges.flatMap { case orig @ (low, high) => if(high < value) Some(orig) else if(low < value) Some((low, value-1)) else None },
-                 values.filter { a => a < value },
+                values.filter { a => a < value },
                 this.name)
             case nme.GT => new Values(
                 ranges.flatMap { case orig @ (low, high) => if(high <= value) Some(orig) else if(low <= value) Some((low, value)) else None },
@@ -117,7 +130,7 @@ class AbstractInterpretation(val global: Global) {
                 this.name)
             case _ => Values.empty
           }
-        case _ => Values.empty
+        case _ => Values.empty.addActualSize(this.actualSize)
       }
     }
     
@@ -131,15 +144,21 @@ class AbstractInterpretation(val global: Global) {
             .map { case (low, high) => (if(low > 0) low else 0, math.max(math.abs(low), math.abs(high))) }
             .map { case (low, high) if low > high => (high, low); case (low, high) => (low, high) },
           values.map(a => math.abs(a)))
-      case size if (size.toString == "size" || size.toString == "length") && ((this.ranges.size == 1 && this.values.size == 0) || (this.ranges.size == 0 && this.values.size >= 1)) =>
-        Values(this.size)
-      case head if (head.toString == "head") && (this.size == 1) => Values(this.getValueForce) //Only works for one element :) 
-      case last if (last.toString == "last") && (this.size == 1) => Values(this.getValueForce) //Only works for one element :)
+
+      case size if (size.toString == "size" || size.toString == "length") && (this.actualSize != -1) => Values(this.actualSize)
+      case head_last if (head_last.toString == "head|last") && (this.size == 1) => Values(this.getValueForce) //Only works for one element :)
+      //case tail_init if (tail_init.toString == "tail|init") && this.actualSize != -1 => Values.empty.addActualSize(this.actualSize - 1) //TODO: doesn't work
+      case to if (to.toString matches "toArray|toBuffer|toIndexedSeq|toList|toSeq|toTraversable|toVector") => this
+      case distinct if (distinct.toString == "distinct") && this.actualSize != -1 => this.addActualSize(this.size) //Will hold, while Set is used for values
+      case id if (id.toString matches "reverse") => this //Will hold, while Set is used for values
+      case max if (max.toString == "max") && !this.isEmpty => Values(this.max)
+      case min if (min.toString == "min") && !this.isEmpty => Values(this.min)
+
       case _ => Values.empty
     }
     def apply(op: Name)(right: Values): Values = {
       val left = this
-      
+
       val func: (Int, Int) => Int = op match {
           case nme.ADD => _ + _
           case nme.SUB => _ - _
@@ -152,7 +171,7 @@ class AbstractInterpretation(val global: Global) {
           case nme.ASR => _ >> _
           case nme.MOD if right.isValue && right.getValue != 0 => _ % _
           case nme.DIV if right.isValue && right.getValue != 0 => _ / _
-          case a if a.toString == "apply" => _ + _ //Foo, check below
+          case a if a.toString == "apply" => (a: Int, b: Int) => throw new Exception() //Foo, check below
           case _ => return Values.empty
       }
       
@@ -163,17 +182,13 @@ class AbstractInterpretation(val global: Global) {
         } else {
           Values.empty
         }
+      } else if(op.toString == "apply") {
+          //TODO: if you wanted actual values, you need to save seq type and refactor values from Set to Seq
+          if(left.isSeq && left.actualSize == 1 && left.size == 1 && right.isValue && right.getValueForce == 0) Values(left.getValueForce) else left
       } else if(left.isValue && right.isValue) {
         Values(func(left.getValue, right.getValue))
       } else if(!left.isValue && right.isValue) {
-        if(op.toString == "apply" && ((this.ranges.size == 1 && this.values.size == 0) || (this.ranges.size == 0 && this.values.size >= 1))) {
-          //TODO: if you wanted actual values, you need to save seq type and refactor values from Set to Seq
-          if(this.size == 1) Values(this.getValueForce) else this
-          println(this)
-          this
-        } else {
-          left.map(a => func(a, right.getValue))
-        }
+        left.map(a => func(a, right.getValue))
       } else if(left.isValue && !right.isValue) {
         right.map(a => func(left.getValue, a))
       } else {
@@ -196,11 +211,11 @@ class AbstractInterpretation(val global: Global) {
     //approximate
     def size: Int = values.size + ranges.foldLeft(0)((acc, range) => acc + (range._2 - range._1) + 1)
     
-    override def toString: String = "Values("+(if(name.size > 0) name+")(" else "")+(values.map(_.toString) ++ ranges.map(a => a._1+"-"+a._2)).mkString(",")+")"
+    override def toString: String = "Values("+(if(name.size > 0) name+")(" else "")+(values.map(_.toString) ++ ranges.map(a => a._1+"-"+a._2)).mkString(",")+", "+isSeq+", "+actualSize+")"
   }
   
   //ADD: GenSeq, and then implement .head .tail, ...
-  val SeqLikeObject: Symbol = definitions.getModule(newTermName("scala.collection.GenTraversable"))
+  val SeqLikeObject: Symbol = definitions.getModule(newTermName("scala.collection.GenSeq"))
   val SeqLikeClass: Symbol = definitions.getClass(newTermName("scala.collection.SeqLike"))
   val SeqLikeContains: Symbol = SeqLikeClass.info.member(newTermName("contains"))
   val SeqLikeApply: Symbol = SeqLikeClass.info.member(newTermName("apply"))
@@ -209,46 +224,57 @@ class AbstractInterpretation(val global: Global) {
     method == target || method.allOverriddenSymbols.contains(target)
   }
   
+  //TODO: extend with more functions... and TEST TEST TEST TEST
+  def computeExpr(tree: Tree): Values = {
+    tree match {
+      case Literal(Constant(value: Int)) => Values(value)
+      case Ident(termName) => vals(termName.toString)
+      
+      case Apply(Select(Apply(Select(scala_Predef, intWrapper), List(Literal(Constant(low: Int)))), to_until), List(Literal(Constant(high: Int)))) if (to_until.toString matches "to|until") =>
+        val high2 = if(to_until.toString == "to") high else high-1
+        new Values(Set((low, high2)), Set(), "", isSeq = true, high2-low)
+
+      case Apply(Select(Apply(Select(scala_Predef, intWrapper), List(expr1)), to_until), List(expr2)) if (to_until.toString matches "to|until") && computeExpr(expr1).isValue && computeExpr(expr2).isValue =>
+        val (low, high) = (computeExpr(expr1).getValue, computeExpr(expr2).getValue + (if(to_until.toString == "to") 0 else -1))
+        new Values(Set((low, high)), Set(), "", isSeq = true, high-low)
+
+      case Apply(TypeApply(genApply @ Select(_,_), _), genVals) if methodImplements(genApply.symbol, SeqLikeGenApply) =>
+        //ADD: List(expr,2,3) - save size, even if you can't compute expr
+        val values = genVals.map(v => computeExpr(v))
+        if(values.forall(_.isValue)) new Values(Set(), values.map(_.getValue).toSet, "", isSeq = true, actualSize = values.size) else Values.empty
+
+      case Apply(Select(Select(scala, scala_Array), apply), genVals) if(scala_Array.toString == "Array") =>
+        val values = genVals.map(v => computeExpr(v))
+        if(values.forall(_.isValue)) new Values(Set(), values.map(_.getValue).toSet, "", isSeq = true, actualSize = values.size) else Values.empty
+      
+      case Select(Apply(arrayOps @ Select(_, intArrayOps), List(expr)), op) if(arrayOps.toString == "scala.this.Predef.intArrayOps") => 
+        computeExpr(expr).applyUnary(op)
+      
+      case Apply(TypeApply(t @ Select(expr, op), _), List(Select(scala_math_Ordering, _Int))) if _Int.toString.endsWith("Int") => //.max .min
+        computeExpr(t)
+
+      //List(Literal(Constant(1)), Literal(Constant(2)), Literal(Constant(3)), Literal(Constant(4)), Literal(Constant(0)), Literal(Constant(0))))
+      case Select(expr, op) =>
+        //println((expr, op, computeExpr(expr).applyUnary(op)))
+        computeExpr(expr).applyUnary(op)
+      
+      case Apply(Select(scala_math_package, abs), List(expr)) if scala_math_package.toString == "scala.math.`package`" && abs.toString == "abs" => //TODO: scala and java abs
+        computeExpr(expr).applyUnary(abs)
+
+      case Apply(Select(expr1, op), List(expr2)) =>
+        //println(op)
+        (computeExpr(expr1))(op)(computeExpr(expr2))
+      
+      case a => /*println("computeExpr: "+showRaw( a ));*/ Values.empty
+    }
+  }
       
   var vals = collection.mutable.HashMap[String, Values]().withDefaultValue(Values.empty)
-  def forLoop(tree: GTree, unit: GUnit) {
+  def forLoop(tree: GTree) {
     //TODO: actually anything that takes (A <: (a Number) => _), this is awful
     val funcs = "foreach|map|filter(Not)?|exists|find|flatMap|forall|groupBy|count|((drop|take)While)|(min|max)By|partition|span"
 
     val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
-    
-    //TODO: extend with more functions... and TEST TEST TEST TEST
-    def computeExpr(tree: Tree, curr: Values = Values.empty): Values = {
-      tree match {
-        case Literal(Constant(value: Int)) => Values(value)
-        case Ident(termName) => vals(termName.toString)
-        
-        case Apply(Select(Apply(Select(scala_Predef, intWrapper), List(Literal(Constant(low: Int)))), to_until), List(Literal(Constant(high: Int)))) if (to_until.toString matches "to|until") =>
-          (if(to_until.toString == "to") Values(low, high, "") else Values(low, high-1, ""))
-
-        case Apply(Select(Apply(Select(scala_Predef, intWrapper), List(expr1)), to_until), List(expr2)) if (to_until.toString matches "to|until") && computeExpr(expr1, curr).isValue && computeExpr(expr2, curr).isValue =>
-          val (low, high) = (computeExpr(expr1, curr).getValue, computeExpr(expr2, curr).getValue)
-          (if(to_until.toString == "to") Values(low, high, "") else Values(low, high-1, ""))
-
-        case Apply(TypeApply(genApply @ Select(_,_), _), genVals) if methodImplements(genApply.symbol, SeqLikeGenApply) =>
-          //TODO: oh god, this isn't typesafe in any way
-          //ADD: List(expr,2,3) - save size, even if you can't compute expr
-          val values = genVals.map(v => computeExpr(v))
-          if(values.forall(_.isValue)) Values(values.map(_.getValue).toSet, "") else Values.empty
-
-        case Select(expr, op) => computeExpr(expr, curr).applyUnary(op)
-        
-        case Apply(Select(scala_math_package, abs), List(expr)) if scala_math_package.toString == "scala.math.`package`" && abs.toString == "abs" => //TODO: scala and java abs
-          computeExpr(expr, curr).applyUnary(abs)
-
-        case Apply(Select(expr1, op), List(expr2)) =>
-          //println(op)
-          (computeExpr(expr1, curr))(op)(computeExpr(expr2, curr))
-        
-
-        case _ => Values.empty
-      }
-    }
     
     val (param, values, body) = tree match {
       case Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, param, _, _)), body))) if (foreach_map.toString matches funcs) =>
@@ -263,58 +289,71 @@ class AbstractInterpretation(val global: Global) {
         //println("not a loop("+tree.pos+"): "+showRaw(tree))
         return
     }
-    vals += param.toString -> values
-
-    def traverseFor(tree: GTree) {
-      tree match {
-        case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, param, _, _)), body))) =>
-          forLoop(forloop, unit)
-        
-        case ValDef(m: Modifiers, valName, TypeTree(), Literal(Constant(a: Int))) if(!m.hasFlag(MUTABLE)) =>
-          //println(valName.toString)
-          vals += valName.toString -> Values(a, valName.toString)
-
-        case ValDef(m: Modifiers, valName, TypeTree(), expr) if(!m.hasFlag(MUTABLE) && !m.hasFlag(LAZY)) && !computeExpr(expr).isEmpty => //&& computeExpr(expr).isValue =>
-          //ADD: aliasing... val a = i, where i is an iterator, then 1/i-a is divbyzero
-          vals += valName.toString -> computeExpr(expr).addName(valName.toString)
-          //println(vals(valName.toString))
-        
-        case If(condExpr, t, f) => 
-          //println("in")
-          //println(vals);
-          val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
-          
-          vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr))).withDefaultValue(Values.empty)
-          //println(vals)
-          t.foreach(traverseFor)
-
-          vals = backupVals.map(a => (a._1, a._2.applyInverseCond(condExpr))).withDefaultValue(Values.empty)
-          //println(vals)
-          f.foreach(traverseFor)
-          
-          vals = backupVals.withDefaultValue(Values.empty)
-          //println("out")
-
-        case pos @ Apply(Select(_, op), List(expr)) if (op == nme.DIV || op == nme.MOD) && (computeExpr(expr).exists { a => a == 0 }) => 
-          unit.warning(pos.pos, "During this loop you will likely divide by zero.")
-
-        case pos @ Apply(Select(Ident(seq), apply), List(indexExpr)) 
-          if methodImplements(pos.symbol, SeqLikeApply) && vals.contains(seq.toString) && (computeExpr(indexExpr).exists { a => a >= vals(seq.toString).size }) =>
-          //println(seq.toString)
-          //println(computeExpr(indexExpr))
-          unit.warning(pos.pos, "During this loop you will likely use a too large index for a collection.")
-
-        case pos @ Apply(Select(seq, apply), List(indexExpr)) 
-          if methodImplements(pos.symbol, SeqLikeApply) && (computeExpr(indexExpr).exists { a => a < 0 }) =>
-          //println(computeExpr(indexExpr))
-          unit.warning(pos.pos, "During this loop you will likely use a negative index for a collection.")
-        
-        case _ => tree.children.foreach(traverseFor)
-      }
-    }
     
-    traverseFor(body)
+    if(!values.isEmpty) {
+      vals += param.toString -> values
+
+      traverseBlock(body)
+    }
     vals = backupVals.withDefaultValue(Values.empty)
   }
+  
+  val visitedBlocks = collection.mutable.HashSet[GTree]()
  
+  def traverseBlock(tree: GTree) {
+    val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
+    
+    traverse(tree)
+    
+    vals = backupVals.withDefaultValue(Values.empty)
+  }
+  def traverse(tree: GTree) {
+    if(visitedBlocks(tree)) return else visitedBlocks += tree
+    //if(vals.size > 0) println("in"+tree)
+    //if(vals.size > 0) println("> "+vals);
+    tree match {
+      case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, _, _, _)), _))) =>
+        forLoop(forloop)
+      
+      case ValDef(m: Modifiers, valName, TypeTree(), Literal(Constant(a: Int))) if(!m.hasFlag(MUTABLE)) =>
+        val valNameStr = valName.toString.trim
+        vals += valNameStr -> Values(a, valNameStr)
+        //println(vals(valName.toString))
+
+      case ValDef(m: Modifiers, valName, TypeTree(), expr) if(!m.hasFlag(MUTABLE) && !m.hasFlag(LAZY)) && !computeExpr(expr).isEmpty => //&& computeExpr(expr).isValue =>
+        //ADD: aliasing... val a = i, where i is an iterator, then 1/i-a is divbyzero
+        //ADD: isSeq and actualSize
+        val valNameStr = valName.toString.trim
+        vals += valNameStr -> computeExpr(expr).addName(valNameStr)
+        //println(vals(valName.toString))
+      
+      case If(condExpr, t, f) => 
+        val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
+        
+        vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr))).withDefaultValue(Values.empty)
+        t.foreach(traverse)
+
+        vals = backupVals.map(a => (a._1, a._2.applyInverseCond(condExpr))).withDefaultValue(Values.empty)
+        f.foreach(traverse)
+        
+        vals = backupVals.withDefaultValue(Values.empty)
+        //println(vals)
+
+      case pos @ Apply(Select(_, op), List(expr)) if (op == nme.DIV || op == nme.MOD) && (computeExpr(expr).exists { a => a == 0 }) => 
+        unit.warning(pos.pos, "You will likely divide by zero here.")
+
+      case pos @ Apply(Select(Ident(seq), apply), List(indexExpr)) 
+        if methodImplements(pos.symbol, SeqLikeApply) && vals.contains(seq.toString) && (computeExpr(indexExpr).exists { a => a >= vals(seq.toString).actualSize }) =>
+        //println(seq.toString)
+        //println(computeExpr(indexExpr))
+        unit.warning(pos.pos, "You will likely use a too large index for a collection here.")
+
+      case pos @ Apply(Select(seq, apply), List(indexExpr)) 
+        if methodImplements(pos.symbol, SeqLikeApply) && (computeExpr(indexExpr).exists { a => a < 0 }) =>
+        //println(computeExpr(indexExpr))
+        unit.warning(pos.pos, "You will likely use a negative index for a collection here.")
+      
+      case _ => tree.children.foreach(traverse)
+    }
+  }
 }

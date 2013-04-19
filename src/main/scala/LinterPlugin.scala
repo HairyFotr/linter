@@ -142,8 +142,11 @@ class LinterPlugin(val global: Global) extends Plugin {
       def isGlobalImport(selector: ImportSelector): Boolean = {
         selector.name == nme.WILDCARD && selector.renamePos == -1
       }
+      
+      val abstractInterpretation = new AbstractInterpretation(global, unit)
 
       override def traverse(tree: Tree) { 
+        abstractInterpretation.traverseBlock(tree)
         tree match {
           case ValDef(m: Modifiers, varName, TypeTree(), value) if(m.hasFlag(MUTABLE)) =>
             varDecls += varName.toString.trim
@@ -372,10 +375,23 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
           } => // lololololololol
 
+
+          case ClassDef(mods, name, tparams, impl) =>
+            abstractInterpretation.traverseBlock(impl)
+
+          case ModuleDef(mods, name, impl) => 
+            abstractInterpretation.traverseBlock(impl)
+
+          case block @ Block(_, _) =>
+            abstractInterpretation.traverseBlock(block)
+
           case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, param, _, _)), body))) if { //if (foreach_map.toString matches "foreach|map") && {
-            (new AbstractInterpretation(global)).forLoop(forloop, unit)
+            abstractInterpretation.forLoop(forloop)
             false
           } => //
+
+          case DefDef(_, _, _, _, _, block) => 
+            abstractInterpretation.traverseBlock(block)
 
           case pos @ Apply(Select(seq, apply), List(Literal(Constant(index: Int)))) 
             if methodImplements(pos.symbol, SeqLikeApply) && index < 0 =>
