@@ -385,6 +385,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case Ident(termName) => 
         val name = termName.toString
         val n = (if(name.contains(".this.")) name.substring(name.lastIndexOf(".")+1) else name).trim
+        //println(n+": "+vals(n))
         vals(n)
       
       case Apply(Select(Apply(Select(scala_Predef, intWrapper), List(Literal(Constant(low: Int)))), to_until), List(Literal(Constant(high: Int)))) if (to_until.toString matches "to|until") =>
@@ -450,7 +451,9 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     
     val (param, values, body) = tree match {
       case Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, param, _, _)), body))) if (foreach_map.toString matches funcs) =>
+        //println(showRaw(collection))
         val values = computeExpr(collection).addName(param.toString)
+        //println(values)
         //if(values.isEmpty) {
             //println("not a collection I know("+tree.pos+"): "+showRaw(collection))
             //return
@@ -494,9 +497,20 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case ValDef(m: Modifiers, valName, TypeTree(), expr) if(!m.hasFlag(MUTABLE) && !m.hasFlag(LAZY)) /*&& !computeExpr(expr).isEmpty*/ => //&& computeExpr(expr).isValue =>
         //ADD: aliasing... val a = i, where i is an iterator, then 1/i-a is divbyzero
         //ADD: isSeq and actualSize
-        val valNameStr = valName.toString.trim
+
+        val valNameStr = valName.toString
         vals += valNameStr -> computeExpr(expr).addName(valNameStr)
+       
         //println("newVal: "+vals(valName.toString))
+        
+        expr match {
+          case e => //Block(_, _) | If(_,_,_) =>
+            //println(expr)
+            val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
+            traverse(expr)
+            vals = backupVals.withDefaultValue(Values.empty)
+          //case _ =>
+        }
       
       case Match(pat, cases) if pat.tpe.toString != "Any @unchecked" && cases.size >= 2 =>
         for(c <- cases) {
@@ -512,6 +526,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         //println(vals)
         vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr))).withDefaultValue(Values.empty)
         //println(vals)
+        //ADD: if always true, or always false pass the return value, e.g. val a = 1; val b = if(a == 1) 5 else 4
         t.foreach(traverse)
 
         vals = backupVals.map(a => (a._1, a._2.applyInverseCond(condExpr))).withDefaultValue(Values.empty)
