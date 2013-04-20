@@ -51,9 +51,10 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     def toValues = new Values(values = values ++ ranges.flatMap { case (low, high) => (low to high) }, name = name, isSeq = isSeq, actualSize = actualSize)
     
     def isEmpty = this.size == 0
-    def isValue = this.values.size == 1 && this.ranges.size == 0 // TODO: this is stupid and buggy, and woudn't exist if I didn't mix all types into one class
+    def nonEmpty = this.size > 0
+    def isValue = this.values.size == 1 && this.ranges.isEmpty // TODO: this is stupid and buggy, and woudn't exist if I didn't mix all types into one class
     def getValue = if(isValue) values.head else throw new Exception()
-    def isValueForce = (this.values.size == 1 && this.ranges.size == 0) || (ranges.size == 1 && this.size == 1)
+    def isValueForce = (this.values.size == 1 && this.ranges.isEmpty) || (ranges.size == 1 && this.size == 1)
     def getValueForce = if(isValue) values.head else if(ranges.size == 1 && this.size == 1) ranges.head._1 else throw new Exception()
 
     def max = (values ++ ranges.map(_._2)).max
@@ -80,7 +81,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           values
             .map(func))
       } else {
-        if(this.ranges.size > 0 && this.size <= 100001) //ADD: it's not that bad - it simply won't check the big ranges further.
+        if(this.ranges.nonEmpty && this.size <= 100001) //ADD: it's not that bad - it simply won't check the big ranges further.
           (new Values(values = values ++ ranges.flatMap { case (low, high) => (low to high) }, name = name, isSeq = isSeq, actualSize = actualSize)).map(func)
         else 
           Values.empty
@@ -99,7 +100,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
             this.name)
 
         //ADD: expr op expr that handles idents right
-        case Apply(Select(Ident(v), op), List(expr)) if v.toString == this.name && this.size > 0 && computeExpr(expr).isValue => 
+        case Apply(Select(Ident(v), op), List(expr)) if v.toString == this.name && this.nonEmpty && computeExpr(expr).isValue => 
           val value = computeExpr(expr).getValue
           val out = op match {
             case nme.EQ => 
@@ -154,7 +155,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
               if(left.isValue && right.isValue && left.getValue == right.getValue) {
                 unit.warning(condExpr.pos, "This condition will " + (if(op == nme.EQ) "always" else "never") + " hold.")
                 if(op == nme.EQ && (left.name == this.name || right.name == this.name)) out = this
-              } else if(left.size > 0 && right.size > 0 && (left.min > right.max || right.min > left.max)) {
+              } else if(left.nonEmpty && right.nonEmpty && (left.min > right.max || right.min > left.max)) {
                 unit.warning(condExpr.pos, "This condition will " + (if(op == nme.EQ) "never" else "always") + " hold.")
                 if(op != nme.EQ && (left.name == this.name || right.name == this.name)) out = this
               } else if(right.name == this.name && left.isValueForce && op == nme.EQ) { //Yoda conditions 
@@ -170,7 +171,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
                   unit.warning(condExpr.pos, "This condition will " + (if(op == nme.GT) "never" else "always") + " hold.")
                   if(op != nme.GT && (left.name == this.name || right.name == this.name)) out = this
                 }
-              } else if(left.size > 0 && right.size > 0) {
+              } else if(left.nonEmpty && right.nonEmpty) {
                 if(left.max <= right.min) {
                   unit.warning(condExpr.pos, "This condition will " + (if(op == nme.GT) "never" else "always") + " hold.")
                   if(op != nme.GT && (left.name == this.name || right.name == this.name)) out = this
@@ -189,7 +190,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
                   unit.warning(condExpr.pos, "This condition will " + (if(op == nme.GE) "never" else "always") + " hold.")
                   if(op != nme.GT && (left.name == this.name || right.name == this.name)) out = this
                 }
-              } else if(left.size > 0 && right.size > 0) {
+              } else if(left.nonEmpty && right.nonEmpty) {
                 if(left.max < right.min) {
                   unit.warning(condExpr.pos, "This condition will " + (if(op == nme.GE) "never" else "always") + " hold.")
                   if(op != nme.GE && (left.name == this.name || right.name == this.name)) out = this
@@ -220,8 +221,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         case Apply(Select(Ident(v), op), List(expr)) if v.toString == this.name && computeExpr(expr).isValue => 
           val value = computeExpr(expr).getValue
           op match { //TODO: warn if some condition can never be true
-            case a if a.toString == "$eq$eq" => if(this.exists(a => a == value)) this.dropValue(value) else { Values.empty }
-            case a if a.toString == "$bang$eq" => if(this.exists(a => a == value)) Values(value) else { Values.empty }
+            case nme.EQ => if(this.exists(a => a == value)) this.dropValue(value) else { Values.empty }
+            case nme.NE => if(this.exists(a => a == value)) Values(value) else { Values.empty }
             case nme.LE => new Values(
                 ranges.flatMap { case orig @ (low, high) => if(low > value) Some(orig) else if(high > value) Some((value+1, high)) else None },
                 values.filter { a => a > value },
@@ -262,8 +263,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case to if (to.toString matches "toIndexedSeq|toList|toSeq|toVector") => this //only immutable
       case distinct if (distinct.toString == "distinct") && this.actualSize != -1 => this.toValues.addActualSize(this.size) //Will hold, while Set is used for values
       case id if (id.toString matches "reverse") => this //Will hold, while Set is used for values
-      case max if (max.toString == "max") && !this.isEmpty => Values(this.max)
-      case min if (min.toString == "min") && !this.isEmpty => Values(this.min)
+      case max if (max.toString == "max") && this.nonEmpty => Values(this.max)
+      case min if (min.toString == "min") && this.nonEmpty => Values(this.min)
 
       case empty if (empty.toString == "isEmpty") && (this.actualSize != -1) => 
         unit.warning(treePosHolder.pos, "This will " + (if(this.actualSize == 0) "always" else "never") + " hold.")
@@ -461,7 +462,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         return
     }
     
-    if(!values.isEmpty) {
+    if(values.nonEmpty) {
       vals += param.toString -> values
 
       traverseBlock(body)
@@ -539,8 +540,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         vals = backupVals.withDefaultValue(Values.empty)
 
       case a: AbstractInterpretation.this.global.Tree => 
-        //if(vals.size > 0) println("in: "+showRaw(tree))
-        //if(vals.size > 0) println(">   "+vals);
+        //if(vals.nonEmpty) println("in: "+showRaw(tree))
+        //if(vals.nonEmpty) println(">   "+vals);
         tree.children.foreach(traverse)
     }
   }

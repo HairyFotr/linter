@@ -325,10 +325,10 @@ class LinterPlugin(val global: Global) extends Plugin {
             //TODO: there are people still doing breakable { while
             val warnMsg = "This condition will always be "+a+"."
             unit.warning(cond.pos, warnMsg)
-          case Apply(Select(Literal(Constant(false)), term), _) if term.toString == "$amp$amp" =>
+          case Apply(Select(Literal(Constant(false)), term), _) if term == nme.ZAND =>
             val warnMsg = "This part of boolean expression will always be false."
             unit.warning(tree.pos, warnMsg)
-          case Apply(Select(Literal(Constant(true)), term), _) if term.toString == "$bar$bar" =>
+          case Apply(Select(Literal(Constant(true)), term), _) if term == nme.ZOR =>
             val warnMsg = "This part of boolean expression will always be true."
             unit.warning(tree.pos, warnMsg)
             
@@ -436,7 +436,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     class AfterLinterTraverser(unit: CompilationUnit) extends Traverser {
       override def traverse(tree: Tree) {
         val maybeVals = (varDecls -- varAssigns)
-        if(!maybeVals.isEmpty) unit.warning(tree.pos, "[experimental] These vars might secretly be vals: grep -rnP --include=*.scala 'var ([(][^)]*)?("+maybeVals.mkString("|")+")'")
+        if(maybeVals.nonEmpty) unit.warning(tree.pos, "[experimental] These vars might secretly be vals: grep -rnP --include=*.scala 'var ([(][^)]*)?("+maybeVals.mkString("|")+")'")
         varDecls.clear
       }
     }
