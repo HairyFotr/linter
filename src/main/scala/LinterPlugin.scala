@@ -165,6 +165,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           //TODO: Too hacky detection, also doesn't actually check if you close it - just that you don't use it as a oneliner
             val warnMsg = "You should close the file stream after use."
             unit.warning(fromFile.pos, warnMsg)
+            return
             
           case If(cond1, _, If(cond2, _, _)) if cond1 equalsStructure cond2 =>
             unit.warning(cond2.pos, "The else-if has the same condition.")
@@ -236,7 +237,8 @@ class LinterPlugin(val global: Global) extends Plugin {
             stringLiteralCount(str) += 1
             if(stringLiteralCount(str) == threshold && !(stringLiteralFileExceptions.contains(unit.source.toString)) && !(str.matches(stringLiteralExceptions))) {
               //unit.warning(tree.pos, unit.source.path.toString)
-              unit.warning(tree.pos, """String literal """"+str+"""" appears multiple times.""")
+              //Too much noise :)
+              //unit.warning(tree.pos, """String literal """"+str+"""" appears multiple times.""")
             }
             
           case Match(Literal(Constant(a)), cases) =>
@@ -251,7 +253,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 .map { s => " will always return " + s }
                 .getOrElse("")
             
-            unit.warning(tree.pos, "Pattern matching on a constant value " + a + returnVal + ".")
+            unit.warning(tree.pos, "Pattern matching on a constant value " + a /*+ returnVal*/ + ".")
 
           case Match(pat, cases) if pat.tpe.toString != "Any @unchecked" && cases.size >= 2 =>
             //"Any @unchecked" seems to happen on the matching structures of actors - and all cases return true
@@ -296,7 +298,8 @@ class LinterPlugin(val global: Global) extends Plugin {
                 //This one always turns out to be a false positive
                 //unit.warning(tree.pos, "All "+cases.size+" cases will return "+cases.head.body+", regardless of pattern value") 
               } else if(streak.streak > 1) {
-                unit.warning(streak.tree.body.pos, streak.streak+" neighbouring cases are identical, and could be merged.")
+                //TODO: should check actual cases
+                //unit.warning(streak.tree.body.pos, streak.streak+" neighbouring cases are identical, and could be merged.")
               }
             }
 
@@ -313,7 +316,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             unit.warning(cond.pos, "Remove the if and just use the condition.")
           case If(cond, Literal(Constant(false)), Literal(Constant(true))) =>
             unit.warning(cond.pos, "Remove the if and just use the negated condition.")
-          case If(cond, a, b) if a equalsStructure b =>
+          case If(cond, a, b) if (a equalsStructure b) && (a.children.nonEmpty) =>
             //TODO: empty if statement (if(...) { }) triggers this - change warning for that case
             unit.warning(cond.pos, "Both if statement branches have the same structure.")
 
@@ -351,8 +354,12 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           case Block(block, last) if { //TODO: var v; ...non v related stuff...; v = 4 <-- this is the same thing, really
             ((block :+ last) zip ((block :+ last).tail)) exists { 
-              case (ValDef(modifiers, id1, _, _), Assign(id2, _)) if id1.toString == id2.toString =>
+              case (ValDef(modifiers, id1, _, _), Assign(id2, assign)) if id1.toString == id2.toString && !abstractInterpretation.isUsed(assign, id2.toString)=>
                 unit.warning(id2.pos, "Assignment right after declaration is most likely a bug (unless you side-effect like a boss)")
+                true
+              //case (Assign(id1, _), Assign(id2, _)) if id1.toString == id2.toString => // stricter
+              case (Assign(id1, _), Assign(id2, assign)) if id1.toString == id2.toString && !abstractInterpretation.isUsed(assign, id2.toString) =>
+                unit.warning(id2.pos, "Two subsequent assigns are most likely a bug (unless you side-effect like a boss)")
                 true
               //TODO: move to def analysis - this is only for those blocks
               //case (_, l @ Return(_)) if l eq last =>
@@ -360,9 +367,6 @@ class LinterPlugin(val global: Global) extends Plugin {
               //  true              
               case (v @ ValDef(_, id1, _, _), l @ Ident(id2)) if id1.toString == id2.toString && (l eq last) =>
                 unit.warning(v.pos, "You don't need that temp variable.")
-                true
-              case (Assign(id1, _), Assign(id2, _)) if id1.toString == id2.toString =>
-                unit.warning(id1.pos, "Two subsequent assigns are most likely a bug (unless you side-effect like a boss)")
                 true
               case (If(cond1, _, _), If(cond2, _, _)) if cond1 equalsStructure cond2 =>
                 unit.warning(cond1.pos, "Two subsequent ifs have the same condition")
