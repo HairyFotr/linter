@@ -251,7 +251,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
             .map { case (low, high) if low > high => (high, low); case (low, high) => (low, high) },
           values.map(a => math.abs(a)))
 
-      case size if (size.toString == "size" || size.toString == "length") && (this.actualSize != -1) => println((this.name, this.actualSize)); Values(this.actualSize)
+      case size if (size.toString == "size" || size.toString == "length") && (this.actualSize != -1) => Values(this.actualSize)
       case head_last if (head_last.toString == "head|last") && this.actualSize == 1 && this.size == 1 => Values(this.getValueForce) //Only works for one element :)
       //case tail_init if (tail_init.toString == "tail|init") && this.actualSize != -1 => Values.empty.addActualSize(this.actualSize - 1) //TODO: doesn't work
       case to if (to.toString matches "toIndexedSeq|toList|toSeq|toVector") => this //only immutable
