@@ -203,7 +203,12 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           }
           
           out
-        case _ =>
+        case Select(expr, op) =>
+          computeExpr(expr).applyUnary(op)
+          Values.empty.addActualSize(this.actualSize)
+          
+        case expr =>
+          computeExpr(expr)
           Values.empty.addActualSize(this.actualSize)
       }
       
@@ -259,6 +264,13 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case id if (id.toString matches "reverse") => this //Will hold, while Set is used for values
       case max if (max.toString == "max") && !this.isEmpty => Values(this.max)
       case min if (min.toString == "min") && !this.isEmpty => Values(this.min)
+
+      case empty if (empty.toString == "isEmpty") && (this.actualSize != -1) => 
+        unit.warning(treePosHolder.pos, "This will " + (if(this.actualSize == 0) "always" else "never") + " hold.")
+        Values.empty
+      case empty if (empty.toString == "nonEmpty") && (this.actualSize != -1) => 
+        unit.warning(treePosHolder.pos, "This will " + (if(this.actualSize > 0) "always" else "never") + " hold.")
+        Values.empty
 
       case _ => Values.empty
     }
