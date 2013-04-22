@@ -89,6 +89,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       }
     
     def applyCond(condExpr: Tree): (Values, Values) = {//TODO: return (true, false) ValueSets in one go - applyInverseCond sucks //TODO: true and false cound be possible returns for error msgs
+      var alwaysHold, neverHold = false
       val out = condExpr match {
         case Apply(Select(expr1, op), List(expr2)) if op == nme.ZAND => //&&
           this.applyCond(expr1)._1.applyCond(expr2)._1
@@ -106,19 +107,19 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           val out = op match {
             case nme.EQ => 
               if(this.exists(_ == value)) {
-                if(this.forall(_ == value)) unit.warning(condExpr.pos, "This condition will always hold.")
-                Values(value).addName(name) 
+                if(this.forall(_ == value)) alwaysHold = true
+                Values(value).addName(name)
               } else { 
-                unit.warning(condExpr.pos, "This condition will never hold.")
+                neverHold = true
                 Values.empty
               }
             case nme.NE => 
               if(this.exists(_ == value)) {
                 val out = this.dropValue(value) 
-                if(out.isEmpty) unit.warning(condExpr.pos, "This condition will never hold.")
+                if(out.isEmpty) neverHold = true
                 out
               } else {
-                unit.warning(condExpr.pos, "This condition will always hold.")
+                alwaysHold = true
                 this
               }
             case nme.GT => new Values(
@@ -142,9 +143,9 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
               Values.empty
           }
           
-          if(Set(nme.GT, nme.GE, nme.LT, nme.LE)(op)) {
-            if(out.isEmpty) unit.warning(condExpr.pos, "This condition will never hold.")
-            if(out.size == this.size) unit.warning(condExpr.pos, "This condition will always hold.")
+          if(Set(nme.GT, nme.GE, nme.LT, nme.LE) contains op) {
+            if(out.isEmpty) neverHold = true
+            if(out.size == this.size) alwaysHold = true
           }
           
           out          
@@ -154,10 +155,10 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           op match {
             case nme.EQ | nme.NE =>
               if(left.isValue && right.isValue && left.getValue == right.getValue) {
-                unit.warning(condExpr.pos, "This condition will " + (if(op == nme.EQ) "always" else "never") + " hold.")
+                if(op == nme.EQ) alwaysHold = true else neverHold = true
                 if(op == nme.EQ && (left.name == this.name || right.name == this.name)) out = this
               } else if(left.nonEmpty && right.nonEmpty && (left.min > right.max || right.min > left.max)) {
-                unit.warning(condExpr.pos, "This condition will " + (if(op == nme.EQ) "never" else "always") + " hold.")
+                if(op != nme.EQ) alwaysHold = true else neverHold = true
                 if(op != nme.EQ && (left.name == this.name || right.name == this.name)) out = this
               } else if(right.name == this.name && left.isValueForce && op == nme.EQ) { //Yoda conditions 
                 out = Values(left.getValueForce).addName(this.name)
@@ -166,18 +167,18 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
             case nme.GT | nme.LE => 
               if(left.isValue && right.isValue) {
                 if(left.getValue > right.getValue) {
-                  unit.warning(condExpr.pos, "This condition will " + (if(op == nme.GT) "always" else "never") + " hold.")
+                  if(op == nme.GT) alwaysHold = true else neverHold = true
                   if(op == nme.GT && (left.name == this.name || right.name == this.name)) out = this
                 } else {
-                  unit.warning(condExpr.pos, "This condition will " + (if(op == nme.GT) "never" else "always") + " hold.")
+                  if(op != nme.GT) alwaysHold = true else neverHold = true
                   if(op != nme.GT && (left.name == this.name || right.name == this.name)) out = this
                 }
               } else if(left.nonEmpty && right.nonEmpty) {
                 if(left.max <= right.min) {
-                  unit.warning(condExpr.pos, "This condition will " + (if(op == nme.GT) "never" else "always") + " hold.")
+                  if(op != nme.GT) alwaysHold = true else neverHold = true
                   if(op != nme.GT && (left.name == this.name || right.name == this.name)) out = this
                 } else if(left.min > right.max) {
-                  unit.warning(condExpr.pos, "This condition will " + (if(op == nme.GT) "always" else "never") + " hold.")
+                  if(op == nme.GT) alwaysHold = true else neverHold = true
                   if(op == nme.GT && (left.name == this.name || right.name == this.name)) out = this
                 }
               }
@@ -185,18 +186,18 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
             case nme.GE | nme.LT => 
               if(left.isValue && right.isValue) {
                 if(left.getValue >= right.getValue) {
-                  unit.warning(condExpr.pos, "This condition will " + (if(op == nme.GE) "always" else "never") + " hold.")
+                  if(op == nme.GE) alwaysHold = true else neverHold = true
                   if(op == nme.GE && (left.name == this.name || right.name == this.name)) out = this
                 } else {
-                  unit.warning(condExpr.pos, "This condition will " + (if(op == nme.GE) "never" else "always") + " hold.")
-                  if(op != nme.GT && (left.name == this.name || right.name == this.name)) out = this
+                  if(op != nme.GE) alwaysHold = true else neverHold = true
+                  if(op != nme.GE && (left.name == this.name || right.name == this.name)) out = this
                 }
               } else if(left.nonEmpty && right.nonEmpty) {
                 if(left.max < right.min) {
-                  unit.warning(condExpr.pos, "This condition will " + (if(op == nme.GE) "never" else "always") + " hold.")
+                  if(op != nme.GE) alwaysHold = true else neverHold = true
                   if(op != nme.GE && (left.name == this.name || right.name == this.name)) out = this
                 } else if(left.min >= right.max) {
-                  unit.warning(condExpr.pos, "This condition will " + (if(op == nme.GE) "always" else "never") + " hold.")
+                  if(op == nme.GE) alwaysHold = true else neverHold = true
                   if(op == nme.GE && (left.name == this.name || right.name == this.name)) out = this
                 }
               }
@@ -214,7 +215,10 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           Values.empty.addActualSize(this.actualSize)
       }
       
-      if(!isUsed(condExpr, this.name)) (this, this) else (out, this - out)
+      if(neverHold) unit.warning(condExpr.pos, "This condition will never hold.")
+      if(alwaysHold) unit.warning(condExpr.pos, "This condition will always hold.")
+      
+      if(!isUsed(condExpr, this.name)) (this, this) else (out, if(neverHold) this else if(alwaysHold) Values.empty else this - out)
     }
     def -(v: Values) = { 
       if(this.isEmpty || v.isEmpty) {
@@ -222,7 +226,6 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       } else {
         var out = this
         v map { a => out = out.dropValue(a); a }
-        println(v)
         out
       }
     }
