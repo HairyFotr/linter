@@ -26,6 +26,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     //def apply(low: Int, high: Int, name: String, isSeq: Boolean, actualSize: Int): Values = new Values(name = name, ranges = Set((low, high)), isSeq = isSeq, actualSize = actualSize)
     //def apply(s: Set[Int], name: String, isSeq: Boolean, actualSize: Int): Values = new Values(name = name, values = s, isSeq = isSeq, actualSize = actualSize)
     def apply(i: Int, name: String = ""): Values = new Values(name = name, values = Set(i))
+    def apply(low: Int, high: Int): Values = new Values(ranges = Set((low, high)))
   }
   class Values(
       val ranges: Set[(Int, Int)] = Set[(Int, Int)](),
@@ -250,6 +251,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case nme.UNARY_+ => this
       case nme.UNARY_- => this.map(a => -a)
       case nme.UNARY_~ => this.map(a => ~a, rangeSafe = false)
+      case signum if signum.toString == "signum" => this.map(a => math.signum(a))
       case abs if abs.toString == "abs" =>
         new Values(
           ranges
@@ -292,7 +294,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           case nme.ASR => (_ >> _, false): F
           case nme.MOD if right.size == 1 && right.getValueForce != 0 => (_ % _, false): F
           case nme.DIV if right.size == 1 && right.getValueForce != 0 => (_ / _, false): F
-          case a if a.toString matches "apply|take|drop|map" => ((a: Int, b: Int) => throw new Exception(), false): F //Foo, check below
+          case a if a.toString matches "apply|take|drop|map|max|min" => ((a: Int, b: Int) => throw new Exception(), false): F //Foo, check below
           case _ => return Values.empty
       }
       
@@ -309,6 +311,58 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       } else if(op.toString == "map") {
         //println(" here")
         right
+      } else if(op.toString == "max") {
+        if(left.isValue && right.isValue) { 
+          Values(math.max(left.getValue, right.getValue))
+        } else if(left.isValue && !right.isValue) {
+          if(left.getValue >= right.max) {
+            unit.warning(treePosHolder.pos, "This max will always return the first value")
+            Values(left.getValue)
+          } else if(left.getValue <= right.min) {
+            unit.warning(treePosHolder.pos, "This max will always return the second value")
+            right
+          } else {
+            Values.empty
+          }
+        } else if(!left.isValue && right.isValue) {
+          if(right.getValue >= left.max) {
+            unit.warning(treePosHolder.pos, "This max will always return the second value")
+            Values(right.getValue)
+          } else if(right.getValue <= left.min) {
+            unit.warning(treePosHolder.pos, "This max will always return the first value")
+            left
+          } else {
+            Values.empty
+          }
+        } else {
+          Values.empty
+        }          
+      } else if(op.toString == "min") {
+        if(left.isValue && right.isValue) {
+          Values(math.min(left.getValue, right.getValue))
+        } else if(left.isValue && !right.isValue) {
+          if(left.getValue <= right.min) {
+            unit.warning(treePosHolder.pos, "This min will always return the first value")
+            Values(left.getValue)
+          } else if(left.getValue > right.max) {
+            unit.warning(treePosHolder.pos, "This min will always return the second value")
+            right
+          } else {
+            Values.empty
+          }
+        } else if(!left.isValue && right.isValue) {
+          if(right.getValue <= left.min) {
+            unit.warning(treePosHolder.pos, "This min will always return the second value")
+            Values(right.getValue)
+          } else if(right.getValue > left.max) {
+            unit.warning(treePosHolder.pos, "This min will always return the first value")
+            left
+          } else {
+            Values.empty
+          }
+        } else {
+          Values.empty
+        }          
       } else if(op.toString == "take") {
         if(left.isSeq && left.actualSize != -1 && right.isValue) {
           if(right.getValueForce >= left.actualSize) {
@@ -412,13 +466,40 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case Apply(TypeApply(t @ Select(expr, op), _), List(Select(scala_math_Ordering, _Int))) if _Int.toString.endsWith("Int") => //.max .min
         computeExpr(t)
 
+      
+      case Apply(Select(scala_math_package, op), params) if scala_math_package.toString == "scala.math.`package`" => //TODO: scala and java abs
+        op.toString match {
+          case "abs" | "signum" if params.size == 1 => computeExpr(params.head).applyUnary(op)
+          case "max" | "min"    if params.size == 2 => computeExpr(params(0))(op)(computeExpr(params(1)))
+          case _ => Values.empty
+        }
+
+      case Apply(Select(scala_math_package, abs), List(expr)) if scala_math_package.toString == "scala.math.`package`" && abs.toString == "max" => //TODO: scala and java abs
+        computeExpr(expr).applyUnary(abs)
+
+      case Apply(Select(scala_util_Random, nextInt), params) if nextInt.toString == "nextInt" => //if scala_util_Random.toString == "scala.util" =>
+        if(params.size == 1) {
+          val param = computeExpr(params.head)
+          if(param.nonEmpty) {
+            if(param.min <= 0) {
+              unit.warning(treePosHolder.pos, "The parameter of this nextInt might be lower than 1 here.")
+              Values.empty
+            } else {
+              Values(0, param.max-1)
+            }
+          } else {
+            Values.empty
+          }
+        } else {
+          //ADD: check what happens on +1, also if overflows are worthy of detection elsewhere :)
+          //Values(Int.MinValue, Int.MaxValue)
+          Values.empty
+        }
+
       //List(Literal(Constant(1)), Literal(Constant(2)), Literal(Constant(3)), Literal(Constant(4)), Literal(Constant(0)), Literal(Constant(0))))
       case Select(expr, op) =>
         //println((expr, op, computeExpr(expr).applyUnary(op)))
         computeExpr(expr).applyUnary(op)
-      
-      case Apply(Select(scala_math_package, abs), List(expr)) if scala_math_package.toString == "scala.math.`package`" && abs.toString == "abs" => //TODO: scala and java abs
-        computeExpr(expr).applyUnary(abs)
 
       case Apply(Select(expr1, op), List(expr2)) =>
         //println((op, expr1, expr2, (computeExpr(expr1))(op)(computeExpr(expr2))))
@@ -489,12 +570,12 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, _, _, _)), _))) =>
         forLoop(forloop)
       
-      case ValDef(m: Modifiers, valName, TypeTree(), Literal(Constant(a: Int))) if(!m.hasFlag(MUTABLE)) =>
+      case ValDef(m: Modifiers, valName, _, Literal(Constant(a: Int))) if(!m.hasFlag(MUTABLE)) =>
         val valNameStr = valName.toString.trim
         vals += valNameStr -> Values(a, valNameStr)
         //println(vals(valName.toString))
 
-      case ValDef(m: Modifiers, valName, TypeTree(), expr) if(!m.hasFlag(MUTABLE) && !m.hasFlag(LAZY)) /*&& !computeExpr(expr).isEmpty*/ => //&& computeExpr(expr).isValue =>
+      case ValDef(m: Modifiers, valName, _, expr) if(!m.hasFlag(MUTABLE) && !m.hasFlag(LAZY)) /*&& !computeExpr(expr).isEmpty*/ => //&& computeExpr(expr).isValue =>
         //ADD: aliasing... val a = i, where i is an iterator, then 1/i-a is divbyzero
         //ADD: isSeq and actualSize
 
@@ -535,7 +616,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         vals = backupVals.withDefaultValue(Values.empty)
         //println(vals)
 
-      case pos @ Apply(Select(_, op), List(expr)) if (op == nme.DIV || op == nme.MOD) && (computeExpr(expr).exists { a => a == 0 }) => 
+      case pos @ Apply(Select(_, op), List(expr)) if (op == nme.DIV || op == nme.MOD) && (computeExpr(expr).contains(0)) => 
         unit.warning(pos.pos, "You will likely divide by zero here.")
 
       case pos @ Apply(Select(Ident(seq), apply), List(indexExpr)) 
@@ -552,6 +633,12 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case DefDef(_, _, _, _, _, block) => 
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
         traverse(block)
+        vals = backupVals.withDefaultValue(Values.empty)
+
+      case b @ Block(_, _) => 
+        //println("block: "+b)
+        val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
+        tree.children.foreach(traverse)
         vals = backupVals.withDefaultValue(Values.empty)
 
       case a: AbstractInterpretation.this.global.Tree => 
