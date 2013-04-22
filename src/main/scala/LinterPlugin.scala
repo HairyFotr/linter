@@ -146,7 +146,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       val abstractInterpretation = new AbstractInterpretation(global, unit)
 
       override def traverse(tree: Tree) { 
-        //abstractInterpretation.traverseBlock(tree)
+        abstractInterpretation.traverseBlock(tree)
         tree match {
           case ValDef(m: Modifiers, varName, TypeTree(), value) if(m.hasFlag(MUTABLE)) =>
             varDecls += varName.toString.trim

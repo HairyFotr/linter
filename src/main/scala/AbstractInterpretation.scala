@@ -88,13 +88,13 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           Values.empty
       }
     
-    def applyCond(condExpr: Tree): Values = {//TODO: return (true, false) ValueSets in one go - applyInverseCond sucks //TODO: true and false cound be possible returns for error msgs
+    def applyCond(condExpr: Tree): (Values, Values) = {//TODO: return (true, false) ValueSets in one go - applyInverseCond sucks //TODO: true and false cound be possible returns for error msgs
       val out = condExpr match {
         case Apply(Select(expr1, op), List(expr2)) if op == nme.ZAND => //&&
-          this.applyCond(expr1).applyCond(expr2)
+          this.applyCond(expr1)._1.applyCond(expr2)._1
           
         case Apply(Select(expr1, op), List(expr2)) if op == nme.ZOR => //&&
-          val (left,right) = (this.applyCond(expr1), this.applyCond(expr2))
+          val (left,right) = (this.applyCond(expr1)._1, this.applyCond(expr2)._1)
           new Values(
             left.ranges ++ right.ranges,
             left.values ++ right.values,
@@ -214,36 +214,16 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           Values.empty.addActualSize(this.actualSize)
       }
       
-      if(!isUsed(condExpr, this.name)) this else out
+      if(!isUsed(condExpr, this.name)) (this, this) else (out, this - out)
     }
-    def applyInverseCond(condExpr: Tree) = { //TODO: wow, really... copy paste?
-      if(!isUsed(condExpr, this.name)) this else condExpr match {
-        //ADD: grouping with && ||, etc... replace both sides with with Expr (but test - seems weird)
-        case Apply(Select(Ident(v), op), List(expr)) if v.toString == this.name && computeExpr(expr).isValue => 
-          val value = computeExpr(expr).getValue
-          op match { //TODO: warn if some condition can never be true
-            case nme.EQ => if(this.exists(a => a == value)) this.dropValue(value) else { Values.empty }
-            case nme.NE => if(this.exists(a => a == value)) Values(value) else { Values.empty }
-            case nme.LE => new Values(
-                ranges.flatMap { case orig @ (low, high) => if(low > value) Some(orig) else if(high > value) Some((value+1, high)) else None },
-                values.filter { a => a > value },
-                this.name)
-            case nme.LT => new Values(
-                ranges.flatMap { case orig @ (low, high) => if(low >= value) Some(orig) else if(high >= value) Some((value, high)) else None },
-                values.filter { a => a >= value },
-                this.name)
-            case nme.GE => new Values(
-                ranges.flatMap { case orig @ (low, high) => if(high < value) Some(orig) else if(low < value) Some((low, value-1)) else None },
-                values.filter { a => a < value },
-                this.name)
-            case nme.GT => new Values(
-                ranges.flatMap { case orig @ (low, high) => if(high <= value) Some(orig) else if(low <= value) Some((low, value)) else None },
-                values.filter { a => a <= value },
-                this.name)
-            case _ => 
-              Values.empty
-          }
-        case _ => Values.empty.addActualSize(this.actualSize)
+    def -(v: Values) = { 
+      if(this.isEmpty || v.isEmpty) {
+        Values.empty
+      } else {
+        var out = this
+        v map { a => out = out.dropValue(a); a }
+        println(v)
+        out
       }
     }
     
@@ -605,12 +585,13 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
         
         //println(vals)
-        vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr))).withDefaultValue(Values.empty)
+        vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr)._1)).withDefaultValue(Values.empty)
         //println(vals)
         //ADD: if always true, or always false pass the return value, e.g. val a = 1; val b = if(a == 1) 5 else 4
         t.foreach(traverse)
 
-        vals = backupVals.map(a => (a._1, a._2.applyInverseCond(condExpr))).withDefaultValue(Values.empty)
+        vals = backupVals.withDefaultValue(Values.empty)
+        vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr)._2)).withDefaultValue(Values.empty)
         f.foreach(traverse)
         
         vals = backupVals.withDefaultValue(Values.empty)
