@@ -250,6 +250,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case id if (id.toString matches "reverse") => this //Will hold, while Set is used for values
       case max if (max.toString == "max") && this.nonEmpty => Values(this.max)
       case min if (min.toString == "min") && this.nonEmpty => Values(this.min)
+      case sum if (sum.toString == "sum") && this.nonEmpty && this.toValues.size == this.actualSize => Values(this.toValues.values.sum)
 
       case empty if (empty.toString == "isEmpty") && (this.actualSize != -1) => 
         unit.warning(treePosHolder.pos, "This will " + (if(this.actualSize == 0) "always" else "never") + " hold.")
@@ -479,6 +480,9 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           Values.empty
         }
 
+      case Apply(TypeApply(Select(valName, op), _), List(scala_math_Numeric_IntIsIntegral)) if scala_math_Numeric_IntIsIntegral.toString == "math.this.Numeric.IntIsIntegral" && op.toString == "sum" =>
+        computeExpr(valName).applyUnary(op)
+
       //List(Literal(Constant(1)), Literal(Constant(2)), Literal(Constant(3)), Literal(Constant(4)), Literal(Constant(0)), Literal(Constant(0))))
       case Select(expr, op) =>
         //println((expr, op, computeExpr(expr).applyUnary(op)))
@@ -558,7 +562,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         vals += valNameStr -> Values(a, valNameStr)
         //println(vals(valName.toString))
 
-      case ValDef(m: Modifiers, valName, _, expr) if(!m.hasFlag(MUTABLE) && !m.hasFlag(LAZY)) /*&& !computeExpr(expr).isEmpty*/ => //&& computeExpr(expr).isValue =>
+      case ValDef(m: Modifiers, valName, _, expr) if !m.hasFlag(MUTABLE) /*&& !m.hasFlag(LAZY)) && !computeExpr(expr).isEmpty*/ => //&& computeExpr(expr).isValue =>
         //ADD: aliasing... val a = i, where i is an iterator, then 1/i-a is divbyzero
         //ADD: isSeq and actualSize
 
