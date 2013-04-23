@@ -253,10 +253,10 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case sum if (sum.toString == "sum") && this.nonEmpty && this.toValues.size == this.actualSize => Values(this.toValues.values.sum)
 
       case empty if (empty.toString == "isEmpty") && (this.actualSize != -1) => 
-        unit.warning(treePosHolder.pos, "This will " + (if(this.actualSize == 0) "always" else "never") + " hold.")
+        unit.warning(treePosHolder.pos, "This condition will " + (if(this.actualSize == 0) "always" else "never") + " hold.")
         Values.empty
       case empty if (empty.toString == "nonEmpty") && (this.actualSize != -1) => 
-        unit.warning(treePosHolder.pos, "This will " + (if(this.actualSize > 0) "always" else "never") + " hold.")
+        unit.warning(treePosHolder.pos, "This condition will " + (if(this.actualSize > 0) "always" else "never") + " hold.")
         Values.empty
 
       case _ => Values.empty
@@ -517,8 +517,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
 
     val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
     
-    val (param, values, body) = tree match {
-      case Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, param, _, _)), body))) if (foreach_map.toString matches funcs) =>
+    val (param, values, body, func) = tree match {
+      case Apply(TypeApply(Select(collection, func), _), List(Function(List(ValDef(_, param, _, _)), body))) if (func.toString matches funcs) =>
         //println(showRaw(collection))
         val values = computeExpr(collection).addName(param.toString)
         //println(values)
@@ -527,14 +527,16 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
             //return
         //}
         
-        (param, values, body)
+        (param.toString, values, body, func.toString)
       case _ => 
         //println("not a loop("+tree.pos+"): "+showRaw(tree))
         return
     }
     
     if(values.nonEmpty) {
-      vals += param.toString -> values
+      vals += param -> values
+      
+      if(!isUsed(body, param) && func != "foreach") unit.warning(tree.pos, "Iterator value is not used in the body.")
 
       traverseBlock(body)
     }
