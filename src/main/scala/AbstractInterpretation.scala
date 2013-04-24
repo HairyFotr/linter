@@ -278,7 +278,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           case nme.ASR => (_ >> _, false): F
           case nme.MOD if right.size == 1 && right.getValueForce != 0 => (_ % _, false): F
           case nme.DIV if right.size == 1 && right.getValueForce != 0 => (_ / _, false): F
-          case a if a.toString matches "apply|take|drop|map|max|min" => ((a: Int, b: Int) => throw new Exception(), false): F //Foo, check below
+          case a if a.toString matches "apply|take|drop|map|max|min|contains" => ((a: Int, b: Int) => throw new Exception(), false): F //Foo, check below
           case _ => return Values.empty
       }
       
@@ -293,8 +293,16 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         //TODO: if you wanted actual values, you need to save seq type and refactor values from Set to Seq
         if(left.isSeq && left.actualSize == 1 && left.size == 1 && right.isValue && right.getValueForce == 0) Values(left.getValueForce) else left
       } else if(op.toString == "map") {
-        //println(" here")
         right
+      } else if(op.toString == "contains") {
+        if(right.isValue) {
+          if(left.contains(right.getValue)) {
+            unit.warning(treePosHolder.pos, "This contains will always return true")
+          } else {
+            unit.warning(treePosHolder.pos, "This contains will never return true")
+          }
+        }
+        Values.empty
       } else if(op.toString == "max") {
         if(left.isValue && right.isValue) { 
           Values(math.max(left.getValue, right.getValue))
@@ -502,9 +510,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         out
       
       case a => 
-        //val raw = showRaw( a ); 
-        //if(!exprs.contains(raw) && raw.size < 700 && raw.size > "EmptyTree".size) println("computeExpr: "+treePosHolder.toString+"\n"+raw);
-        //exprs += raw
+        //val raw = showRaw( a ); if(!exprs.contains(raw) && raw.size < 700 && raw.size > "EmptyTree".size) println("computeExpr: "+treePosHolder.toString+"\n"+raw); exprs += raw
         Values.empty
     }
   }
