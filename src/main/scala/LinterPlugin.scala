@@ -346,6 +346,13 @@ class LinterPlugin(val global: Global) extends Plugin {
             if java_math_BigDecimal.toString == "java.math.BigDecimal" =>
             unit.warning(tree.pos, "Possible loss of precision - use a string constant")
             
+          case pos @ Apply(Select(expr1, op), List(expr2)) if (op == nme.DIV) => 
+            (expr1, expr2) match {
+              case (expr1, Apply(abs, List(expr2))) if abs.toString == "scala.math.`package`.abs" && expr1.toString == expr2.toString => unit.warning(pos.pos, "Did you mean to use the signum function here?")
+              case (Apply(abs, List(expr1)), expr2) if abs.toString == "scala.math.`package`.abs" && expr1.toString == expr2.toString => unit.warning(pos.pos, "Did you mean to use the signum function here?")
+              case _ => //OK
+            }
+
           //ignores "Assignment right after declaration..." in case class hashcode
           case DefDef(mods, name, _, _, _, Block(block, last)) if name.toString == "hashCode" && {
             (block :+ last) match { 
@@ -380,8 +387,6 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
           } => // lololololololol
 
-
-          //TODO: I can't figure out how to use class vals - they show up as clazz.this.valName, and I can't f
           case ClassDef(mods, name, tparams, impl) =>
             abstractInterpretation.traverseBlock(impl)
 

@@ -425,7 +425,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         val n = (if(name.contains(".this.")) name.substring(name.lastIndexOf(".")+1) else name).trim
         //println(n+": "+vals(n))
         vals(n)
-      
+        
       case Apply(Select(Apply(Select(scala_Predef, intWrapper), List(Literal(Constant(low: Int)))), to_until), List(Literal(Constant(high: Int)))) if (to_until.toString matches "to|until") =>
         val high2 = if(to_until.toString == "to") high else high-1
         new Values(Set((low, high2)), Set(), "", isSeq = true, high2-low)
@@ -502,10 +502,13 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         out
       
       case a => 
-        //println("computeExpr: "+showRaw( a ));
+        //val raw = showRaw( a ); 
+        //if(!exprs.contains(raw) && raw.size < 700 && raw.size > "EmptyTree".size) println("computeExpr: "+treePosHolder.toString+"\n"+raw);
+        //exprs += raw
         Values.empty
     }
   }
+  //val exprs = collection.mutable.HashSet[String]()
       
   var vals = collection.mutable.HashMap[String, Values]().withDefaultValue(Values.empty)
   var treePosHolder: GTree = null //ugly hack to get position for a few warnings
