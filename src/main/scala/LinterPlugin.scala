@@ -347,9 +347,10 @@ class LinterPlugin(val global: Global) extends Plugin {
             unit.warning(tree.pos, "Possible loss of precision - use a string constant")
             
           case pos @ Apply(Select(expr1, op), List(expr2)) if (op == nme.DIV) => 
+            val warnMsg = "Did you mean to use the signum function here? (signum also avoids division by zero)"
             (expr1, expr2) match {
-              case (expr1, Apply(abs, List(expr2))) if abs.toString == "scala.math.`package`.abs" && expr1.toString == expr2.toString => unit.warning(pos.pos, "Did you mean to use the signum function here?")
-              case (Apply(abs, List(expr1)), expr2) if abs.toString == "scala.math.`package`.abs" && expr1.toString == expr2.toString => unit.warning(pos.pos, "Did you mean to use the signum function here?")
+              case (expr1, Apply(abs, List(expr2))) if abs.toString == "scala.math.`package`.abs" && expr1.toString == expr2.toString => unit.warning(pos.pos, warnMsg)
+              case (Apply(abs, List(expr1)), expr2) if abs.toString == "scala.math.`package`.abs" && expr1.toString == expr2.toString => unit.warning(pos.pos, warnMsg)
               case _ => //OK
             }
 
