@@ -82,7 +82,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           values
             .map(func))
       } else {
-        if(this.ranges.nonEmpty && this.size <= 100001) //ADD: it's not that bad - it simply won't check the big ranges further.
+        if(this.ranges.nonEmpty && this.size <= 100001) //ADD: this only checks small ranges, also can still get slow
           (new Values(values = values ++ ranges.flatMap { case (low, high) => (low to high) }, name = name, isSeq = isSeq, actualSize = actualSize)).map(func)
         else 
           Values.empty
@@ -242,11 +242,21 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
             .map { case (low, high) if low > high => (high, low); case (low, high) => (low, high) },
           values.map(a => math.abs(a)))
 
-      case size if (size.toString == "size" || size.toString == "length") && (this.actualSize != -1) => Values(this.actualSize)
-      case head_last if (head_last.toString == "head|last") && this.actualSize == 1 && this.size == 1 => Values(this.getValueForce) //Only works for one element :)
-      //case tail_init if (tail_init.toString == "tail|init") && this.actualSize != -1 => Values.empty.addActualSize(this.actualSize - 1) //TODO: doesn't work
+      case size if (size.toString matches "size|length") && (this.actualSize != -1) => Values(this.actualSize)
+      case head_last if (head_last.toString matches "head|last") => 
+        //Only works for one element :)
+        if(this.actualSize == 0) unit.warning(treePosHolder.pos, "Taking the "+head_last.toString+" of an empty collection.")
+        if(this.actualSize == 1 && this.size == 1) Values(this.getValueForce) else Values.empty
+      case tail_init if (tail_init.toString matches "tail|init") && this.actualSize != -1 => 
+        if(this.actualSize == 0) {
+          unit.warning(treePosHolder.pos, "Taking the "+tail_init.toString+" of an empty collection.")
+          Values.empty
+        } else {
+          Values.empty.addActualSize(this.actualSize - 1)
+        }
+      
       case to if (to.toString matches "toIndexedSeq|toList|toSeq|toVector") => this //only immutable
-      case distinct if (distinct.toString == "distinct") && this.actualSize != -1 => this.toValues.addActualSize(this.size) //Will hold, while Set is used for values
+      case distinct if (distinct.toString == "distinct") && this.actualSize != -1 => this.toValues.addActualSize(this.size)
       case id if (id.toString matches "reverse") => this //Will hold, while Set is used for values
       case max if (max.toString == "max") && this.nonEmpty => Values(this.max)
       case min if (min.toString == "min") && this.nonEmpty => Values(this.min)
@@ -259,7 +269,9 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         unit.warning(treePosHolder.pos, "This condition will " + (if(this.actualSize > 0) "always" else "never") + " hold.")
         Values.empty
 
-      case _ => Values.empty
+      case a => 
+        //val raw = showRaw( treePosHolder ); println("applyUnary: "+treePosHolder.toString+"\n"+raw);
+        Values.empty
     }
     def apply(op: Name)(right: Values): Values = {
       val left = this
@@ -291,7 +303,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         }
       } else if(op.toString == "apply") {
         //TODO: if you wanted actual values, you need to save seq type and refactor values from Set to Seq
-        if(left.isSeq && left.actualSize == 1 && left.size == 1 && right.isValue && right.getValueForce == 0) Values(left.getValueForce) else left
+        if(left.isSeq && left.actualSize == 1 && left.size == 1 && right.isValueForce && right.getValueForce == 0) Values(left.getValueForce) else left
       } else if(op.toString == "map") {
         right
       } else if(op.toString == "contains") {
