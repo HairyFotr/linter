@@ -92,6 +92,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       }
     
     def applyCond(condExpr: Tree): (Values, Values) = {//TODO: return (true, false) ValueSets in one go - applyInverseCond sucks //TODO: true and false cound be possible returns for error msgs
+      //println("expr: "+showRaw(condExpr))
       var alwaysHold, neverHold = false
       val out = condExpr match {
         case Apply(Select(expr1, op), List(expr2)) if op == nme.ZAND => //&&
@@ -104,8 +105,21 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
             left.values ++ right.values,
             this.name)
 
+        case Select(Apply(scala_augmentString, List(name)), nonEmpty) if
+          scala_augmentString.toString.endsWith(".augmentString") &&
+          nonEmpty.toString == "nonEmpty" && {
+            //println("aaaaaaaaaaaaaaaaaaaaaa"+name.toString+"   "+stringVals)
+            val str = stringVals.find(_.name.exists(_ == name.toString))
+            if(str.isDefined && str.get.alwaysNonEmpty) {
+              unit.warning(condExpr.pos, "This string will never be empty.")
+            }
+            false
+          } => //
+          Values.empty
+
         //ADD: expr op expr that handles idents right
         case Apply(Select(Ident(v), op), List(expr)) if v.toString == this.name && this.nonEmpty && computeExpr(expr).isValue => 
+        
           val value = computeExpr(expr).getValue
           val out = op match {
             case nme.EQ => 
@@ -214,6 +228,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           Values.empty.addActualSize(this.actualSize)
           
         case expr =>
+          //println("expr: "+showRaw(expr))
           computeExpr(expr)
           Values.empty.addActualSize(this.actualSize)
       }
@@ -535,7 +550,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       
   // go immutable
   var vals = collection.mutable.HashMap[String, Values]().withDefaultValue(Values.empty)
-  var stringVals = collection.mutable.HashSet[String]()
+  var stringVals = collection.mutable.HashSet[StringAttrs]()
   var treePosHolder: GTree = null //ugly hack to get position for a few warnings
   
   def forLoop(tree: GTree) {
@@ -574,6 +589,55 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   }
   
   val visitedBlocks = collection.mutable.HashSet[GTree]()
+  
+  // Just something quick I hacked together for an actual bug
+  implicit def String2StringAttrs(s: String) = new StringAttrs(exactValue = Some(s))
+  object StringAttrs {
+    def empty = new StringAttrs()
+    def apply(tree: Tree): StringAttrs = {
+      def traverse(tree: Tree): StringAttrs = tree match {
+        case Literal(Constant(c)) => new StringAttrs(exactValue = Some(c.toString))
+        case Apply(Select(expr1, nme.ADD), List(expr2)) => traverse(expr1) + traverse(expr2)
+        case Ident(name) => stringVals.find(_.name.exists(_ == name.toString)).getOrElse(empty)
+        case Apply(Select(expr, noEffect), List()) if noEffect.toString matches "trim|to(Upper|Lower)Case" =>
+          traverse(expr)
+
+        case a => 
+          //println(showRaw(a))
+          empty
+      }
+      
+      val a = traverse(tree)
+      //println("tree: "+ a)
+      a
+    }
+  }
+  class StringAttrs(
+      val exactValue: Option[String] = None,
+      val name: Option[String] = None,
+      minLength: Int = 0) {
+    
+    def addName(name: String): StringAttrs = new StringAttrs(exactValue, Some(name), minLength)
+    
+    //println(this)
+
+    def alwaysNonEmpty = getMinLength > 0
+    def getMinLength = math.max(minLength, exactValue.getOrElse("").trim.length)
+    
+    def +(s: StringAttrs) = 
+      new StringAttrs(
+        exactValue = if(this.exactValue.isDefined && s.exactValue.isDefined) Some(this.exactValue.get + s.exactValue.get) else None,
+        minLength = this.getMinLength + s.getMinLength)
+    
+    override def hashCode: Int = if(exactValue.isDefined) exactValue.hashCode else exactValue.hashCode + name.hashCode + minLength
+    override def equals(that: Any): Boolean = that match {
+      case s: StringAttrs => (this.exactValue.isDefined && s.exactValue.isDefined && this.exactValue.get == s.exactValue.get)
+      case s: String => exactValue.exists(_ == s)
+      case _ => false
+    }
+    
+    override def toString = (exactValue, name, minLength).toString
+  }
  
   def traverseBlock(tree: GTree) {
     val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
@@ -600,14 +664,31 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         stringVals += str
         visitedBlocks += s
         
+        val str2 = StringAttrs(s).addName(valName.toString)
+        //println("str: "+str2)
+        if(str2.exactValue.isDefined || str2.getMinLength > 0) {
+          stringVals += str2
+        }
+        //println("stringVals: "+stringVals)
+
       case ValDef(m: Modifiers, valName, _, Literal(Constant(a: Int))) if(!m.hasFlag(MUTABLE)) =>
         val valNameStr = valName.toString.trim
         vals += valNameStr -> Values(a, valNameStr)
         //println(vals(valName.toString))
 
-      case ValDef(m: Modifiers, valName, _, expr) if !m.hasFlag(MUTABLE) /*&& !m.hasFlag(LAZY)) && !computeExpr(expr).isEmpty*/ => //&& computeExpr(expr).isValue =>
+      case v@ValDef(m: Modifiers, valName, _, expr) if !m.hasFlag(MUTABLE) /*&& !m.hasFlag(LAZY)) && !computeExpr(expr).isEmpty*/ => //&& computeExpr(expr).isValue =>
         //ADD: aliasing... val a = i, where i is an iterator, then 1/i-a is divbyzero
         //ADD: isSeq and actualSize
+
+        if(expr.tpe.toString == "String") {
+          val str = StringAttrs(expr).addName(valName.toString)
+          //println("str: "+str)
+          if(str.exactValue.isDefined || str.getMinLength > 0) {
+            stringVals += str
+            visitedBlocks += expr
+          }
+          //println("stringVals: "+stringVals)
+        }
 
         val valNameStr = valName.toString
         vals += valNameStr -> computeExpr(expr).addName(valNameStr)

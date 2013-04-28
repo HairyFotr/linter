@@ -242,6 +242,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               //unit.warning(tree.pos, """String literal """"+str+"""" appears multiple times.""")
             }
             
+            implicit def String2StringAttrs(s: String) = new abstractInterpretation.StringAttrs(exactValue = Some(s))
             if(abstractInterpretation.stringVals contains str) {
               unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
               abstractInterpretation.visitedBlocks += s
