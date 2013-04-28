@@ -230,7 +230,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Literal(Constant(null)) =>
             //TODO: Too much noise - limit in some way
             //unit.warning(tree.pos, "Using null is considered dangerous.")
-          case Literal(Constant(str: String)) =>
+          case s @ Literal(Constant(str: String)) =>
             //TODO: String interpolation gets broken down into parts and causes false positives
             //TODO: some quick benchmark showed string literals are actually more optimized than almost anything else, even final vals
             val threshold = 4
@@ -242,6 +242,11 @@ class LinterPlugin(val global: Global) extends Plugin {
               //unit.warning(tree.pos, """String literal """"+str+"""" appears multiple times.""")
             }
             
+            if(abstractInterpretation.stringVals contains str) {
+              unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
+              abstractInterpretation.visitedBlocks += s
+            }
+
           case Match(Literal(Constant(a)), cases) =>
             //TODO: figure this, and similar if rules, for some types of val x = Literal(Constant(...)) declarations
             
@@ -361,41 +366,41 @@ class LinterPlugin(val global: Global) extends Plugin {
               case _ => false
             }} => return //
 
-          case Block(block, last) if { //TODO: var v; ...non v related stuff...; v = 4 <-- this is the same thing, really
-            ((block :+ last) zip ((block :+ last).tail)) exists { 
-              case (ValDef(modifiers, id1, _, _), Assign(id2, assign)) if id1.toString == id2.toString && !abstractInterpretation.isUsed(assign, id2.toString)=>
-                unit.warning(id2.pos, "Assignment right after declaration is most likely a bug (unless you side-effect like a boss)")
-                true
-              //case (Assign(id1, _), Assign(id2, _)) if id1.toString == id2.toString => // stricter
-              case (Assign(id1, _), Assign(id2, assign)) if id1.toString == id2.toString && !abstractInterpretation.isUsed(assign, id2.toString) =>
-                unit.warning(id2.pos, "Two subsequent assigns are most likely a bug (unless you side-effect like a boss)")
-                true
-              //TODO: move to def analysis - this is only for those blocks
-              //case (_, l @ Return(_)) if l eq last =>
-              //  unit.warning(l.pos, "Scala has implicit return, so you don't need 'return'")
-              //  true              
-              case (v @ ValDef(_, id1, _, _), l @ Ident(id2)) if id1.toString == id2.toString && (l eq last) =>
-                unit.warning(v.pos, "You don't need that temp variable.")
-                true
-              case (If(cond1, _, _), If(cond2, _, _)) if cond1 equalsStructure cond2 =>
-                unit.warning(cond1.pos, "Two subsequent ifs have the same condition")
-                true
-              case (s1, s2) if s1 equalsStructure s2 =>
-                unit.warning(s1.pos, "You're doing the exact same thing twice.")
-                true
-              case _ =>
-                false 
-            }
-          } => // lololololololol
-
           case ClassDef(mods, name, tparams, impl) =>
             abstractInterpretation.traverseBlock(impl)
 
           case ModuleDef(mods, name, impl) => 
             abstractInterpretation.traverseBlock(impl)
 
-          case block @ Block(_, _) =>
-            abstractInterpretation.traverseBlock(block)
+          case blockElem @ Block(init, last) =>
+            abstractInterpretation.traverseBlock(blockElem)
+
+            val block = init :+ last
+            //TODO: var v; ...non v related stuff...; v = 4 <-- this is the same thing, really
+            (block zip block.tail) foreach { 
+              case (ValDef(modifiers, id1, _, _), Assign(id2, assign)) if id1.toString == id2.toString && !abstractInterpretation.isUsed(assign, id2.toString)=>
+                unit.warning(id2.pos, "Assignment right after declaration is most likely a bug (unless you side-effect like a boss)")
+
+              //case (Assign(id1, _), Assign(id2, _)) if id1.toString == id2.toString => // stricter
+              case (Assign(id1, _), Assign(id2, assign)) if id1.toString == id2.toString && !abstractInterpretation.isUsed(assign, id2.toString) =>
+                unit.warning(id2.pos, "Two subsequent assigns are most likely a bug (unless you side-effect like a boss)")
+
+              //TODO: move to def analysis - this is only for those blocks
+              //case (_, l @ Return(_)) if l eq last =>
+              //  unit.warning(l.pos, "Scala has implicit return, so you don't need 'return'")
+              //  true              
+              case (v @ ValDef(_, id1, _, _), l @ Ident(id2)) if id1.toString == id2.toString && (l eq last) =>
+                unit.warning(v.pos, "You don't need that temp variable.")
+
+              case (If(cond1, _, _), If(cond2, _, _)) if cond1 equalsStructure cond2 =>
+                unit.warning(cond1.pos, "Two subsequent ifs have the same condition")
+
+              case (s1, s2) if s1 equalsStructure s2 =>
+                unit.warning(s1.pos, "You're doing the exact same thing twice.")
+
+              case _ =>
+            }
+
 
           case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, param, _, _)), body))) if { //if (foreach_map.toString matches "foreach|map") && {
             abstractInterpretation.forLoop(forloop)

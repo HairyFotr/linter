@@ -5,6 +5,9 @@ import scala.tools.nsc.plugins.{Plugin, PluginComponent}
 import scala.tools.nsc.symtab.Flags.{IMPLICIT, OVERRIDE, MUTABLE, CASE, LAZY}
 import com.foursquare.lint.global._
 
+// Warning: Don't try too hard to understand this code, it's a mess and needs
+// to be rewritten in a type-safe and transparent way.
+
 class AbstractInterpretation(val global: Global, val unit: GUnit) {
   import global._
 
@@ -514,10 +517,12 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       
       case Apply(Apply(TypeApply(Select(valName, map), List(_, _)), List(Function(List(ValDef(mods, paramName, _, EmptyTree)), expr))), _) if(map.toString == "map") => //List(TypeApply(Select(Select(This(newTypeName("immutable")), scala.collection.immutable.List), newTermName("canBuildFrom")), List(TypeTree()))))
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
+        val backupStrs = stringVals.clone
         vals += paramName.toString -> computeExpr(valName)
         //println(">        "+vals)
         val out = computeExpr(expr)
         vals = backupVals
+        stringVals = backupStrs
         //println(">        "+out)
         out
       
@@ -528,7 +533,9 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   }
   //val exprs = collection.mutable.HashSet[String]()
       
+  // go immutable
   var vals = collection.mutable.HashMap[String, Values]().withDefaultValue(Values.empty)
+  var stringVals = collection.mutable.HashSet[String]()
   var treePosHolder: GTree = null //ugly hack to get position for a few warnings
   
   def forLoop(tree: GTree) {
@@ -537,6 +544,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     val funcs = "foreach|map|filter(Not)?|exists|find|flatMap|forall|groupBy|count|((drop|take)While)|(min|max)By|partition|span"
 
     val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
+    val backupStrs = stringVals.clone
     
     val (param, values, body, func) = tree match {
       case Apply(TypeApply(Select(collection, func), _), List(Function(List(ValDef(_, param, _, _)), body))) if (func.toString matches funcs) =>
@@ -562,16 +570,19 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       traverseBlock(body)
     }
     vals = backupVals.withDefaultValue(Values.empty)
+    stringVals = backupStrs
   }
   
   val visitedBlocks = collection.mutable.HashSet[GTree]()
  
   def traverseBlock(tree: GTree) {
     val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
+    val backupStrs = stringVals.clone
     
     traverse(tree)
     
     vals = backupVals.withDefaultValue(Values.empty)
+    stringVals = backupStrs
   }
   def traverse(tree: GTree) {
     if(visitedBlocks(tree)) return else visitedBlocks += tree
@@ -580,6 +591,15 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, _, _, _)), _))) =>
         forLoop(forloop)
       
+      case s @ Literal(Constant(str: String)) if stringVals contains str =>
+        unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
+        visitedBlocks += s
+
+      case ValDef(m: Modifiers, valName, _, s @ Literal(Constant(str: String))) if(!m.hasFlag(MUTABLE)) =>
+        if(stringVals contains str) unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
+        stringVals += str
+        visitedBlocks += s
+        
       case ValDef(m: Modifiers, valName, _, Literal(Constant(a: Int))) if(!m.hasFlag(MUTABLE)) =>
         val valNameStr = valName.toString.trim
         vals += valNameStr -> Values(a, valNameStr)
@@ -598,21 +618,26 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           case e => //Block(_, _) | If(_,_,_) =>
             //println(expr)
             val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
+            val backupStrs = stringVals.clone
             traverse(expr)
             vals = backupVals.withDefaultValue(Values.empty)
+            stringVals = backupStrs
           //case _ =>
         }
       
       case Match(pat, cases) if pat.tpe.toString != "Any @unchecked" && cases.size >= 2 =>
         for(c <- cases) {
           val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
+          val backupStrs = stringVals.clone
           //TODO: c.pat can override some variables
           traverse(c.body)
           vals = backupVals.withDefaultValue(Values.empty)
+          stringVals = backupStrs
         }
       
       case If(condExpr, t, f) => 
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
+        val backupStrs = stringVals.clone
         
         //println(vals)
         vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr)._1)).withDefaultValue(Values.empty)
@@ -625,6 +650,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         f.foreach(traverse)
         
         vals = backupVals.withDefaultValue(Values.empty)
+        stringVals = backupStrs
         //println(vals)
 
       case pos @ Apply(Select(_, op), List(expr)) if (op == nme.DIV || op == nme.MOD) && (computeExpr(expr).contains(0)) => 
@@ -643,18 +669,23 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       
       case DefDef(_, _, _, _, _, block) => 
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
+        val backupStrs = stringVals.clone
         traverse(block)
         vals = backupVals.withDefaultValue(Values.empty)
+        stringVals = backupStrs
 
       case b @ Block(_, _) => 
         //println("block: "+b)
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
+        val backupStrs = stringVals.clone
         tree.children.foreach(traverse)
         vals = backupVals.withDefaultValue(Values.empty)
+        stringVals = backupStrs
 
-      case a: AbstractInterpretation.this.global.Tree => 
+      case _ => 
         //if(vals.nonEmpty) println("in: "+showRaw(tree))
         //if(vals.nonEmpty) println(">   "+vals);
+        //if(showRaw(tree).startsWith("Literal") || showRaw(tree).startsWith("Constant")) println("in: "+showRaw(tree))
         tree.children.foreach(traverse)
     }
   }
