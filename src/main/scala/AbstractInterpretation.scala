@@ -752,6 +752,13 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
         val backupStrs = stringVals.clone
         traverse(block)
+        block match {
+          //case Block(_, pos @ Literal(Constant(returnVal))) => 
+            //unit.warning(pos.pos, "This function returns a constant.")
+          case Block(_, pos @ Ident(returnVal)) if vals(returnVal.toString).size == 1 && !vals(returnVal.toString).isSeq => 
+            unit.warning(pos.pos, "This function always returns the same value.")
+          case _ =>
+        }
         vals = backupVals.withDefaultValue(Values.empty)
         stringVals = backupStrs
 
