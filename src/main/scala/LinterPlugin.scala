@@ -386,6 +386,9 @@ class LinterPlugin(val global: Global) extends Plugin {
               case (Assign(id1, _), Assign(id2, assign)) if id1.toString == id2.toString && !abstractInterpretation.isUsed(assign, id2.toString) =>
                 unit.warning(id2.pos, "Two subsequent assigns are most likely a bug (unless you side-effect like a boss)")
 
+              case (Assign(id1, id2), Assign(id2_, id1_)) if(id1 equalsStructure id1_) && (id2 equalsStructure id2_) =>
+                unit.warning(id1_.pos, "Did you mean to swap these two variables?")
+
               //TODO: move to def analysis - this is only for those blocks
               //case (_, l @ Return(_)) if l eq last =>
               //  unit.warning(l.pos, "Scala has implicit return, so you don't need 'return'")
