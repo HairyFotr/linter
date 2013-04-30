@@ -151,14 +151,21 @@ class LinterPlugin(val global: Global) extends Plugin {
           case ValDef(m: Modifiers, varName, TypeTree(), value) if(m.hasFlag(MUTABLE)) =>
             varDecls += varName.toString.trim
             //println("vardecl |"+varName.toString.trim+"|")
-          case Apply(Select(a, assign), _) if varDecls.contains(assign.toString.dropRight(4)) => 
+          case a @ Apply(Select(type1, varSetter), List(Select(type2, varName))) if (type1 equalsStructure type2) && (varSetter.toString == varName.toString+"_$eq") =>
+            unit.warning(a.pos, "Assigning a variable to itself?")
+
+          case Apply(Select(a, assign), _) if varDecls.contains(assign.toString.dropRight(4)) => //drop "_$eq" - setter
             val varName = assign.toString.dropRight(4)
             varAssigns += varName.toString
             //println("varassign |"+varName+"|")
             
-          case Assign(l @ Ident(varName), r) =>
-            varAssigns += varName.toString
+          case Assign(l, r) =>
+            l match {
+              case Ident(varName) => varAssigns += varName.toString
+              case _ =>
+            }
             //println("varassign2 |"+varName+"|")
+            
             if(l equalsStructure r) {
               unit.warning(l.pos, "Assigning a variable to itself?")
             }
