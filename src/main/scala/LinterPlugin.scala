@@ -156,9 +156,12 @@ class LinterPlugin(val global: Global) extends Plugin {
             varAssigns += varName.toString
             //println("varassign |"+varName+"|")
             
-          case Assign(Ident(varName), _) =>
+          case Assign(l @ Ident(varName), r) =>
             varAssigns += varName.toString
             //println("varassign2 |"+varName+"|")
+            if(l equalsStructure r) {
+              unit.warning(l.pos, "Assigning a variable to itself?")
+            }
 
           case ClassDef(m: Modifiers, className, _, _) if m.hasFlag(CASE) => return // case classes cause false positives...
 
