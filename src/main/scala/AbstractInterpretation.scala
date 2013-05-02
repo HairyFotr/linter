@@ -438,7 +438,6 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     override def toString: String = "Values("+(if(name.size > 0) name+")(" else "")+(values.map(_.toString) ++ ranges.map(a => a._1+"-"+a._2)).mkString(",")+", "+isSeq+", "+actualSize+")"
   }
   
-  //ADD: GenSeq, and then implement .head .tail, ...
   val SeqLikeObject: Symbol = definitions.getModule(newTermName("scala.collection.GenSeq"))
   val SeqLikeClass: Symbol = definitions.getClass(newTermName("scala.collection.SeqLike"))
   val SeqLikeContains: Symbol = SeqLikeClass.info.member(newTermName("contains"))
@@ -473,7 +472,6 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         new Values(Set((low, high)), Set(), "", isSeq = true, high-low)
 
       case t @ Apply(TypeApply(genApply @ Select(_,_), _), genVals) if methodImplements(genApply.symbol, SeqLikeGenApply) && (!t.tpe.widen.toString.contains("collection.mutable.")) =>
-        //ADD: List(expr,2,3) - save size, even if you can't compute expr
         val values = genVals.map(v => computeExpr(v))
         if(values.forall(_.isValue)) new Values(Set(), values.map(_.getValue).toSet, "", isSeq = true, actualSize = values.size) else Values.empty.addActualSize(genVals.size)
 
@@ -489,17 +487,17 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         computeExpr(t)
 
       
-      case Apply(Select(scala_math_package, op), params) if scala_math_package.toString == "scala.math.`package`" => //TODO: scala and java abs
+      case Apply(Select(scala_math_package, op), params) if scala_math_package.toString == "scala.math.`package`" =>
         op.toString match {
           case "abs" | "signum" if params.size == 1 => computeExpr(params.head).applyUnary(op)
           case "max" | "min"    if params.size == 2 => computeExpr(params(0))(op)(computeExpr(params(1)))
           case _ => Values.empty
         }
 
-      case Apply(Select(scala_math_package, abs), List(expr)) if scala_math_package.toString == "scala.math.`package`" && abs.toString == "max" => //TODO: scala and java abs
+      case Apply(Select(scala_math_package, abs), List(expr)) if scala_math_package.toString == "scala.math.`package`" && abs.toString == "max" =>
         computeExpr(expr).applyUnary(abs)
 
-      case Apply(Select(scala_util_Random, nextInt), params) if nextInt.toString == "nextInt" => //if scala_util_Random.toString == "scala.util" =>
+      case Apply(Select(scala_util_Random, nextInt), params) if nextInt.toString == "nextInt" => //if scala_util_Random.toString == "scala.util" => or rather the type
         if(params.size == 1) {
           val param = computeExpr(params.head)
           if(param.nonEmpty) {

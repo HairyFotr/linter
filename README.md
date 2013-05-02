@@ -1,9 +1,11 @@
 # Linter Compiler Plugin
 
-This is a compiler plugin that adds additional lint checks to protect against sharp corners
+This is a compiler plugin that adds additional lint checks to protect against sharp corners 
 in the Scala compiler and standard libraries.
 
-It's a work in progress. For an overview of writing compiler plugins, see http://www.scala-lang.org/node/140
+It's currently very much a work in progress - some parts will need to be rewritten. 
+
+For an overview of writing compiler plugins, see http://www.scala-lang.org/node/140
 
 ## Usage
 

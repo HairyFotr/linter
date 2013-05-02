@@ -68,12 +68,20 @@ class LinterPlugin(val global: Global) extends Plugin {
             if(name.toString != "<init>" && !block.isEmpty && !mods.hasFlag(OVERRIDE)) {
               //Get the parameters, except the implicit ones
               val params = valDefs.flatMap(_.filterNot(_.mods.hasFlag(IMPLICIT))).map(_.name.toString).toBuffer
-              if(!(name.toString == "main" && params.size == 1 && params.head == "args")) { // filter main method
+              val blockIsEmpty = block match {
+                case Literal(Constant(a: Unit)) => true
+                case Ident(qmarks) if qmarks.toString == "$qmark$qmark$qmark" => true
+                case Select(scala_Predef, qmarks) if qmarks.toString == "$qmark$qmark$qmark" => true
+                case a if block.isEmpty => true
+                case _ => false
+              }
+              
+              if(!(name.toString == "main" && params.size == 1 && params.head == "args") && !blockIsEmpty) { // filter main method
                 val used = for(Ident(name) <- tree if params contains name.toString) yield name.toString
                 val unused = params -- used
                 
                 unused.size match { //TODO: scalaz is a good codebase for finding interesting false positives
-                  case 0 =>
+                  case 0 => //
                   case 1 => unit.warning(tree.pos, "Parameter %s is not used in method %s" format (unused.mkString(", "), name))
                   case _ => unit.warning(tree.pos, "Parameters (%s) are not used in method %s" format (unused.mkString(", "), name))
                 }
@@ -162,7 +170,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Assign(l, r) =>
             l match {
               case Ident(varName) => varAssigns += varName.toString
-              case _ =>
+              case _ => //
             }
             //println("varassign2 |"+varName+"|")
             
@@ -191,8 +199,8 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           case Apply(Select(Literal(Constant(s: String)), func), params) =>
             func.toString match {
-              case "$plus"|"equals"|"$eq$eq"|"toCharArray" => //false positives            
-              case "length" => unit.warning(tree.pos, "Taking the size of a constant string")
+              case "$plus"|"equals"|"$eq$eq"|"toCharArray"|"matches" => //false positives            
+              case "length" => unit.warning(tree.pos, "Taking the length of a constant string")
               case _        => unit.warning(tree.pos, "Processing a constant string")
             }
             
