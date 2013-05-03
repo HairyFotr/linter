@@ -525,20 +525,22 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     """)
   }
   
+  @Test
   def style__YodaConditions() {
     implicit val msg = "Yoda conditions"
 
     should("""
       |var a = 5
-      |if(5 == a)
+      |if(5 == a) "foo"
     """)
     shouldnt("""
       |var a = 5
-      |if(a == 5)
+      |if(a == 5) "foo"
     """)
   }
   
   
+  @Test
   def string__constantLength() {
     implicit val msg = "of a constant string"
 
@@ -559,6 +561,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     """)
   }
 
+  @Test
   def string__processingConstant() {
     implicit val msg = "Processing a constant string"
     
@@ -572,6 +575,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     """)
   }
 
+  @Test
   def if__mergeInner() {
     implicit val msg = "These two ifs can be merged"
     
@@ -624,6 +628,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     """)
   }
   
+  @Test
   def numeric__signum() {
     implicit val msg = "Did you mean to use the signum function"
     
@@ -646,6 +651,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     """)
   }
 
+  @Test
   def possibleBugs__assignment() {
     implicit val msg = "Assignment right after declaration"
     
@@ -671,6 +677,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     """)
   }
 
+  @Test
   def possibleBugs__assignment2() {
     implicit val msg = "Two subsequent assigns"
     
@@ -690,6 +697,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     """)
   }
 
+  @Test
   def possibleBugs__swapVars() {
     implicit val msg = "Did you mean to swap these two variables"
     
@@ -711,29 +719,80 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     """)
   }
 
+  @Test
   def style__tempVariable() {
     implicit val msg = "You don't need that temp variable"
    
     should("""
-      def a = {
-        val out = 5 + 5
-        out
-      }
+      |def a = {
+      |  val out = 5 + 5
+      |  out
+      |}
     """) 
 
     //TODO: some more cases to cover with val vs var
 
     shouldnt("""
-      def a = {
-        var out = 5
-        out += 5
-        out
-      }
+      |def a = {
+      |  var out = 5
+      |  out += 5
+      |  out
+      |}
     """)
   }
+  
+  @Test
+  def possibleBugs__sameThingTwice() {
+    implicit val msg = "You're doing the exact same thing twice."
+    
+    should("""
+      |val a = 5
+      |println(a) 
+      |println(a) 
+    """)
+    
+    shouldnt("""
+      |var a = 5
+      |println(a)
+      |print(a)
+      |print(a+1)
+    """)
+  }
+  
+  @Test
+  def collections__negativeIndex() {
+    implicit val msg = "negative index"
+    
+    should("""
+      |val a = List(1,2,3)
+      |a(-1)
+     """)
+    should("""
+      |val a = List(1,2,3)
+      |a(a.size-a.size-1)
+     """)
+    should("""
+      |val a = List(1,2,3,4)
+      |val b = -a.size /* -4 */
+      |a(a.size/2 + b + 1) /* 2 - 4 + 1 == -1 */
+     """)
+     
+    shouldnt("""
+      |val a = List(1,2,3)
+      |a(0)
+     """)
+    shouldnt("""
+      |val a = List(1,2,3)
+      |a(a.size-a.size)
+     """)
+    shouldnt("""
+      |val a = List(1,2,3,4)
+      |val b = -a.size + 1 /* -3 */
+      |a(a.size/2 + b + 1) /* 2 - 3 + 1 == 0 */
+     """)
+  }
+  
 /*unit.warning(tree.pos, "Possible loss of precision - use a string constant")
-unit.warning(s1.pos, "You're doing the exact same thing twice.")  
-unit.warning(pos.pos, "Using a negative index for a collection.")
 unit.warning(divByZero.pos, "Literal division by zero.")
 
 src/main/scala/LinterPlugin.scala:        if(maybeVals.nonEmpty) unit.warning(tree.pos, "[experimental] These vars might secretly be vals: grep -rnP --include=*.scala 'var ([(][^)]*)?("+maybeVals.mkString("|")+")'")
