@@ -16,14 +16,17 @@
 
 package com.foursquare.lint
 
-import org.junit.{Before, Test}
+import org.junit.{Ignore, Before, Test}
 import org.specs2.matcher.{StandardMatchResults, JUnitMustMatchers}
 import util.matching.Regex
 import collection.mutable
 
-class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
-  var linterPlugin: LinterPlugin = null
+// TODO: 
+// * each test should have a positive and a negative case
+// * if it's worth it, error msgs could come from outside
+// * handle/test plugin settings (when settings are done)
 
+class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   class Compiler {
 
     import java.io.{PrintWriter, StringWriter}
@@ -48,306 +51,384 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       override protected def newCompiler(settings: Settings, reporter: Reporter) = {
         settings.outputDirs setSingleOutput virtualDirectory
         val compiler = super.newCompiler(settings, reporter)
-        linterPlugin = new LinterPlugin(compiler)
+        val linterPlugin = new LinterPlugin(compiler)
         for (phase <- linterPlugin.components)
           compiler.asInstanceOf[ {def phasesSet: mutable.HashSet[tools.nsc.SubComponent]}].phasesSet += phase
         compiler
       }
     }
 
-    def compileAndLint(code: String): Option[String] = {
+    def compileAndLint(code: String): String = {
       stringWriter.getBuffer.delete(0, stringWriter.getBuffer.length)
       val thunked = "() => { %s }".format(code)
       interpreter.interpret(thunked) match {
-        case Results.Success => None
-        case Results.Error => Some(stringWriter.toString)
+        case Results.Success => ""
+        case Results.Error => stringWriter.toString
         case Results.Incomplete => throw new Exception("Incomplete code snippet")
       }
     }
   }
-
   val compiler = new Compiler
 
-  def check(code: String, expectedError: Option[Regex] = None) {
-    // Either they should both be None or the expected error should be a
-    // substring of the actual error.
-    (expectedError, compiler.compileAndLint(code)) must beLike {
-      case (None, None) => ok
-      case (Some(exp), Some(act)) if exp.findFirstIn(act).isDefined => ok
+  // A few hacks to scrap the boilerplate and better pinpoint the failing test
+  def should(code: String, nt: Boolean = false)(implicit expectedMsg: String) {
+    val cleanCode = code.trim.stripMargin
+    (expectedMsg, compiler.compileAndLint(cleanCode)) must beLike {
+      case (expected, actual) if (nt ^ actual.contains(expected)) => ok
+      case _ => ko("in "+(if(nt) "negative case" else "positive case")+":\n  " + cleanCode.trim.replaceAll("\\n", "\n  "))
     }
   }
+  def shouldnt(code: String)(implicit expectedError: String) { should(code, nt = true)(expectedError) }
+  def noWarnings(code: String) { compiler.compileAndLint(code) must be ("") }
 
   @Before
   def forceCompilerInit() {
-    check( """1 + 1""")
+    compiler.compileAndLint("1 + 1")
+  }
+  
+  @Test
+  def caseClass__NoWarn() {
+    noWarnings("""case class A()""")
+    noWarnings("""case class A(a: Float)""")
+    noWarnings("""class A(a: Float, b: String)""")
   }
 
-  @Test
-  def testFromFile() {
-    check( """scala.io.Source.fromFile("README.md").mkString""", Some("You should close the file stream after use.".r))
-    check( """scala.io.Source.fromFile("README.md")""")
-  }
-
-  @Test
-  def testHasVersusContains() {
-    val msg = Some( """List\[Int\].contains\(.*String\) will probably return false.""".r)
-
-    check( """val x = List(4); x.contains("foo")""", msg)
-
-    // Set and Map have type-safe contains methods so we don't want to warn on
-    // those. 
-    check( """val x = Set(4); x.contains(3)""")
-    check( """val x = Map(4 -> 5); x.contains(3)""")
-  }
-
-  @Test
-  def testNoOptionGet() {
-    val msg = Some("Calling .get on Option will throw an exception if the Option is None.".r)
-
-    check( """Option(10).get""", msg)
-    check( """val x: Option[Int] = None ; x.get""", msg)
-    check( """val x: Option[Int] = Some(3); x.get""", msg)
-    check( """val x = None ; x.get""", msg)
-    check( """val x = Some(3) ; x.get""", msg)
-
-    check( """Map(1 -> "1", 2 -> "2").get(1)""")
-  }
-
-  @Test
-  def testJavaConversionsImport() {
-    val msg = Some("Conversions in scala.collection.JavaConversions._ are dangerous.".r)
-
-    check("import scala.collection.JavaConversions._;", msg)
-  }
-
-  @Test
-  def testAnyWildcardImport() {
-    val msg = Some("Wildcard imports should be avoided. Favor import selector clauses.".r)
-
-    check("import collection._;", msg)
-  }
-
-  @Test
-  def testUnsafeEquals() {
-    val msg = Some("Comparing with ==".r)
-
-    // Should warn
-    check("Nil == None", msg)
-    check( """{
-      val x: List[Int] = Nil
-      val y: List[String] = Nil
-      x == y
-    }""", msg)
-
-    // Should compile
-    check( """ "foo" == "bar" """)
-    check( """{
-      val x: List[Int] = Nil
-      val y: List[Int] = Nil
-      x == y
-    }""")
-    check( """{
-      val x: String = "foo"
-      val y: String = "bar"
-      x == y
-    }""")
-    check( """{
-      val x: String = "foo"
-      x == "bar"
-    }""")
-  }
-
-  @Test
-  def testNull() {
-    check( """val a = null""", Some("Using null is considered dangerous.".r))
-  }
-
-  @Test
-  def testCaseClassNull() {
-    check( """case class A()""")
-  }
-  @Test
-  def testCaseClassFloat() {
-    check( """case class A(a: Float)""")
-  }
-  @Test
-  def testClass() {
-    check( """class A(a: Float, b: String)""")
-  }
-
-  @Test
-  def testIfChecks() {
-    val msg = Some("Remove the if ".r)
-    check( """
-      val a,b = 5
-      if(a == b && b > 5) 
-        true 
-      else 
-        false""", msg)
-        
-    check( """
-      val a,b = 5
-      if(a != b && b > 5)
-        false
-      else
-        true""", msg)
-  }
-  @Test
-  def testIfChecks2() {
-    val msg = Some("""Both if statement branches have the same structure""".r)
-    check( """
-      val a,b = 10
-      if(b > 4)
-        (1+1,a) 
-      else
-        (2,a)""", msg)
-        
-    check( """
-      val a,b = 4
-      if(b > 4)
-        (1+1,a) 
-      else if(b > 7)
-        (2,a)""")
-  }
-  @Test
-  def testIfChecks3() {
-    check( """if(1 > 5) 7 else 8""", Some("This condition will always be false.".r))
-    check( """if(1 < 5) 7 else 8""", Some("This condition will always be true.".r))
-  }
-
-  @Test
-  def testCaseChecks() {
-    val msg = Some("""neighbouring cases are identical""".r)
-    check( """
-      val a = 7
-      a match { 
-        case 3 => println("hello") 
-        case 4 => println("hello") 
-        case 5 => println("hello") 
-        case _ => println("how low") 
-      }""", msg)
+  @Test 
+  def Source_FromFile__close() {
+    implicit val msg = "You should close the file stream after use."
+     
+    should("""scala.io.Source.fromFile("README.md").mkString""")
+    //should("""scala.io.Source.fromFile("README.md")""")
     
-    check( """
-      val a = 7;
-      a match { 
-        case 3 => println("hello1")
-        case 4 => println("hello2")
-        case 5 => println("hello3")
-        case _ => println("how low")
-      }""")
+    shouldnt("""val a = scala.io.Source.fromFile("README.md"); a.mkString(""); a.close()""")
+    shouldnt("""def fromFile(s: String) = ""; fromFile("aaa").mkString("")""")
+  }
 
-    check( """
-      import scala.concurrent._
-      import ExecutionContext.Implicits.global
-      import scala.util.{Failure,Success}
-      future { 1+1 } andThen { case Success(a) => println("win") case Failure(s) => println("fail") }
+  @Test
+  def contains__types() {
+    implicit val msg = ") will probably return false."
+
+    should("""val x = List(4); x.contains("foo")""")
+
+    // Set and Map have type-safe contains methods so we don't want to warn on those. 
+    shouldnt("""val x = Set(4); x.contains(3)""")
+    shouldnt("""val x = Map(4 -> 5); x.contains(3)""")
+  }
+
+
+  @Test
+  def import__JavaConversions() {
+    implicit val msg = "Conversions in scala.collection.JavaConversions._ are dangerous."
+    should("import scala.collection.JavaConversions._;")
+  }
+
+  @Test
+  @Ignore
+  def import__wildcard() {
+    implicit val msg = "Wildcard imports should be avoided. Favor import selector clauses."
+
+    should("import collection._;")
+    shouldnt("import util.Random")
+  }
+
+  @Test
+  def equals__types() {
+    implicit val msg = "Comparing with == on instances of different types"
+
+    should("Nil == None")
+    should("""
+      |val x: List[Int] = Nil
+      |val y: List[String] = Nil
+      |x == y""")
+
+    shouldnt(""" "foo" == "bar" """)
+    shouldnt("""
+      |val x: List[Int] = Nil
+      |val y: List[Int] = Nil
+      |x == y""")
+    shouldnt("""
+      |val x: String = "foo"
+      |val y: String = "bar"
+      |x == y""")
+    shouldnt("""
+      |val x: String = "foo"
+      |x == "bar" """)
+  }
+
+  @Test
+  @Ignore
+  def null__check() {
+    implicit val msg = "Using null is considered dangerous."
+    
+    should("""val a = null""")    
+    shouldnt("""val a = 5""")
+  }
+
+  @Test
+  def if__useCondition() {
+    implicit val msg = "Remove the if and just use the"
+    
+    should("""
+      |val a,b = 5
+      |if(a == b && b > 5) 
+      |  true 
+      |else 
+      |  false""")
+    should("""
+      |val a,b = 5
+      |if(a != b && b > 5)
+      |  false
+      |else
+      |  true""")
+
+    shouldnt("""
+      |val a,b = 5
+      |if(a != b && b > 5)
+      |  1+1
+      |else
+      |  true""")
+  }
+  
+  @Test
+  def if__sameBranches() {
+    implicit val msg = "If statement branches have the same structure"
+    should("""
+      |val a,b = 10
+      |if(b > 4)
+      |  (1+1,a) 
+      |else
+      |  (2,a)""")
+    should("""
+      |val a,b = 4
+      |if(b > 4)
+      |  (1+1,a) 
+      |else if(b > 7)
+      |  (2,a)""")
+      
+    shouldnt("""
+      |val a,b = 4
+      |if(b > 4)
+      |  (3,a) 
+      |else if(b > 7)
+      |  (2,a)""")      
+  }
+  
+  @Test
+  def if_condition() {
+    should("""if(1 > 5) 7 else 8""")("This condition will always be false.")
+    should("""if(1 < 5) 7 else 8""")("This condition will always be true.")
+  }
+
+  @Test
+  def case_neigbouringCases() {
+    implicit val msg = "neighbouring cases are identical"
+    should("""
+      |val a = 7
+      |a match { 
+      |  case 3 => println("hello") 
+      |  case 4 => println("hello") 
+      |  case 5 => println("hello") 
+      |  case _ => println("how low") 
+      |}""")
+
+    //TODO: shouldn't warn on complicated guards that can't really be merged
+    
+    shouldnt("""
+      |val a = 7
+      |a match { 
+      |  case 3 => println("hello1")
+      |  case 4 => println("hello2")
+      |  case 5 => println("hello3")
+      |  case _ => println("how low")
+      |}""")
+    shouldnt("""
+      |import scala.concurrent._
+      |import ExecutionContext.Implicits.global
+      |import scala.util.{Failure,Success}
+      |future { 1+1 } andThen { case Success(a) => println("win") case Failure(s) => println("fail") }
     """)
-
   }
+  
   @Test
-  def testCaseChecks2() {
-    check( """
-      5 match {
-        case 3 => "hello"
-        case _ => "hi"
-      }""", Some("""Pattern matching on a constant value""".r))
+  def case_constantValue() {
+    implicit val msg = "Pattern matching on a constant value"
     
-    //Negative case now, but could be positive in the future
-    //check( """val a = 5; a match { case 3 => "hello"; case _ => "hi" }""", Some("""Pattern matching on a constant value""").r)
+    should("""
+      |5 match {
+      |  case 3 => "hello"
+      |  case _ => "hi"
+      |}""")
     
-    check( """
-      val a = 5
-      a match {
-        case 3 => "hello";
-        case _ => "hi"
-      }""")
+    //TODO: should("""val a = 5; a match { case 3 => "hello"; case _ => "hi" }""")
+    
+    shouldnt("""
+      |val a = 5
+      |a match {
+      |  case 3 => "hello";
+      |  case _ => "hi"
+      |}""")
   }
+  
   @Test
-  def testCaseChecks3() {
-    check( """
-      val a = Option("")
-      a match {
-        case Some(x) => x
-        case _ => null
-      }""", Some("""There are probably better ways of handling an Option""".r))
-  }
-  @Test
-  def testCaseChecks4() {
-    check( """
+  @Ignore
+  def case_ifStatement() {
+    implicit val msg = "This is probably better written as an if statement."
+    
+    should("""
       val a = true;
       a match {
         case true => 0
         case false => 1
-      }""", Some("""This is probably better written as an if statement.""".r))
+      }""")
   }
 
+  @Test
+  @Ignore
+  def case_useMonadic() {
+    implicit val msg = "There are probably better ways of handling an Option"
+    
+    should("""
+      val a = Option("")
+      a match {
+        case Some(x) => x
+        case _ => null
+      }""")
+  }
 
   @Test
-  def implicitRetType() {
-    check( """
-      import scala.language.implicitConversions
-      implicit def int2string(a: Int) = a.toString
-    """, Some("""needs explicit return type""".r))
-    check( """
-      import scala.language.implicitConversions
-      implicit def int2string(a: Int): String = a.toString
+  @Ignore
+  def option_get() {
+    implicit val msg = "Calling .get on Option will throw an exception if the Option is None."
+
+    should("""Option(10).get""")
+    should("""val x: Option[Int] = None ; x.get""")
+    should("""val x: Option[Int] = Some(3); x.get""")
+    should("""val x = None ; x.get""")
+    should("""val x = Some(3) ; x.get""")
+
+    shouldnt("""Map(1 -> "1", 2 -> "2").get(1)""")
+  }
+
+  @Test
+  def implicit_returnType() {
+    implicit val msg = "needs explicit return type"
+    
+    should("""
+      |import scala.language.implicitConversions
+      |implicit def int2string(a: Int) = a.toString
+    """)
+    
+    shouldnt("""
+      |import scala.language.implicitConversions
+      |implicit def int2string(a: Int): String = a.toString
     """)
   }
 
   @Test
-  def redundantParameters() {
-    check( """def func(a:Int, b:Int) = a""", Some("""not used in method""".r))
-    check( """def func(a:Int)(implicit b:Int) = a""")
-    check( """def func(a:Int) = a""")
+  def def__redundantParameters() {
+    implicit val msg = "not used in method"
+    
+    should("""def func(a:Int, b:Int) = a""")
+    should("""def func(a:Int)(implicit b:Int) = b""")
+    
+    shouldnt("""def func(a:Int)(implicit b:Int) = a""")
+    shouldnt("""def func(a:Int) = a""")
+    shouldnt("""def func(a:Int) {}""")
+    shouldnt("""def func(a:Int) = ???""")
   }
 
   @Test
-  def duplicatedStringLiterals() {
-    check( """
-      val a = "hh"
-      val b = "hh"
-      val c = "hh"
-      val d = "hh"
-      val e = "hh"
-    """, Some("""String literal""".r))
-
-    //can't really decide if this is a bug or a feature
-    /*check( """
-      val a = "hh"
-      val b = s"${a}hh"
-      val c = s" ${a}hh"
-      val d = s"  ${a}hh"
-      val e = s"  ${a}hh"
-    """)*/
+  @Ignore
+  def string_duplicatedLiterals() {
+    implicit val msg = "String literal"
+    
+    should("""
+      |val a = "hh"
+      |val b = "hh"
+      |val c = "hh"
+      |val d = "hh"
+      |val e = "hh"
+    """)
+    //TODO: can't really decide if this one is a bug or a feature
+    should("""
+      |val a = "hh"
+      |val b = s"${a}hh"
+      |val c = s" ${a}hh"
+      |val d = s"  ${a}hh"
+      |val e = s"  ${a}hh"
+    """)
+    
+    shouldnt("""
+      |val a = "hh"
+      |val b = a
+      |val c = b
+      |val d = c
+      |val e = d
+    """)
   }
   
   @Test
-  def AsInstanceOf() {
-    check( """
-      val a = "aa"
-      a.replace(a.asInstanceOf[CharSequence], "bb".asInstanceOf[CharSequence])
-    """, Some("""Avoid using asInstanceOf""".r))
+  def string_alreadyDefined() {
+    implicit val msg = "You have defined that string as a val already"
     
-   check( """
-      val a = "aa"
-      a.replace(a: CharSequence, "bb": CharSequence)
+    should("""
+      |val a = "hh"
+      |val b = "hh"
+    """)
+    /*TODO: should("""{
+      |val a = "hh"
+      |val b = "hh" + "cde"
+    }""")*/
+    
+    shouldnt("""
+      |val a = "hh"
+      |val b = a + "cde"
+    """)
+    shouldnt("""
+      |var a = "hh"
+      |a += "aa"
+      |val b = a + "cde"
+    """)
+  }
+  
+  @Test
+  @Ignore
+  def instanceOf__check() {
+    implicit val msg = "Avoid using asInstanceOf"
+    
+    should("""
+      |val a = "aa"
+      |a.replace(a.asInstanceOf[CharSequence], "bb".asInstanceOf[CharSequence])
+    """)
+    
+   shouldnt("""
+      |val a = "aa"
+      |a.replace(a: CharSequence, "bb": CharSequence)
     """)
    }
-
+   
   @Test
-  def log1p() {
-    val msg = Some("""Use math.log1p instead of math.log""".r)
+  def numeric_log1p() {
+    implicit val msg = "Use math.log1p instead of math.log"
 
-    check( """
-      val a = 4d
-      math.log(1 + a)
-    """, msg)
+    should("""
+      |val a = 4d
+      |math.log(1 + a)
+    """)
+    should("""
+      |val a = 4d
+      |math.log(1d + a)
+    """)
 
-    check( """
-      val a = 4d
-      math.log(1d + a)
-    """, msg)
+    shouldnt("""
+      |val a = 4d
+      |math.log(2d + a)
+    """)
+    shouldnt("""
+      |val a = 4d
+      |math.log1p(1 + a)
+    """)
   }
-  
 
 }
+
