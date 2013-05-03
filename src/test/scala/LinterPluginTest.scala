@@ -214,13 +214,13 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
   
   @Test
-  def if_condition() {
+  def if__condition() {
     should("""if(1 > 5) 7 else 8""")("This condition will always be false.")
     should("""if(1 < 5) 7 else 8""")("This condition will always be true.")
   }
 
   @Test
-  def case_neigbouringCases() {
+  def case__neigbouringCases() {
     implicit val msg = "neighbouring cases are identical"
     should("""
       |val a = 7
@@ -250,7 +250,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
   
   @Test
-  def case_constantValue() {
+  def case__constantValue() {
     implicit val msg = "Pattern matching on a constant value"
     
     should("""
@@ -271,7 +271,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   
   @Test
   @Ignore
-  def case_ifStatement() {
+  def case__ifStatement() {
     implicit val msg = "This is probably better written as an if statement."
     
     should("""
@@ -284,7 +284,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   @Ignore
-  def case_useMonadic() {
+  def case__useMonadic() {
     implicit val msg = "There are probably better ways of handling an Option"
     
     should("""
@@ -297,7 +297,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   @Ignore
-  def option_get() {
+  def option__get() {
     implicit val msg = "Calling .get on Option will throw an exception if the Option is None."
 
     should("""Option(10).get""")
@@ -310,7 +310,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
 
   @Test
-  def implicit_returnType() {
+  def implicit__returnType() {
     implicit val msg = "needs explicit return type"
     
     should("""
@@ -339,7 +339,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   @Ignore
-  def string_duplicatedLiterals() {
+  def string__duplicatedLiterals() {
     implicit val msg = "String literal"
     
     should("""
@@ -368,7 +368,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
   
   @Test
-  def string_alreadyDefined() {
+  def string__alreadyDefined() {
     implicit val msg = "You have defined that string as a val already"
     
     should("""
@@ -429,6 +429,344 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       |math.log1p(1 + a)
     """)
   }
+
+
+  @Test
+  def probableBugs__selfAssign() {
+    implicit val msg = "Assigning a variable to itself?"
+
+    should("""
+      |var a = 4d
+      |println("hi")
+      |a = a
+    """)
+    should("""
+      |class t { 
+      |  var a = 4d
+      |  def k { a = a }
+      |}
+    """)
+
+    shouldnt("""
+      |var a = 4d
+      |a += 1
+    """)
+    shouldnt("""
+      |var a = 4d
+      |a = a * a
+    """)
+  }
+
+  @Test
+  def probableBugs__sameElseIfCondition() {
+    implicit val msg = "The else-if has the same condition."
+
+    should("""
+      |var a = "b"
+      |if(a.size == 5) 
+      |  println("hi")
+      |else if(a.size == 5) 
+      |  println("hello")
+    """)
+    should("""
+      |var a = 5
+      |val b = 
+      |  if(a == 4) 
+      |    println("hi")
+      |  else if(a == 4) 
+      |    println("hello")
+    """)
+
+    shouldnt("""
+      |var a = "b"
+      |if(a.size == 5) 
+      |  println("hi")
+      |else if(a.size != 5) 
+      |  println("hello")
+    """)
+    shouldnt("""
+      |var a = 5
+      |val b = 
+      |  if(a == 4) 
+      |    println("hi")
+      |  else if(a == 5) 
+      |    println("hello")
+    """)
+  }
+  
+  @Test
+  def probableBugs__sameExpression() {
+    implicit val msg = "same expression on both sides"
+
+    should("""
+      |var a = "b"
+      |if(a.size == a.size) "foo"
+    """)
+    should("""
+      |var a = "b"
+      |val b = (a != a)
+    """)
+    should("""
+      |var a = 5
+      |val b = if(a > 5 && a > 5) "foo" else "bar"
+    """)
+
+    shouldnt("""
+      |var a = "b"
+      |if(a.size == a.size+1) "foo"
+    """)
+    shouldnt("""
+      |var a = "A5"
+      |val b = (a != a.toLowerCase)
+    """)
+    shouldnt("""
+      |var a = 5
+      |val b = if(a > 5 && a >= 5) "foo" else "bar"
+    """)
+  }
+  
+  def style__YodaConditions() {
+    implicit val msg = "Yoda conditions"
+
+    should("""
+      |var a = 5
+      |if(5 == a)
+    """)
+    shouldnt("""
+      |var a = 5
+      |if(a == 5)
+    """)
+  }
+  
+  
+  def string__constantLength() {
+    implicit val msg = "of a constant string"
+
+    should("""
+      |"5".size
+    """)
+    should("""
+      |"5".length
+    """)
+
+    shouldnt(""" 
+      |var a = "5"
+      |a.size
+    """)
+    shouldnt(""" 
+      |var a = "5"
+      |a.length
+    """)
+  }
+
+  def string__processingConstant() {
+    implicit val msg = "Processing a constant string"
+    
+    should(""" 
+      |"aBc".toLowerCase
+    """)
+    
+    shouldnt("""
+      |val a = "aBc"
+      |a.toLowerCase
+    """)
+  }
+
+  def if__mergeInner() {
+    implicit val msg = "These two ifs can be merged"
+    
+    should("""
+      |val a,b = 4
+      |if(a > 3) {
+      |  if(b == 4) {
+      |    println("foo")
+      |  }
+      |}
+    """)
+
+    shouldnt("""
+      |val a,b = 4
+      |if(a > 3) {
+      |  println("bar")
+      |  if(b == 4) {
+      |    println("foo")
+      |  }
+      |}
+    """)
+    shouldnt("""
+      |val a,b = 4
+      |if(a > 3) {
+      |  if(b == 4) {
+      |    println("foo")
+      |  }
+      |  println("bar")
+      |}
+    """)
+    shouldnt("""
+      |val a,b = 4
+      |if(a > 3) {
+      |  if(b == 4) {
+      |    println("foo")
+      |  } else {
+      |    println("bar")
+      |  }
+      |}
+    """)
+    shouldnt("""
+      |val a,b = 4
+      |if(a > 3) {
+      |  if(b == 4) {
+      |    println("foo")
+      |  }
+      |} else {
+      |  println("bar")
+      |}
+    """)
+  }
+  
+  def numeric__signum() {
+    implicit val msg = "Did you mean to use the signum function"
+    
+    should("""
+      |val a = 4d
+      |a/math.abs(a)
+    """)
+    should("""
+      |val a = 4d
+      |math.abs(a)/a
+    """)
+
+    shouldnt("""
+      |val a = 4d
+      |math.abs(a/a)
+    """)
+    shouldnt("""
+      |val a = 4d
+      |a/math.abs(a+1)
+    """)
+  }
+
+  def possibleBugs__assignment() {
+    implicit val msg = "Assignment right after declaration"
+    
+    should("""
+      |var a = 6
+      |a = 3
+    """)
+    //TODO:
+    /*should("""
+      |var a = 6
+      |println("foo")
+      |a = 3
+    """)*/
+
+    // Most of the real-world cases are like this - use var to compute new value
+    shouldnt("""
+      |var a = "A6"
+      |a = a.toLowerCase
+    """)
+    shouldnt("""
+      |var a = 6
+      |a += 3
+    """)
+  }
+
+  def possibleBugs__assignment2() {
+    implicit val msg = "Two subsequent assigns"
+    
+    should("""
+      |var a = 6
+      |println(a)
+      |a = 4
+      |a = 3
+    """)
+
+    // Most of the real-world cases are like this - use var to compute new value
+    shouldnt("""
+      |var a = "A6"
+      |println(a)
+      |a = a.toLowerCase
+      |a = a + "d"
+    """)
+  }
+
+  def possibleBugs__swapVars() {
+    implicit val msg = "Did you mean to swap these two variables"
+    
+    should("""
+      |var a = 6
+      |var b = 7
+      |println(a+b)
+      |a = b
+      |b = a
+    """)
+
+    shouldnt("""
+      |var a = 6
+      |var b = 7
+      |println(a+b)
+      |val c = a
+      |a = b
+      |b = c
+    """)
+  }
+
+  def style__tempVariable() {
+    implicit val msg = "You don't need that temp variable"
+   
+    should("""
+      def a = {
+        val out = 5 + 5
+        out
+      }
+    """) 
+
+    //TODO: some more cases to cover with val vs var
+
+    shouldnt("""
+      def a = {
+        var out = 5
+        out += 5
+        out
+      }
+    """)
+  }
+/*unit.warning(tree.pos, "Possible loss of precision - use a string constant")
+unit.warning(s1.pos, "You're doing the exact same thing twice.")  
+unit.warning(pos.pos, "Using a negative index for a collection.")
+unit.warning(divByZero.pos, "Literal division by zero.")
+
+src/main/scala/LinterPlugin.scala:        if(maybeVals.nonEmpty) unit.warning(tree.pos, "[experimental] These vars might secretly be vals: grep -rnP --include=*.scala 'var ([(][^)]*)?("+maybeVals.mkString("|")+")'")
+src/main/scala/AbstractInterpretation.scala:              unit.warning(condExpr.pos, "This string will never be empty.")
+src/main/scala/AbstractInterpretation.scala:      if(neverHold) unit.warning(condExpr.pos, "This condition will never hold.")
+src/main/scala/AbstractInterpretation.scala:      if(alwaysHold) unit.warning(condExpr.pos, "This condition will always hold.")
+src/main/scala/AbstractInterpretation.scala:        if(this.actualSize == 0) unit.warning(treePosHolder.pos, "Taking the "+head_last.toString+" of an empty collection.")
+src/main/scala/AbstractInterpretation.scala:          unit.warning(treePosHolder.pos, "Taking the "+tail_init.toString+" of an empty collection.")
+src/main/scala/AbstractInterpretation.scala:        unit.warning(treePosHolder.pos, "This condition will " + (if(this.actualSize == 0) "always" else "never") + " hold.")
+src/main/scala/AbstractInterpretation.scala:        unit.warning(treePosHolder.pos, "This condition will " + (if(this.actualSize > 0) "always" else "never") + " hold.")
+src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This contains will always return true")
+src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This contains will never return true")
+src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This max will always return the first value")
+src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This max will always return the second value")
+src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This max will always return the second value")
+src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This max will always return the first value")
+src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This min will always return the first value")
+src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This min will always return the second value")
+src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This min will always return the second value")
+src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This min will always return the first value")
+src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This take is always unnecessary.")
+src/main/scala/AbstractInterpretation.scala:            if(right.getValueForce <= 0) unit.warning(treePosHolder.pos, "This collection will always be empty.")
+src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This drop is always unnecessary.")
+src/main/scala/AbstractInterpretation.scala:            if(left.actualSize-right.getValueForce <= 0) unit.warning(treePosHolder.pos, "This collection will always be empty.")
+src/main/scala/AbstractInterpretation.scala:              unit.warning(treePosHolder.pos, "The parameter of this nextInt might be lower than 1 here.")
+src/main/scala/AbstractInterpretation.scala:      if(!isUsed(body, param) && func != "foreach") unit.warning(tree.pos, "Iterator value is not used in the body.")
+src/main/scala/AbstractInterpretation.scala:        unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
+src/main/scala/AbstractInterpretation.scala:        if(stringVals contains str) unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
+src/main/scala/AbstractInterpretation.scala:        unit.warning(pos.pos, "You will likely divide by zero here.")
+src/main/scala/AbstractInterpretation.scala:        unit.warning(pos.pos, "You will likely use a too large index for a collection here.")
+src/main/scala/AbstractInterpretation.scala:        unit.warning(pos.pos, "You will likely use a negative index for a collection here.")
+src/main/scala/AbstractInterpretation.scala:            unit.warning(pos.pos, "This function always returns the same value.")
+h*/
 
 }
 

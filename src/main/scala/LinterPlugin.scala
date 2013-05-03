@@ -191,7 +191,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           case Apply(Select(left, func), List(right)) if (func.toString matches "[$]amp[$]amp|[$]bar[$]bar") && (left equalsStructure right) =>        
             unit.warning(tree.pos, "Structurally the same expression on both sides of condition.")
-          case Apply(Select(left, func), List(right)) if (func.toString matches "[$](greater|less|eq)([$]eq)?") && (left equalsStructure right) =>        
+          case Apply(Select(left, func), List(right)) if (func.toString matches "[$](greater|less|eq|bang)([$]eq)?") && (left equalsStructure right) =>        
             unit.warning(tree.pos, "Structurally the same expression on both sides of comparison.")
 
           case Apply(Select(Literal(const), func), params) if params.size == 1 && (func.toString matches "[$](greater|less|eq)([$]eq)?") && (params.head match { case Literal(_) => false case _ => true })  =>
