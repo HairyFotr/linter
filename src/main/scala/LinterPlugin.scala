@@ -72,7 +72,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 case Literal(Constant(a: Unit)) => true
                 case Ident(qmarks) if qmarks.toString == "$qmark$qmark$qmark" => true
                 case Select(scala_Predef, qmarks) if qmarks.toString == "$qmark$qmark$qmark" => true
-                case a if block.isEmpty => true
+                //case a if a.isEmpty || a.children.isEmpty => true
                 case _ => false
               }
               
@@ -307,11 +307,17 @@ class LinterPlugin(val global: Global) extends Plugin {
               }
             }
             
+            //TODO: Put into utils
+            def isLiteral(t:Tree) = t match {
+              case Literal(_) => true
+              case _ => false
+            }
+            
             //Checking for duplicate case bodies
             case class Streak(streak: Int, tree: CaseDef)
             var streak = Streak(0, cases.head)
             def checkStreak(c: CaseDef) {
-              if((c.body equalsStructure streak.tree.body) && !(c.body.children == List())) {
+              if((c.body equalsStructure streak.tree.body) && isLiteral(c.pat) && !(c.body.children == List())) {
                 streak = Streak(streak.streak + 1, c)
               } else {
                 printStreakWarning()
@@ -323,8 +329,8 @@ class LinterPlugin(val global: Global) extends Plugin {
                 //This one always turns out to be a false positive
                 //unit.warning(tree.pos, "All "+cases.size+" cases will return "+cases.head.body+", regardless of pattern value") 
               } else if(streak.streak > 1) {
-                //TODO: should check actual cases
-                //unit.warning(streak.tree.body.pos, streak.streak+" neighbouring cases are identical, and could be merged.")
+                //TODO: should check actual cases - only simple values can be merged
+                unit.warning(streak.tree.body.pos, streak.streak+" neighbouring cases are identical, and could be merged.")
               }
             }
 
@@ -341,9 +347,10 @@ class LinterPlugin(val global: Global) extends Plugin {
             unit.warning(cond.pos, "Remove the if and just use the condition.")
           case If(cond, Literal(Constant(false)), Literal(Constant(true))) =>
             unit.warning(cond.pos, "Remove the if and just use the negated condition.")
-          case If(cond, a, b) if (a equalsStructure b) && (a.children.nonEmpty) =>
-            //TODO: empty if statement (if(...) { }) triggers this - change warning for that case
-            unit.warning(cond.pos, "Both if statement branches have the same structure.")
+          case If(cond, a, b) if (a equalsStructure b) && (a.children.nonEmpty) => //TODO: empty if statement (if(...) { }) triggers this - change warning for that case
+            unit.warning(a.pos, "If statement branches have the same structure.")
+          case If(cond, a, If(cond2, b, c)) if (a equalsStructure b) || (a equalsStructure c) || (b equalsStructure c) && (a.children.nonEmpty) =>
+            unit.warning(a.pos, "If statement branches have the same structure.")
 
           case If(cond @ Literal(Constant(a: Boolean)), _, _) => 
             //TODO: try to figure out things like (false && a > 5 && ...) (btw, this works if a is a final val)
