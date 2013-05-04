@@ -28,7 +28,7 @@ class LinterPlugin(val global: Global) extends Plugin {
   import global._
 
   val name = "linter"
-  val description = ""
+  val description = "a static analysis compiler plugin"
   val components = List[PluginComponent](PreTyperComponent, LinterComponent, AfterLinterComponent)
   
   override val optionsHelp: Option[String] = Some("  -P:linter No options yet, just letting you know I'm here")
@@ -72,6 +72,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 case Literal(Constant(a: Unit)) => true
                 case Ident(qmarks) if qmarks.toString == "$qmark$qmark$qmark" => true
                 case Select(scala_Predef, qmarks) if qmarks.toString == "$qmark$qmark$qmark" => true
+                case Throw(_) => true
                 //case a if a.isEmpty || a.children.isEmpty => true
                 case _ => false
               }
@@ -190,9 +191,9 @@ class LinterPlugin(val global: Global) extends Plugin {
             unit.warning(cond2.pos, "The else-if has the same condition.")
 
           case Apply(Select(left, func), List(right)) if (func.toString matches "[$]amp[$]amp|[$]bar[$]bar") && (left equalsStructure right) =>        
-            unit.warning(tree.pos, "Structurally the same expression on both sides of condition.")
+            unit.warning(tree.pos, "Same expression on both sides of condition.")
           case Apply(Select(left, func), List(right)) if (func.toString matches "[$](greater|less|eq|bang)([$]eq)?") && (left equalsStructure right) =>        
-            unit.warning(tree.pos, "Structurally the same expression on both sides of comparison.")
+            unit.warning(tree.pos, "Same expression on both sides of comparison.")
 
           case Apply(Select(Literal(const), func), params) if params.size == 1 && (func.toString matches "[$](greater|less|eq)([$]eq)?") && (params.head match { case Literal(_) => false case _ => true })  =>
             unit.warning(tree.pos, "You are using Yoda conditions") // http://www.codinghorror.com/blog/2012/07/new-programming-jargon.html :)
@@ -216,7 +217,17 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             unit.warning(tree.pos, "Use math.log1p instead of math.log for added accuracy.")
             
-          case Apply(eqeq @ Select(lhs, nme.EQ), List(rhs)) if methodImplements(eqeq.symbol, Object_==) && !isSubtype(lhs, rhs) && !isSubtype(rhs, lhs) =>
+          case Apply(math_sqrt, List(Apply(math_pow, List(expr, Literal(Constant(a)))))) 
+            if a == 2 && math_sqrt.toString == "scala.math.`package`.sqrt" && math_pow.toString == "scala.math.`package`.pow" =>
+            
+            unit.warning(tree.pos, "Use abs instead of sqrt(pow(_, 2)).")
+
+          case Apply(math_sqrt, List(Apply(Select(expr1, nme.MUL), List(expr2))))
+            if (expr1 equalsStructure expr2) && math_sqrt.toString == "scala.math.`package`.sqrt" =>
+            
+            unit.warning(tree.pos, "Use abs instead of sqrt(pow(x*x)).")
+
+          case Apply(eqeq @ Select(lhs, nme.EQ), List(rhs)) if methodImplements(eqeq.symbol, Object_==) && !isSubtype(lhs, rhs) && !isSubtype(rhs, lhs) && lhs.tpe.widen.toString != "Null" && rhs.tpe.widen.toString != "Null" =>
             val warnMsg = "Comparing with == on instances of different types (%s, %s) will probably return false."
             unit.warning(eqeq.pos, warnMsg.format(lhs.tpe.widen, rhs.tpe.widen))
 
@@ -260,8 +271,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               //unit.warning(tree.pos, """String literal """"+str+"""" appears multiple times.""")
             }
             
-            implicit def String2StringAttrs(s: String) = new abstractInterpretation.StringAttrs(exactValue = Some(s))
-            if(abstractInterpretation.stringVals contains str) {
+            if(abstractInterpretation.stringVals.exists(_.exactValue == Some(str))) {
               unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
               abstractInterpretation.visitedBlocks += s
             }
@@ -349,7 +359,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             unit.warning(cond.pos, "Remove the if and just use the negated condition.")
           case If(cond, a, b) if (a equalsStructure b) && (a.children.nonEmpty) => //TODO: empty if statement (if(...) { }) triggers this - change warning for that case
             unit.warning(a.pos, "If statement branches have the same structure.")
-          case If(cond, a, If(cond2, b, c)) if (a equalsStructure b) || (a equalsStructure c) || (b equalsStructure c) && (a.children.nonEmpty) =>
+          case If(cond, a, If(cond2, b, c)) if (a.children.nonEmpty && ((a equalsStructure b) || (a equalsStructure c))) || (b.children.nonEmpty && (b equalsStructure c)) =>
             unit.warning(a.pos, "If statement branches have the same structure.")
 
           case If(cond @ Literal(Constant(a: Boolean)), _, _) => 
@@ -377,13 +387,15 @@ class LinterPlugin(val global: Global) extends Plugin {
             if java_math_BigDecimal.toString == "java.math.BigDecimal" =>
             unit.warning(tree.pos, "Possible loss of precision - use a string constant")
             
-          case pos @ Apply(Select(expr1, op), List(expr2)) if (op == nme.DIV) => 
-            val warnMsg = "Did you mean to use the signum function here? (signum also avoids division by zero)"
-            (expr1, expr2) match {
-              case (expr1, Apply(abs, List(expr2))) if abs.toString == "scala.math.`package`.abs" && expr1.toString == expr2.toString => unit.warning(pos.pos, warnMsg)
-              case (Apply(abs, List(expr1)), expr2) if abs.toString == "scala.math.`package`.abs" && expr1.toString == expr2.toString => unit.warning(pos.pos, warnMsg)
-              case _ => //OK
-            }
+          case pos @ Apply(Select(expr1, op), List(expr2)) if (op == nme.DIV) && ((expr1, expr2) match {
+            case (expr1, Apply(abs, List(expr2))) if abs.toString == "scala.math.`package`.abs" && expr1.toString == expr2.toString => true
+            case (Apply(abs, List(expr1)), expr2) if abs.toString == "scala.math.`package`.abs" && expr1.toString == expr2.toString => true
+            case (expr1, Select(Apply(wrapper @ Select(_, _), List(expr2)), abs)) if wrapper.toString.endsWith("Wrapper") && abs.toString == "abs" && expr1.toString == expr2.toString => true
+            case (Select(Apply(wrapper @ Select(_, _), List(expr1)), abs), expr2) if wrapper.toString.endsWith("Wrapper") && abs.toString == "abs" && expr1.toString == expr2.toString => true
+            case _ =>
+            false
+          }) =>
+            unit.warning(pos.pos, "Did you mean to use the signum function here? (signum also avoids division by zero)")
 
           //ignores "Assignment right after declaration..." in case class hashcode
           case DefDef(mods, name, _, _, _, Block(block, last)) if name.toString == "hashCode" && {
@@ -430,6 +442,10 @@ class LinterPlugin(val global: Global) extends Plugin {
               case _ =>
             }
 
+          case Select(Apply(pos @ Select(collection, find), func), isDefined) 
+            if find.toString == "find" && isDefined.toString == "isDefined" && (collection.toString.startsWith("scala.") || collection.toString.startsWith("immutable.")) =>
+            
+            unit.warning(pos.pos, "Use exists() instead of find().isDefined")
 
           case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, param, _, _)), body))) if { //if (foreach_map.toString matches "foreach|map") && {
             abstractInterpretation.forLoop(forloop)
@@ -477,7 +493,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     class AfterLinterTraverser(unit: CompilationUnit) extends Traverser {
       override def traverse(tree: Tree) {
         val maybeVals = (varDecls -- varAssigns)
-        if(maybeVals.nonEmpty) unit.warning(tree.pos, "[experimental] These vars might secretly be vals: grep -rnP --include=*.scala 'var ([(][^)]*)?("+maybeVals.mkString("|")+")'")
+        //if(maybeVals.nonEmpty) unit.warning(tree.pos, "[experimental] These vars might secretly be vals: grep -rnP --include=*.scala 'var ([(][^)]*)?("+maybeVals.mkString("|")+")'")
         varDecls.clear
       }
     }

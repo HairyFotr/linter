@@ -108,8 +108,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         case Select(Apply(scala_augmentString, List(name)), nonEmpty) if
           scala_augmentString.toString.endsWith(".augmentString") &&
           nonEmpty.toString == "nonEmpty" && {
-            //println("aaaaaaaaaaaaaaaaaaaaaa"+name.toString+"   "+stringVals)
             val str = stringVals.find(_.name.exists(_ == name.toString))
+            //println("aaaaaaaaaaaaaaaaaaaaaa("+name.toString+") -"+str+"-  |"+stringVals)
             if(str.isDefined && str.get.alwaysNonEmpty) {
               unit.warning(condExpr.pos, "This string will never be empty.")
             }
@@ -288,7 +288,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         Values.empty
 
       case a => 
-        //val raw = showRaw( treePosHolder ); println("applyUnary: "+treePosHolder.toString+"\n"+raw);
+        //val raw = showRaw( treePosHolder );println("applyUnary: "+treePosHolder.toString+"\n"+raw);
         Values.empty
     }
     def apply(op: Name)(right: Values): Values = {
@@ -410,6 +410,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           Values.empty
         }
       } else if(left.isValue && right.isValue) {
+        if(left.getValue == right.getValue && op == nme.SUB) unit.warning(treePosHolder.pos, "Same expression on both sides of subtraction.")
         Values(func(left.getValue, right.getValue))
       } else if(!left.isValue && right.isValue) {
         left.map(a => func(a, right.getValue), rangeSafe = isRangeSafe)
@@ -422,7 +423,9 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
             //case nme.ADD => left.map(a => a+a) //WRONG
             //case nme.MUL => left.map(a => a*a)
             case nme.DIV if(!left.contains(0)) => Values(1) //TODO: never gets executed?
-            case nme.SUB | nme.XOR => Values(0)
+            case nme.SUB | nme.XOR => 
+              if(op == nme.SUB) unit.warning(treePosHolder.pos, "Same expression on both sides of subtraction.")
+              Values(0)
             case nme.AND | nme.OR  => left
             case _ => Values.empty
           }
@@ -463,6 +466,17 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         //println(n+": "+vals(n))
         vals(n)
         
+      // String size
+      case Apply(Select(Ident(id), func), List()) if stringVals.exists(_.name == Some(id.toString)) && func.toString == "length" =>
+        val exactValue = stringVals.find(_.name == Some(id.toString)).map(_.exactValue)
+        exactValue.map(v => if(v.isDefined) Values(v.get.size) else Values.empty).getOrElse(Values.empty)
+        
+      case Select(Apply(Select(predef, augmentString), List(Ident(id))), size)
+        if stringVals.exists(_.name == Some(id.toString)) && predef.toString == "scala.this.Predef" && augmentString.toString == "augmentString" && size.toString == "size" => 
+        val exactValue = stringVals.find(_.name == Some(id.toString)).map(_.exactValue)
+        exactValue.map(v => Values(v.size)).getOrElse(Values.empty)
+
+      // Range
       case Apply(Select(Apply(Select(scala_Predef, intWrapper), List(Literal(Constant(low: Int)))), to_until), List(Literal(Constant(high: Int)))) if (to_until.toString matches "to|until") =>
         val high2 = if(to_until.toString == "to") high else high-1
         new Values(Set((low, high2)), Set(), "", isSeq = true, high2-low)
@@ -531,7 +545,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case Apply(Apply(TypeApply(Select(valName, map), List(_, _)), List(Function(List(ValDef(mods, paramName, _, EmptyTree)), expr))), _) if(map.toString == "map") => //List(TypeApply(Select(Select(This(newTypeName("immutable")), scala.collection.immutable.List), newTermName("canBuildFrom")), List(TypeTree()))))
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
         val backupStrs = stringVals.clone
-        vals += paramName.toString -> computeExpr(valName)
+        val res = computeExpr(valName)
+        vals += paramName.toString -> res
         //println(">        "+vals)
         val out = computeExpr(expr)
         vals = backupVals
@@ -539,8 +554,25 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         //println(">        "+out)
         out
       
+      case If(cond, expr1, expr2) =>
+        //TODO: compute cond - if always/never holds, return that branch
+        val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
+        val backupStrs = stringVals.clone
+        
+        val e1 = computeExpr(expr1)
+        vals = backupVals
+        stringVals = backupStrs
+
+        val e2 = computeExpr(expr2)
+        vals = backupVals
+        stringVals = backupStrs
+
+        if(e1.isValue && e2.isValue) new Values(values = e1.values ++ e2.values) else Values.empty
+
       case a => 
         //val raw = showRaw( a ); if(!exprs.contains(raw) && raw.size < 700 && raw.size > "EmptyTree".size) println("computeExpr: "+treePosHolder.toString+"\n"+raw); exprs += raw
+        //for(Ident(id) <- a) if(stringVals.exists(_.name == Some(id.toString))) { println("id: "+id+"  "+showRaw( a )); }
+        //println(showRaw( a ))
         Values.empty
     }
   }
@@ -589,17 +621,47 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   val visitedBlocks = collection.mutable.HashSet[GTree]()
   
   // Just something quick I hacked together for an actual bug
-  implicit def String2StringAttrs(s: String) = new StringAttrs(exactValue = Some(s))
+  //implicit def String2StringAttrs(s: String) = new StringAttrs(exactValue = Some(s))
   object StringAttrs {
     def empty = new StringAttrs()
     def apply(tree: Tree): StringAttrs = {
       def traverse(tree: Tree): StringAttrs = tree match {
-        case Literal(Constant(c)) => new StringAttrs(exactValue = Some(c.toString))
-        case Apply(Select(expr1, nme.ADD), List(expr2)) => traverse(expr1) + traverse(expr2)
-        case Ident(name) => stringVals.find(_.name.exists(_ == name.toString)).getOrElse(empty)
-        case Apply(Select(expr, noEffect), List()) if noEffect.toString matches "trim|to(Upper|Lower)Case" =>
-          traverse(expr)
+        case Literal(Constant(null)) => new StringAttrs(exactValue = Some("null"))
+        case Literal(Constant(c)) => 
+          if(stringVals.exists(_.exactValue == Some(c.toString))) {
+            unit.warning(tree.pos, "You have defined that string as a val already, maybe use that?")
+          }
 
+          new StringAttrs(exactValue = Some(c.toString))
+          
+        case Apply(Select(expr1, nme.ADD), List(expr2)) => 
+          val (e1, e2) = (traverse(expr1), traverse(expr2))
+          
+          e1 + e2
+          
+        case Apply(Select(expr1, nme.MUL), List(expr2)) if computeExpr(expr2).isValue =>
+          val (e1, n) = (traverse(expr1), computeExpr(expr2).getValue)
+                    
+          e1 * n
+
+        case Ident(name) => stringVals.find(_.name.exists(_ == name.toString)).getOrElse(empty)
+        case Apply(Select(expr, func), List()) if func.toString matches "trim|to(Upper|Lower)Case" =>
+          val res = traverse(expr)
+          
+          func.toString match {
+            case "trim" => new StringAttrs(res.exactValue.map(_.trim), None, res.exactValue.map(_.trim.size).getOrElse(res.getTrimmedMinLength))
+            case "toUpperCase" => new StringAttrs(res.exactValue.map(_.toUpperCase), None, res.minLength)
+            case "toLowerCase" => new StringAttrs(res.exactValue.map(_.toUpperCase), None, res.minLength)
+            case _ => empty
+          }
+        case If(cond, expr1, expr2) =>
+          val (e1, e2) = (traverse(expr1), traverse(expr2))
+          
+          new StringAttrs(minLength = math.min(e1.getMinLength, e2.getMinLength), trimmedMinLength = math.min(e1.getTrimmedMinLength, e2.getTrimmedMinLength))
+
+        case Apply(augmentString, List(Literal(Constant(s:String)))) if(augmentString.toString == "scala.this.Predef.augmentString") =>
+          new StringAttrs(Some(s))
+          
         case a => 
           //println(showRaw(a))
           empty
@@ -613,21 +675,31 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   class StringAttrs(
       val exactValue: Option[String] = None,
       val name: Option[String] = None,
-      minLength: Int = 0) {
+      val minLength: Int = 0,
+      val trimmedMinLength: Int = 0) {
     
-    def addName(name: String): StringAttrs = new StringAttrs(exactValue, Some(name), minLength)
+    def addName(name: String): StringAttrs = new StringAttrs(exactValue, Some(name), minLength, trimmedMinLength)
     
     //println(this)
 
     def alwaysNonEmpty = getMinLength > 0
-    def getMinLength = math.max(minLength, exactValue.getOrElse("").trim.length)
+    def getMinLength = math.max(minLength, exactValue.getOrElse("").length)
+    def getTrimmedMinLength = math.max(trimmedMinLength, exactValue.getOrElse("").trim.length)
     
     def +(s: StringAttrs) = 
       new StringAttrs(
         exactValue = if(this.exactValue.isDefined && s.exactValue.isDefined) Some(this.exactValue.get + s.exactValue.get) else None,
-        minLength = this.getMinLength + s.getMinLength)
+        minLength = this.getMinLength + s.getMinLength,
+        trimmedMinLength = this.getTrimmedMinLength + s.getTrimmedMinLength //ADD: can be made more exact
+      )
+    def *(n: Int) = 
+      new StringAttrs(
+        exactValue = if(this.exactValue.isDefined) Some(this.exactValue.get*n) else None,
+        minLength = this.getMinLength*n,
+        trimmedMinLength = this.getTrimmedMinLength*n //ADD: can be made more exact
+      )
     
-    override def hashCode: Int = if(exactValue.isDefined) exactValue.hashCode else exactValue.hashCode + name.hashCode + minLength
+    override def hashCode: Int = /*if(exactValue.isDefined) exactValue.hashCode else */exactValue.hashCode + name.hashCode + minLength + trimmedMinLength
     override def equals(that: Any): Boolean = that match {
       case s: StringAttrs => (this.exactValue.isDefined && s.exactValue.isDefined && this.exactValue.get == s.exactValue.get)
       case s: String => exactValue.exists(_ == s)
@@ -653,21 +725,21 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, _, _, _)), _))) =>
         forLoop(forloop)
       
-      case s @ Literal(Constant(str: String)) if stringVals contains str =>
+      case s @ Literal(Constant(str: String)) if stringVals.find(_.exactValue == Some(str)).isDefined =>
         unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
         visitedBlocks += s
 
       case ValDef(m: Modifiers, valName, _, s @ Literal(Constant(str: String))) if(!m.hasFlag(MUTABLE)) =>
-        if(stringVals contains str) unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
-        stringVals += str
+        if(stringVals.exists(_.exactValue == Some(str))) unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
+        //stringVals += str
         visitedBlocks += s
         
         val str2 = StringAttrs(s).addName(valName.toString)
-        //println("str: "+str2)
+        //println("str2: "+str2)
         if(str2.exactValue.isDefined || str2.getMinLength > 0) {
           stringVals += str2
         }
-        //println("stringVals: "+stringVals)
+        //println("stringVals2: "+stringVals)
 
       case ValDef(m: Modifiers, valName, _, Literal(Constant(a: Int))) if(!m.hasFlag(MUTABLE)) =>
         val valNameStr = valName.toString.trim
@@ -680,18 +752,21 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
 
         if(expr.tpe.toString == "String") {
           val str = StringAttrs(expr).addName(valName.toString)
-          //println("str: "+str)
+          //println("str1: "+str)
           if(str.exactValue.isDefined || str.getMinLength > 0) {
             stringVals += str
             visitedBlocks += expr
           }
-          //println("stringVals: "+stringVals)
+          //println("stringVals1: "+stringVals)
         }
 
         val valNameStr = valName.toString
-        vals += valNameStr -> computeExpr(expr).addName(valNameStr)
+        val res = computeExpr(expr).addName(valNameStr)
+        vals += valNameStr -> res
        
+        //println("newVal: "+computeExpr(expr).addName(valNameStr))
         //println("newVal: "+vals(valName.toString))
+        //println(showRaw(expr))
         
         expr match {
           case e => //Block(_, _) | If(_,_,_) =>
@@ -769,9 +844,9 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         stringVals = backupStrs
 
       case _ => 
-        //if(vals.nonEmpty) println("in: "+showRaw(tree))
-        //if(vals.nonEmpty) println(">   "+vals);
-        //if(showRaw(tree).startsWith("Literal") || showRaw(tree).startsWith("Constant")) println("in: "+showRaw(tree))
+        //if(vals.nonEmpty)println("in: "+showRaw(tree))
+        //if(vals.nonEmpty)println(">   "+vals);
+        //if(showRaw(tree).startsWith("Literal") || showRaw(tree).startsWith("Constant"))println("in: "+showRaw(tree))
         tree.children.foreach(traverse)
     }
   }

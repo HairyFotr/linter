@@ -40,9 +40,8 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     settings.classpath.value = Source.fromURL(loader.getResource("app.class.path")).mkString
     settings.bootclasspath.append(Source.fromURL(loader.getResource("boot.class.path")).mkString)
     settings.deprecation.value = true // enable detailed deprecation warnings
-    settings.unchecked.value = true // enable detailed unchecked warnings
-    settings.Xwarnfatal.value = true
-    // warnings cause compile failures too
+    settings.unchecked.value = true // enable detailed unchecked warnings    
+    settings.Xwarnfatal.value = true // warnings cause compile failures too
 
     val stringWriter = new StringWriter()
 
@@ -375,10 +374,15 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       |val a = "hh"
       |val b = "hh"
     """)
-    /*TODO: should("""{
+    //"hh" + "hh" is auto-joined by the compiler, so you can't detect
+    should("""
       |val a = "hh"
-      |val b = "hh" + "cde"
-    }""")*/
+      |val b = "hh" + a
+    """)
+    should("""
+      |val a = "hh"
+      |println("hh")
+    """)
     
     shouldnt("""
       |val a = "hh"
@@ -388,6 +392,10 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       |var a = "hh"
       |a += "aa"
       |val b = a + "cde"
+    """)
+    shouldnt("""
+      |println("hh")
+      |val a = "hh"
     """)
   }
   
@@ -496,7 +504,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   
   @Test
   def probableBugs__sameExpression() {
-    implicit val msg = "same expression on both sides"
+    implicit val msg = "Same expression on both sides"
 
     should("""
       |var a = "b"
@@ -510,6 +518,10 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       |var a = 5
       |val b = if(a > 5 && a > 5) "foo" else "bar"
     """)
+    should("""{
+      |val a = 5
+      |val b = 4 + (a-a)
+    }""")
 
     shouldnt("""
       |var a = "b"
@@ -523,6 +535,10 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       |var a = 5
       |val b = if(a > 5 && a >= 5) "foo" else "bar"
     """)
+    shouldnt("""{
+      |var a = 5
+      |val b = 4 + (a-(a-1))
+    }""")
   }
   
   @Test
@@ -635,6 +651,22 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should("""
       |val a = 4d
       |a/math.abs(a)
+    """)
+    should("""
+      |val a = 4d
+      |(a+1)/math.abs(a+1)
+    """)
+    should("""
+      |val a = 4d
+      |a/a.abs
+    """)
+    should("""
+      |val a = 4d
+      |(a+1)/(a+1).abs
+    """)
+    should("""
+      |val a = 4d
+      |(a+1).abs/(a+1)
     """)
     should("""
       |val a = 4d
@@ -776,6 +808,11 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       |val b = -a.size /* -4 */
       |a(a.size/2 + b + 1) /* 2 - 4 + 1 == -1 */
      """)
+    should("""{
+      |val a = List(1,2,3)
+      |val b = "a"
+      |a(b.size-b.length-1)
+     }""")
      
     shouldnt("""
       |val a = List(1,2,3)
@@ -792,11 +829,93 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
      """)
   }
   
-/*unit.warning(tree.pos, "Possible loss of precision - use a string constant")
-unit.warning(divByZero.pos, "Literal division by zero.")
+  @Test
+  def numeric__BigDecimalFromFloat() {
+    implicit val msg = "use a string constant"
+    
+    //TODO: Scala's BigDecimal isn't as bad at accuracy as Java's, but still fails at BigDecimal(0.5555555555555555555555555555555555)
+    should("""BigDecimal(0.1)""")
+    shouldnt("""BigDecimal("0.1")""")
+  }
 
+  @Test
+  def numeric__divisionByZero() {
+    implicit val msg = " by zero"
+    
+    should("""1/0""")
+    should("""
+      |val a = 5
+      |println(a/(a-5))
+    """)
+    should("""
+      |val a = List(1,2,3)
+      |println(a.size/(a.size-3))
+    """)
+    
+    shouldnt("""1/2""")
+    shouldnt("""
+      |val a = List(1,2,3)
+      |println(a.size/(a.size-4))
+    """)
+  }
+
+  @Test
+  def string__nonEmpty() {
+    implicit val msg = "string will never be empty"
+    
+    should("""
+      |{
+      |  val a = " "
+      |  if(a.nonEmpty) "foo"
+      |}
+    """)
+    should("""
+      |{
+      |  var b = " "
+      |  val a = (b + "," + (if(b == " ") "a" else "b")).trim
+      |  if(a.nonEmpty) "foo"
+      |}
+    """)
+
+    //TODO: add toString to tracked vals - 34.toString is easily known
+    shouldnt("""
+      |{
+      |   val a = ""
+      |   if(a.nonEmpty) "foo"
+      |}
+    """)
+  }
+
+  @Test
+  def style__find_isDefined() {
+    implicit val msg = "Use exists() instead of find().isDefined"
+    
+    should("""List(1,2,3).find(_ == 2).isDefined""")
+    should("""Set(1,2,3).find(_ == 2).isDefined""")
+    should("""collection.mutable.HashSet(1,2,3).find(_ == 2).isDefined""")
+    should("""Array(1,2,3).find(_ == 2).isDefined""")
+    should("""def a(x:Int) = x == 2; List(1,2,3).find(a).isDefined""")
+
+    shouldnt("""List(1,2,3).headOption.isDefined""")
+    shouldnt("""List(1,2,3).exists(_ == 2)""")
+  }
+
+  @Test
+  def numeric__badAbs() {
+    implicit val msg = "Use abs instead of"
+    
+    should("""math.sqrt(math.pow(15, 2))""")
+    should("""math.sqrt(math.pow(15d, 2d))""")
+    should("""val a = 14d; math.sqrt(math.pow(a, 2))""")
+    should("""val a = 14d; math.sqrt(a*a)""")
+
+    shouldnt("""math.sqrt(math.pow(15, 3))""")
+    shouldnt("""val a = 14d; math.sqrt(math.pow(a, 3))""")
+    shouldnt("""val a = 14d; math.sqrt(a*(a-1))""")
+  }
+
+/*
 src/main/scala/LinterPlugin.scala:        if(maybeVals.nonEmpty) unit.warning(tree.pos, "[experimental] These vars might secretly be vals: grep -rnP --include=*.scala 'var ([(][^)]*)?("+maybeVals.mkString("|")+")'")
-src/main/scala/AbstractInterpretation.scala:              unit.warning(condExpr.pos, "This string will never be empty.")
 src/main/scala/AbstractInterpretation.scala:      if(neverHold) unit.warning(condExpr.pos, "This condition will never hold.")
 src/main/scala/AbstractInterpretation.scala:      if(alwaysHold) unit.warning(condExpr.pos, "This condition will always hold.")
 src/main/scala/AbstractInterpretation.scala:        if(this.actualSize == 0) unit.warning(treePosHolder.pos, "Taking the "+head_last.toString+" of an empty collection.")
@@ -825,7 +944,16 @@ src/main/scala/AbstractInterpretation.scala:        unit.warning(pos.pos, "You w
 src/main/scala/AbstractInterpretation.scala:        unit.warning(pos.pos, "You will likely use a too large index for a collection here.")
 src/main/scala/AbstractInterpretation.scala:        unit.warning(pos.pos, "You will likely use a negative index for a collection here.")
 src/main/scala/AbstractInterpretation.scala:            unit.warning(pos.pos, "This function always returns the same value.")
-h*/
+
+src/main/scala/LinterPlugin.scala:            val warnMsg = "You should close the file stream after use."
+src/main/scala/LinterPlugin.scala:            //val warnMsg = "Exact comparison of floating point values is potentially unsafe."
+src/main/scala/LinterPlugin.scala:            val warnMsg = "Comparing with == on instances of different types (%s, %s) will probably return false."
+src/main/scala/LinterPlugin.scala:            val warnMsg = "%s.contains(%s) will probably return false."
+src/main/scala/LinterPlugin.scala:            val warnMsg = "This condition will always be "+a+"."
+src/main/scala/LinterPlugin.scala:            val warnMsg = "This part of boolean expression will always be false."
+src/main/scala/LinterPlugin.scala:            val warnMsg = "This part of boolean expression will always be true."
+src/main/scala/LinterPlugin.scala:            val warnMsg = "Did you mean to use the signum function here? (signum also avoids division by zero)"
+*/
 
 }
 
