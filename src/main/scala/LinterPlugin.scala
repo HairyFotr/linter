@@ -51,24 +51,14 @@ class LinterPlugin(val global: Global) extends Plugin {
     class PreTyperTraverser(unit: CompilationUnit) extends Traverser {
       override def traverse(tree: Tree) {
         tree match {
-          //The fact that I don't track the whole chain means false negatives.
-          case ValDef(m: Modifiers, varName, TypeTree(), value) if(m.hasFlag(MUTABLE)) =>
-            varDecls += varName.toString.trim
-            //println("vardecl |"+varName.toString.trim+"|")
-          case Apply(Select(a, assign), _) if varDecls.contains(assign.toString.dropRight(4)) => 
-            val varName = assign.toString.dropRight(4)
-            varAssigns += varName.toString
-            //println("varassign |"+varName+"|")
-          case Assign(Ident(varName), _) =>
-            varAssigns += varName.toString
-            //println("varassign2 |"+varName+"|")
-            //TODO: += and the like seem to not be detected
-            
           case DefDef(mods: Modifiers, name, _, valDefs, typeTree, block) =>
+            //TODO: This nags, when a class overrides a method, but doesn't mark it as such - check out late flags: http://harrah.github.io/browse/samples/compiler/scala/tools/nsc/symtab/Flags.scala.html
             if(name.toString != "<init>" && !block.isEmpty && !mods.hasFlag(OVERRIDE)) {
               //Get the parameters, except the implicit ones
               val params = valDefs.flatMap(_.filterNot(_.mods.hasFlag(IMPLICIT))).map(_.name.toString).toBuffer
-              val blockIsEmpty = block match {
+
+              //TODO: Put into utils
+              def isBlockEmpty(block: Tree) = block match {
                 case Literal(Constant(a: Unit)) => true
                 case Ident(qmarks) if qmarks.toString == "$qmark$qmark$qmark" => true
                 case Select(scala_Predef, qmarks) if qmarks.toString == "$qmark$qmark$qmark" => true
@@ -77,7 +67,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 case _ => false
               }
               
-              if(!(name.toString == "main" && params.size == 1 && params.head == "args") && !blockIsEmpty) { // filter main method
+              if(!(name.toString == "main" && params.size == 1 && params.head == "args") && !isBlockEmpty(block)) { // filter main method
                 val used = for(Ident(name) <- tree if params contains name.toString) yield name.toString
                 val unused = params -- used
                 
@@ -89,7 +79,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               }
             }
 
-            if(mods.hasFlag(IMPLICIT) && typeTree.isEmpty && !(name.toString matches "((i?)to).*|.*To[A-Z].*")) unit.warning(tree.pos, "Implicit method %s needs explicit return type" format name)
+            if(mods.hasFlag(IMPLICIT) && typeTree.isEmpty && !(name.toString matches "((i?)to).+|.+(To|2)[A-Z].*")) unit.warning(tree.pos, "Implicit method %s needs explicit return type" format name)
           case _ => 
         }
         super.traverse(tree)
@@ -157,69 +147,56 @@ class LinterPlugin(val global: Global) extends Plugin {
       override def traverse(tree: Tree) { 
         //abstractInterpretation.traverseBlock(tree)
         tree match {
+          /// Workaround: case class generated code triggers a lot of the checks...
+          case ClassDef(mods, _, _, _) if mods.hasFlag(CASE) => return
+          /// Workaround: suppresse a null warning and a "remove the if" check for """case class A()""" - see case class unapply's AST)
+          case If(Apply(Select(_, nme.EQ), List(Literal(Constant(null)))), Literal(Constant(false)), Literal(Constant(true))) => return
+          /// WorkAround: ignores "Assignment right after declaration..." in case class hashcode
+          case DefDef(mods, name, _, _, _, Block(block, last)) if name.toString == "hashCode" && {
+            (block :+ last) match { 
+              case ValDef(modifiers, id1, _, _) :: Assign(id2, _) :: _ => true
+              case _ => false
+            }} => return
+
+          /// Tracks variable assignment (for unused, vars that could be vals, ...), and checks for self-assignments: a = a
+          //TODO: Scala 2.11 will have unused variables and vars->vals behind the -Xlint flag
+          case a @ Apply(Select(type1, varSetter), List(Select(type2, varName))) if (type1 equalsStructure type2) && (varSetter.toString == varName.toString+"_$eq") =>
+            unit.warning(a.pos, "Assigning a variable to itself?")
           case ValDef(m: Modifiers, varName, TypeTree(), value) if(m.hasFlag(MUTABLE)) =>
             varDecls += varName.toString.trim
             //println("vardecl |"+varName.toString.trim+"|")
-          case a @ Apply(Select(type1, varSetter), List(Select(type2, varName))) if (type1 equalsStructure type2) && (varSetter.toString == varName.toString+"_$eq") =>
-            unit.warning(a.pos, "Assigning a variable to itself?")
-
           case Apply(Select(a, assign), _) if varDecls.contains(assign.toString.dropRight(4)) => //drop "_$eq" - setter
             val varName = assign.toString.dropRight(4)
             varAssigns += varName.toString
             //println("varassign |"+varName+"|")
-            
           case Assign(l, r) =>
-            l match {
-              case Ident(varName) => varAssigns += varName.toString
-              case _ => //
-            }
-            //println("varassign2 |"+varName+"|")
-            
             if(l equalsStructure r) {
               unit.warning(l.pos, "Assigning a variable to itself?")
+            } else l match {
+              case Ident(varName) => 
+                varAssigns += varName.toString
+                //println("varassign2 |"+varName+"|")
+              case _ => 
+                //println(showRaw(l))
             }
 
-          case ClassDef(m: Modifiers, className, _, _) if m.hasFlag(CASE) => return // case classes cause false positives...
-
+          /// Checks if you read from a file without closing it: scala.io.Source.fromFile(file).mkString
+          //TODO: Only checks one-liners where you chain it - doesn't actually check if you close it
           case Select(fromFile, _) if fromFile.toString startsWith "scala.io.Source.fromFile" =>
-          //TODO: Too hacky detection, also doesn't actually check if you close it - just that you don't use it as a oneliner
             val warnMsg = "You should close the file stream after use."
             unit.warning(fromFile.pos, warnMsg)
             return
             
-          case If(cond1, _, If(cond2, _, _)) if cond1 equalsStructure cond2 =>
-            unit.warning(cond2.pos, "The else-if has the same condition.")
-
-          case Apply(Select(left, func), List(right)) if (func.toString matches "[$]amp[$]amp|[$]bar[$]bar") && (left equalsStructure right) =>        
-            unit.warning(tree.pos, "Same expression on both sides of condition.")
-          case Apply(Select(left, func), List(right)) if (func.toString matches "[$](greater|less|eq|bang)([$]eq)?") && (left equalsStructure right) =>        
-            unit.warning(tree.pos, "Same expression on both sides of comparison.")
-
-          case Apply(Select(Literal(const), func), params) if params.size == 1 && (func.toString matches "[$](greater|less|eq)([$]eq)?") && (params.head match { case Literal(_) => false case _ => true })  =>
-            unit.warning(tree.pos, "You are using Yoda conditions") // http://www.codinghorror.com/blog/2012/07/new-programming-jargon.html :)
-
-          case Apply(Select(Literal(Constant(s: String)), func), params) =>
-            func.toString match {
-              case "$plus"|"equals"|"$eq$eq"|"toCharArray"|"matches" => //false positives            
-              case "length" => unit.warning(tree.pos, "Taking the length of a constant string")
-              case _        => unit.warning(tree.pos, "Processing a constant string")
-            }
+          /// Some numeric checks
+          case Apply(Select(lhs, nme.EQ), List(rhs))
+            if isSubtype(lhs, DoubleClass.tpe) || isSubtype(lhs, FloatClass.tpe) || isSubtype(rhs, DoubleClass.tpe) || isSubtype(rhs, FloatClass.tpe) =>
             
-          case Select(Apply(Select(predef, augmentString), List(Literal(Constant(s: String)))), size)
-            if predef.toString == "scala.this.Predef" && augmentString.toString == "augmentString" && size.toString == "size" => 
-            unit.warning(tree.pos, "Taking the size of a constant string")
+            //unit.warning(tree.pos, "Exact comparison of floating point values is potentially unsafe.")
             
-          case Apply(Select(lhs, nme.EQ), List(rhs)) if isSubtype(lhs, DoubleClass.tpe) || isSubtype(lhs, FloatClass.tpe) || isSubtype(rhs, DoubleClass.tpe) || isSubtype(rhs, FloatClass.tpe) =>
-            //val warnMsg = "Exact comparison of floating point values is potentially unsafe."
-            //unit.warning(tree.pos, warnMsg)
-          case Apply(Select(packageName, log), List(Apply(Select(Literal(const), plus), _)))
-            if packageName.toString == "scala.math.`package`" && log.toString == "log" && plus.toString == "$plus" && (const == Constant(1.0) || const == Constant(1)) => 
-
+          case Apply(log, List(Apply(Select(Literal(Constant(const)), nme.ADD), _))) if log.toString == "scala.math.`package`.log" && const == 1 => 
             unit.warning(tree.pos, "Use math.log1p instead of math.log for added accuracy.")
             
-          case Apply(math_sqrt, List(Apply(math_pow, List(expr, Literal(Constant(a)))))) 
-            if a == 2 && math_sqrt.toString == "scala.math.`package`.sqrt" && math_pow.toString == "scala.math.`package`.pow" =>
-            
+          case Apply(sqrt, List(Apply(pow, List(expr, Literal(Constant(two)))))) if two == 2 && sqrt.toString == "scala.math.`package`.sqrt" && pow.toString == "scala.math.`package`.pow" =>
             unit.warning(tree.pos, "Use abs instead of sqrt(pow(_, 2)).")
 
           case Apply(math_sqrt, List(Apply(Select(expr1, nme.MUL), List(expr2))))
@@ -227,74 +204,127 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             unit.warning(tree.pos, "Use abs instead of sqrt(pow(x*x)).")
 
+          /// Signum function checks
+          case pos @ Apply(Select(expr1, op), List(expr2)) if (op == nme.DIV) && ((expr1, expr2) match {
+              case (expr1, Apply(abs, List(expr2))) if abs.toString == "scala.math.`package`.abs" && expr1.toString == expr2.toString => true
+              case (Apply(abs, List(expr1)), expr2) if abs.toString == "scala.math.`package`.abs" && expr1.toString == expr2.toString => true
+              case (expr1, Select(Apply(wrapper @ Select(_, _), List(expr2)), abs)) if wrapper.toString.endsWith("Wrapper") && abs.toString == "abs" && expr1.toString == expr2.toString => true
+              case (Select(Apply(wrapper @ Select(_, _), List(expr1)), abs), expr2) if wrapper.toString.endsWith("Wrapper") && abs.toString == "abs" && expr1.toString == expr2.toString => true
+              case _ => false
+            }) =>
+            
+            unit.warning(pos.pos, "Did you mean to use the signum function here? (signum also avoids division by zero errors)")
+
+          /// BigDecimal checks
+          //TODO: Scala BigDecimal constructor isn't as bad as the Java one - try with 0.1... still fails with 0.555555555555555555555 -
+          // - maybe you could get the actual token, and only warn if BigDecimal(stringToken) != BigDecimal(double)
+          // BigDecimal(0.1)
+          case Apply(Select(scala_package_BigDecimal, apply_valueOf), List(Literal(Constant(d:Double))))
+            if (scala_package_BigDecimal.toString == "scala.`package`.BigDecimal") && (apply_valueOf.toString matches "apply|valueOf") =>
+            unit.warning(tree.pos, "Possible loss of precision - use a string constant")
+          // BigDecimal.valueOf(0.1)
+          case Apply(Select(math_BigDecimal, apply_valueOf), List(Literal(Constant(d:Double)))) 
+            if math_BigDecimal.toString.endsWith("math.BigDecimal") && (apply_valueOf.toString matches "apply|valueOf") =>
+            unit.warning(tree.pos, "Possible loss of precision - use a string constant")
+          // new java.math.BigDecimal(0.1)
+          case Apply(Select(New(java_math_BigDecimal), nme.CONSTRUCTOR), List(Literal(Constant(d: Double)))) 
+            if java_math_BigDecimal.toString == "java.math.BigDecimal" =>
+            unit.warning(tree.pos, "Possible loss of precision - use a string constant")
+          
+          /// Comparing with == on instances of different types: 5 == "5"
+          //TODO: Scala 2.10 has a similar check "comparing values of types Int and String using `==' will always yield false"
           case Apply(eqeq @ Select(lhs, nme.EQ), List(rhs)) if methodImplements(eqeq.symbol, Object_==) && !isSubtype(lhs, rhs) && !isSubtype(rhs, lhs) && lhs.tpe.widen.toString != "Null" && rhs.tpe.widen.toString != "Null" =>
             val warnMsg = "Comparing with == on instances of different types (%s, %s) will probably return false."
             unit.warning(eqeq.pos, warnMsg.format(lhs.tpe.widen, rhs.tpe.widen))
 
-          case Import(pkg, selectors) if pkg.symbol == JavaConversionsModule && selectors.exists(isGlobalImport) =>
+          /// Some import checks
+          case Import(pkg, selectors) if (pkg.symbol == JavaConversionsModule) && (selectors exists isGlobalImport) =>
             unit.warning(pkg.pos, "Conversions in scala.collection.JavaConversions._ are dangerous.")
           
-          case Import(pkg, selectors) if selectors.exists(isGlobalImport) =>
-            //TODO: Too much noise - maybe it would be useful to non-IDE if it printed a nice selector import replacement
+          //case Import(pkg, selectors) if selectors exists isGlobalImport =>
+            //TODO: Too much noise - maybe it would be useful to non-IDE if it printed a nice selector import replacement, e.g. import mutable._ => import mutable.{HashSet,ListBuffer}
             //unit.warning(pkg.pos, "Wildcard imports should be avoided. Favor import selector clauses.")
 
+          /// Collection.contains on different types: List(1,2,3).contains("2")
           case Apply(contains @ Select(seq, _), List(target)) if methodImplements(contains.symbol, SeqLikeContains) && !(target.tpe <:< SeqMemberType(seq.tpe)) =>
             val warnMsg = "%s.contains(%s) will probably return false."
             unit.warning(contains.pos, warnMsg.format(seq.tpe.widen, target.tpe.widen))
 
+          /// Warn about using .asInstanceOf[T]
           //TODO: false positives in case class A(), and in the interpreter init
           //case aa @ Apply(a, List(b @ Apply(s @ Select(instanceOf,dd),ee))) if methodImplements(instanceOf.symbol, AsInstanceOf) =>
           //  println((aa,instanceOf))
-          case instanceOf @ Select(a, func) if methodImplements(instanceOf.symbol, AsInstanceOf) =>   
+          //case instanceOf @ Select(a, func) if methodImplements(instanceOf.symbol, AsInstanceOf) =>   
             //TODO: too much noise, maybe detect when it's completely unnecessary
             //unit.warning(tree.pos, "Avoid using asInstanceOf[T] (use pattern matching, type ascription, etc).")
 
-          case get @ Select(_, nme.get) if methodImplements(get.symbol, OptionGet) => 
-            //TODO: if(x.isDefined) func(x.get) / if(x.isEmpty) ... else func(x.get), etc. are false positives
+          /// Calling Option.get is potentially unsafe
+          //TODO: if(x.isDefined) func(x.get) / if(x.isEmpty) ... else func(x.get), etc. are false positives -- those could be detected in abs-interpreter
+          //case get @ Select(_, nme.get) if methodImplements(get.symbol, OptionGet) => 
             //unit.warning(tree.pos, "Calling .get on Option will throw an exception if the Option is None.")
 
-          case If(Apply(Select(_, nme.EQ), List(Literal(Constant(null)))), Literal(Constant(false)), Literal(Constant(true))) =>
-            // Fixes both the null warning and if check for """case class A()""" ... (x$0.==(null) - see unapply AST of such case class)
-
+          /// Nag about using null
+          //TODO: Too much noise - limit in some way
           case Literal(Constant(null)) =>
-            //TODO: Too much noise - limit in some way
             //unit.warning(tree.pos, "Using null is considered dangerous.")
-          case s @ Literal(Constant(str: String)) =>
+
+          /// String checks
+          case Literal(Constant(str: String)) =>
+            /// Repeated string literals
             //TODO: String interpolation gets broken down into parts and causes false positives
-            //TODO: some quick benchmark showed string literals are actually more optimized than almost anything else, even final vals
+            //TODO: a quick benchmark showed string literals are actually more optimized than almost anything else, even final vals
             val threshold = 4
 
             stringLiteralCount(str) += 1
             if(stringLiteralCount(str) == threshold && !(stringLiteralFileExceptions.contains(unit.source.toString)) && !(str.matches(stringLiteralExceptions))) {
+              //TODO: Too much noise :)
               //unit.warning(tree.pos, unit.source.path.toString)
-              //Too much noise :)
               //unit.warning(tree.pos, """String literal """"+str+"""" appears multiple times.""")
             }
             
+            //TODO: Doesn't this already reach the abs-interpreter anyway?
             if(abstractInterpretation.stringVals.exists(_.exactValue == Some(str))) {
-              unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
-              abstractInterpretation.visitedBlocks += s
+              unit.warning(tree.pos, "You have defined that string as a val already, maybe use that?")
+              abstractInterpretation.visitedBlocks += tree
             }
 
-          case Match(Literal(Constant(a)), cases) =>
-            //TODO: figure this, and similar if rules, for some types of val x = Literal(Constant(...)) declarations
-            
-            val returnVal = //try to detect what it'll return
-              cases 
-                .map { ca => (ca.pat, ca.body) } 
-                .find { case (Literal(Constant(c)), _) => c == a; case _ => false}
-                .map { _._2 } 
-                .orElse { if(cases.last.pat.toString == "_") Some(cases.last.body) else None } 
-                .map { s => " will always return " + s }
-                .getOrElse("")
-            
-            unit.warning(tree.pos, "Pattern matching on a constant value " + a /*+ returnVal*/ + ".")
+          /// Processing a constant string: "hello".size
+          case Apply(Select(Literal(Constant(s: String)), func), params) =>
+            func.toString match {
+              case "$plus"|"equals"|"$eq$eq"|"toCharArray"|"matches" => //ignore
+              case "length" => unit.warning(tree.pos, "Taking the length of a constant string")
+              case _        => unit.warning(tree.pos, "Processing a constant string")
+            }
+          case Select(Apply(Select(predef, augmentString), List(Literal(Constant(s: String)))), size)
+            if predef.toString == "scala.this.Predef" && augmentString.toString == "augmentString" && size.toString == "size" => 
+            unit.warning(tree.pos, "Taking the size of a constant string")
 
+          /// Pattern Matching checks
           case Match(pat, cases) if pat.tpe.toString != "Any @unchecked" && cases.size >= 2 =>
-            //"Any @unchecked" seems to happen on the matching structures of actors - and all cases return true
-            //TODO: there seems to be more of this - see failing test for Futures in testCaseChecks
+            // Workaround: "Any @unchecked" seems to happen on the matching structures of actors - and all cases return true
 
-            //Checking if matching on Option or Boolean
+            //TODO: Put into utils
+            def isLiteral(t:Tree) = t match {
+              case Literal(_) => true
+              case _ => false
+            }
+
+            /// Pattern Matching on a constant value
+            //TODO: move to abs-interpreter
+            if(isLiteral(pat)) {
+              /*val returnValue = 
+                cases 
+                  .map { ca => (ca.pat, ca.body) } 
+                  .find { case (Literal(Constant(c)), _) => c == a; case _ => false}
+                  .map { _._2 } 
+                  .orElse { if(cases.last.pat.toString == "_") Some(cases.last.body) else None } 
+                  .map { s => " will always return " + s }
+                  .getOrElse("")*/
+              
+              unit.warning(tree.pos, "Pattern matching on a constant value.")
+            }
+            
+            /// Checks if pattern matching on Option or Boolean
             var optionCase, booleanCase = false
             val (optionCaseReg, booleanCaseReg) = ("(Some[\\[].*[\\]]|None[.]type)", "Boolean[(](true|false)[)]") //TODO: Hacky hack hack -_-, sorry
             def checkCase(caseTree: CaseDef) {
@@ -316,14 +346,8 @@ class LinterPlugin(val global: Global) extends Plugin {
                 }
               }
             }
-            
-            //TODO: Put into utils
-            def isLiteral(t:Tree) = t match {
-              case Literal(_) => true
-              case _ => false
-            }
-            
-            //Checking for duplicate case bodies
+
+            /// Checking for duplicate case bodies
             case class Streak(streak: Int, tree: CaseDef)
             var streak = Streak(0, cases.head)
             def checkStreak(c: CaseDef) {
@@ -336,7 +360,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
             def printStreakWarning() {
               if(streak.streak == cases.size) {
-                //This one always turns out to be a false positive
+                //This one always turns out to be a false positive :)
                 //unit.warning(tree.pos, "All "+cases.size+" cases will return "+cases.head.body+", regardless of pattern value") 
               } else if(streak.streak > 1) {
                 //TODO: should check actual cases - only simple values can be merged
@@ -352,12 +376,24 @@ class LinterPlugin(val global: Global) extends Plugin {
             printStreakWarning()
             printCaseWarning()
 
+          /// If checks
+          case If(cond1, _, If(cond2, _, _)) if cond1 equalsStructure cond2 =>
+            unit.warning(cond2.pos, "This else-if has the same condition as the previous if.")
+
+          case Apply(Select(left, func), List(right)) if (func.toString matches "[$]amp[$]amp|[$]bar[$]bar") && (left equalsStructure right) =>        
+            unit.warning(tree.pos, "Same expression on both sides of condition.")
+          case Apply(Select(left, func), List(right)) if (func.toString matches "[$](greater|less|eq|bang)([$]eq)?") && (left equalsStructure right) =>        
+            unit.warning(tree.pos, "Same expression on both sides of comparison.")
+
+          /// Yoda conditions (http://www.codinghorror.com/blog/2012/07/new-programming-jargon.html): if(6 == a) ...
+          case Apply(Select(Literal(Constant(const)), func), params) if (params.size) == 1 && (func.toString matches "[$](greater|less|eq)([$]eq)?") && (params.head match { case Literal(_) => false case _ => true })  =>
+            unit.warning(tree.pos, "You are using Yoda conditions")
+
           case If(cond, Literal(Constant(true)), Literal(Constant(false))) =>
-            //TODO: Can I get the unprocessed condition string?
             unit.warning(cond.pos, "Remove the if and just use the condition.")
           case If(cond, Literal(Constant(false)), Literal(Constant(true))) =>
             unit.warning(cond.pos, "Remove the if and just use the negated condition.")
-          case If(cond, a, b) if (a equalsStructure b) && (a.children.nonEmpty) => //TODO: empty if statement (if(...) { }) triggers this - change warning for that case
+          case If(cond, a, b) if (a equalsStructure b) && (a.children.nonEmpty) => //TODO: empty if statement (if(...) { }) triggers this - issue warning for that case?
             unit.warning(a.pos, "If statement branches have the same structure.")
           case If(cond, a, If(cond2, b, c)) if (a.children.nonEmpty && ((a equalsStructure b) || (a equalsStructure c))) || (b.children.nonEmpty && (b equalsStructure c)) =>
             unit.warning(a.pos, "If statement branches have the same structure.")
@@ -375,35 +411,10 @@ class LinterPlugin(val global: Global) extends Plugin {
             unit.warning(tree.pos, warnMsg)
             
           case If(_, If(_, body, Literal(Constant(()))), Literal(Constant(()))) =>
-            unit.warning(tree.pos, "These two ifs can be merged")
+            unit.warning(tree.pos, "These two ifs can be merged into one.")
           
-          case Apply(Select(Select(scala_package, _BigDecimal), apply), List(Literal(Constant(d:Double))))
-            if scala_package.toString == "scala.`package`" && _BigDecimal.toString == "BigDecimal" && apply.toString == "apply" =>
-            unit.warning(tree.pos, "Possible loss of precision - use a string constant")
-          case Apply(Select(math_BigDecimal, apply_valueOf), List(Literal(Constant(d:Double)))) 
-            if math_BigDecimal.toString.endsWith("math.BigDecimal") && (apply_valueOf.toString matches "apply|valueOf") =>
-            unit.warning(tree.pos, "Possible loss of precision - use a string constant")
-          case Apply(Select(New(java_math_BigDecimal), nme.CONSTRUCTOR), List(Literal(Constant(d: Double)))) 
-            if java_math_BigDecimal.toString == "java.math.BigDecimal" =>
-            unit.warning(tree.pos, "Possible loss of precision - use a string constant")
-            
-          case pos @ Apply(Select(expr1, op), List(expr2)) if (op == nme.DIV) && ((expr1, expr2) match {
-            case (expr1, Apply(abs, List(expr2))) if abs.toString == "scala.math.`package`.abs" && expr1.toString == expr2.toString => true
-            case (Apply(abs, List(expr1)), expr2) if abs.toString == "scala.math.`package`.abs" && expr1.toString == expr2.toString => true
-            case (expr1, Select(Apply(wrapper @ Select(_, _), List(expr2)), abs)) if wrapper.toString.endsWith("Wrapper") && abs.toString == "abs" && expr1.toString == expr2.toString => true
-            case (Select(Apply(wrapper @ Select(_, _), List(expr1)), abs), expr2) if wrapper.toString.endsWith("Wrapper") && abs.toString == "abs" && expr1.toString == expr2.toString => true
-            case _ =>
-            false
-          }) =>
-            unit.warning(pos.pos, "Did you mean to use the signum function here? (signum also avoids division by zero)")
-
-          //ignores "Assignment right after declaration..." in case class hashcode
-          case DefDef(mods, name, _, _, _, Block(block, last)) if name.toString == "hashCode" && {
-            (block :+ last) match { 
-              case ValDef(modifiers, id1, _, _) :: Assign(id2, _) :: _ => true
-              case _ => false
-            }} => return //
-
+          
+          /// Abstract interpretation, and multiple-statement checks
           case ClassDef(mods, name, tparams, impl) =>
             abstractInterpretation.traverseBlock(impl)
 
@@ -445,7 +456,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Select(Apply(pos @ Select(collection, find), func), isDefined) 
             if find.toString == "find" && isDefined.toString == "isDefined" && (collection.toString.startsWith("scala.") || collection.toString.startsWith("immutable.")) =>
             
-            unit.warning(pos.pos, "Use exists() instead of find().isDefined")
+            unit.warning(pos.pos, "Use exists(...) instead of find(...).isDefined")
 
           case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, param, _, _)), body))) if { //if (foreach_map.toString matches "foreach|map") && {
             abstractInterpretation.forLoop(forloop)
@@ -455,13 +466,14 @@ class LinterPlugin(val global: Global) extends Plugin {
           case DefDef(_, _, _, _, _, block) => 
             abstractInterpretation.traverseBlock(block)
 
+          //TODO: these two are probably superdeded by abs-interpreter
           case pos @ Apply(Select(seq, apply), List(Literal(Constant(index: Int)))) 
             if methodImplements(pos.symbol, SeqLikeApply) && index < 0 =>
             unit.warning(pos.pos, "Using a negative index for a collection.")
 
-          // cannot check double/float, as typer will automatically translate it to Infinity
-          case divByZero @ Apply(Select(rcvr, op), List(Literal(Constant(0))))
-            if (op == nme.DIV || op == nme.MOD) 
+          case divByZero @ Apply(Select(rcvr, op), List(Literal(Constant(zero))))
+            // cannot check double/float, as typer will automatically translate it to Infinity
+            if (zero == 0) && (op == nme.DIV || op == nme.MOD) 
               &&(rcvr.tpe <:< definitions.ByteClass.tpe
               ||rcvr.tpe <:< definitions.ShortClass.tpe
               ||rcvr.tpe <:< definitions.IntClass.tpe

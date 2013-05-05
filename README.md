@@ -3,7 +3,7 @@
 This is a compiler plugin that adds additional lint checks to protect against sharp corners 
 in the Scala compiler and standard libraries.
 
-It's currently very much a work in progress - some parts will need to be rewritten. 
+It's currently very much a work in progress - some parts will need to be rewritten.
 
 For an overview of writing compiler plugins, see http://www.scala-lang.org/node/140
 
@@ -22,6 +22,9 @@ Or, if you're working with a local version:
 Optionally, run `sbt console` in this project to see it in action.
 
 ## Currently supported warnings
+
+Note: Some of these checks currently disabled, toned down, or maybe even generalized: 
+maybe also check the [test code](https://github.com/HairyFotr/linter/blob/master/src/test/scala/LinterPluginTest.scala#L95).
 
 ### Using `scala.io.Source.fromFile` without closing file
     scala> io.Source.fromFile("README.md").mkString
@@ -151,7 +154,7 @@ Feel free to implement these, or add your own ideas. Pull requests welcome!
 * Expressions spanning multiple lines should be enclosed in parentheses
 * Warn on unrestricted catch clauses (`case e => ...`)
 * Traversable#head, Traversable#last, Traversable#maxBy
-* Warn on shadowing variables, especially those of the same type
+* Warn on shadowing variables, especially those of the same type (`var a = 4; { val a = 5 }`)
 * Warn on inexhaustive pattern matching
 * Boolean function parameters should be named (`func("arg1", force = true)`)
 * Detect vars, that could easily be vals (no assignments)

@@ -23,6 +23,7 @@ import collection.mutable
 
 // TODO: 
 // * each test should have a positive and a negative case
+// * have longer tests, that maybe trigger several checks
 // * if it's worth it, error msgs could come from outside
 // * handle/test plugin settings (when settings are done)
 
@@ -127,7 +128,9 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     implicit val msg = "Wildcard imports should be avoided. Favor import selector clauses."
 
     should("import collection._;")
-    shouldnt("import util.Random")
+    shouldnt("import collection.mutable.HashSet;")
+    shouldnt("import collection.mutable.{HashSet, ListBuffer};")
+    shouldnt("import util.Random;")
   }
 
   @Test
@@ -467,7 +470,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def probableBugs__sameElseIfCondition() {
-    implicit val msg = "The else-if has the same condition."
+    implicit val msg = "else-if has the same condition"
 
     should("""
       |var a = "b"
@@ -835,7 +838,14 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     
     //TODO: Scala's BigDecimal isn't as bad at accuracy as Java's, but still fails at BigDecimal(0.5555555555555555555555555555555555)
     should("""BigDecimal(0.1)""")
+    should("""new java.math.BigDecimal(0.1)""")
+    should("""BigDecimal.valueOf(0.1)""")
+    should("""math.BigDecimal.valueOf(0.1)""")
+    
     shouldnt("""BigDecimal("0.1")""")
+    shouldnt("""new java.math.BigDecimal("0.1")""")
+    shouldnt("""BigDecimal.valueOf("0.1")""")
+    shouldnt("""math.BigDecimal.valueOf("0.1")""")
   }
 
   @Test
@@ -888,7 +898,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def style__find_isDefined() {
-    implicit val msg = "Use exists() instead of find().isDefined"
+    implicit val msg = "Use exists(...) instead of find(...).isDefined"
     
     should("""List(1,2,3).find(_ == 2).isDefined""")
     should("""Set(1,2,3).find(_ == 2).isDefined""")
