@@ -403,6 +403,18 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
   
   @Test
+  def string__abstractInterpretation() {
+    implicit var msg = ""
+    
+    //TODO:
+    
+    msg = "string will never be empty"
+    
+    should("""{ var b = " "; val a = (b + (if(b == " ") "a" else "b"+b)).trim.toLowerCase; if(a.nonEmpty) "foo" }""")
+    shouldnt("""{ var b = " "; val a = (b + (if(b == " ") " " else " "+b)).trim.toLowerCase; if(a.nonEmpty) "foo" }""")
+  }
+
+  @Test
   @Ignore
   def instanceOf__check() {
     implicit val msg = "Avoid using asInstanceOf"

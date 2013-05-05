@@ -623,6 +623,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   // Just something quick I hacked together for an actual bug
   //implicit def String2StringAttrs(s: String) = new StringAttrs(exactValue = Some(s))
   object StringAttrs {
+    //TODO: when merging, save known chunks - .contains then partially works
     def empty = new StringAttrs()
     def apply(tree: Tree): StringAttrs = {
       def traverse(tree: Tree): StringAttrs = tree match {
@@ -649,10 +650,16 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           val res = traverse(expr)
           
           func.toString match {
-            case "trim" => new StringAttrs(res.exactValue.map(_.trim), None, res.exactValue.map(_.trim.size).getOrElse(res.getTrimmedMinLength))
-            case "toUpperCase" => new StringAttrs(res.exactValue.map(_.toUpperCase), None, res.minLength)
-            case "toLowerCase" => new StringAttrs(res.exactValue.map(_.toUpperCase), None, res.minLength)
-            case _ => empty
+            case "trim" => 
+              val newExactValue = res.exactValue.map(_.trim)
+              val newLength = res.exactValue.map(_.trim.size).getOrElse(res.getTrimmedMinLength)
+              new StringAttrs(newExactValue, None, newLength, newLength)
+            case "toUpperCase" =>
+              new StringAttrs(res.exactValue.map(_.toUpperCase), None, res.minLength, res.trimmedMinLength)
+            case "toLowerCase" =>
+              new StringAttrs(res.exactValue.map(_.toLowerCase), None, res.minLength, res.trimmedMinLength)
+            case _ =>
+              empty
           }
         case If(cond, expr1, expr2) =>
           val (e1, e2) = (traverse(expr1), traverse(expr2))
