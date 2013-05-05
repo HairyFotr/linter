@@ -382,8 +382,13 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           case Apply(Select(left, func), List(right)) if (func.toString matches "[$]amp[$]amp|[$]bar[$]bar") && (left equalsStructure right) =>        
             unit.warning(tree.pos, "Same expression on both sides of condition.")
-          case Apply(Select(left, func), List(right)) if (func.toString matches "[$](greater|less|eq|bang)([$]eq)?") && (left equalsStructure right) =>        
-            unit.warning(tree.pos, "Same expression on both sides of comparison.")
+          case Apply(Select(left, func), List(right)) if (func.toString matches "[$](greater|less|eq|bang)([$]eq)?") && (left equalsStructure right) =>
+            if(left.tpe <:< definitions.DoubleClass.tpe || left.tpe <:< definitions.FloatClass.tpe) {
+              /// Use variable.isNaN instead of (variable != variable)
+              unit.warning(tree.pos, "Same expression on both sides of comparison. (Use .isNan instead)")
+            } else {
+              unit.warning(tree.pos, "Same expression on both sides of comparison.")
+            }
 
           /// Yoda conditions (http://www.codinghorror.com/blog/2012/07/new-programming-jargon.html): if(6 == a) ...
           case Apply(Select(Literal(Constant(const)), func), params) if (params.size) == 1 && (func.toString matches "[$](greater|less|eq)([$]eq)?") && (params.head match { case Literal(_) => false case _ => true })  =>

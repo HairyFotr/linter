@@ -419,6 +419,29 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
    }
    
   @Test
+  def numeric_isNan() {
+    implicit val msg = "Use .isNan instead"
+
+    should("""
+      |var a = Double.NaN
+      |if(a != a) "foo"
+    """)
+    should("""
+      |var a = 4f
+      |if(a != a) "foo"
+    """)
+
+    shouldnt("""
+      |var a = 4
+      |if(a != a) "foo"
+    """)
+    shouldnt("""
+      |var a = Double.NaN
+      |if(a == a) "foo"
+    """)
+  }
+  
+  @Test
   def numeric_log1p() {
     implicit val msg = "Use math.log1p instead of math.log"
 
