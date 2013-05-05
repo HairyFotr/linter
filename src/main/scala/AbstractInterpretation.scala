@@ -44,8 +44,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
    
     def contains(i: Int): Boolean = (values contains i) || (ranges exists { case (low, high) => i >= low && i <= high })
     def apply(i: Int) = contains(i)
-    def exists(func: Int => Boolean) = (values exists func) || (ranges exists { case (low, high) => Range(low, high+1) exists func })
-    def forall(func: Int => Boolean) = (values forall func) && (ranges forall { case (low, high) => Range(low, high+1) forall func })
+    def exists(func: Int => Boolean) = (values exists func) || (ranges exists { case (low, high) => (low to high) exists func })
+    def forall(func: Int => Boolean) = (values forall func) && (ranges forall { case (low, high) => (low to high) forall func })
     
     def addRange(low: Int, high: Int): Values = new Values(ranges + (if(low > high) (high, low) else (low, high)), values, name, false, -1)
     def addValue(i: Int): Values = new Values(ranges, values + i, name, false, -1)
@@ -160,7 +160,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
               Values.empty
           }
           
-          if(Set(nme.GT, nme.GE, nme.LT, nme.LE) contains op) {
+          if(Set[Name](nme.GT, nme.GE, nme.LT, nme.LE) contains op) {
             if(out.isEmpty) neverHold = true
             if(out.size == this.size) alwaysHold = true
           }
@@ -315,7 +315,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       if(left.isEmpty || right.isEmpty) {
         //ADD: x & 2^n is Set(2^n,0) and stuff like that :)
         if(left.contains(0) || right.contains(0)) {
-          if(Set(nme.MUL, nme.AND).contains(op)) Values(0) else Values.empty
+          if(Set[Name](nme.MUL, nme.AND) contains op) Values(0) else Values.empty
         } else {
           Values.empty
         }
@@ -570,8 +570,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         if(e1.isValue && e2.isValue) new Values(values = e1.values ++ e2.values) else Values.empty
 
       case a => 
-        //val raw = showRaw( a ); if(!exprs.contains(raw) && raw.size < 700 && raw.size > "EmptyTree".size) println("computeExpr: "+treePosHolder.toString+"\n"+raw); exprs += raw
-        //for(Ident(id) <- a) if(stringVals.exists(_.name == Some(id.toString))) { println("id: "+id+"  "+showRaw( a )); }
+        //val raw = showRaw( a ); if(!exprs.contains(raw) && raw.size < 700 && raw.size > "EmptyTree".size)println("computeExpr: "+treePosHolder.toString+"\n"+raw); exprs += raw
+        //for(Ident(id) <- a) if(stringVals.exists(_.name == Some(id.toString))) {println("id: "+id+"  "+showRaw( a )); }
         //println(showRaw( a ))
         Values.empty
     }
@@ -719,6 +719,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     stringVals = backupStrs
   }
   def traverse(tree: GTree) {
+    //println(tree)
     if(visitedBlocks(tree)) return else visitedBlocks += tree
     treePosHolder = tree
     tree match {
