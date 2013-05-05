@@ -216,16 +216,33 @@ class LinterPlugin(val global: Global) extends Plugin {
             unit.warning(pos.pos, "Did you mean to use the signum function here? (signum also avoids division by zero errors)")
 
           /// BigDecimal checks
-          //TODO: Scala BigDecimal constructor isn't as bad as the Java one - try with 0.1... still fails with 0.555555555555555555555 -
-          // - maybe you could get the actual token, and only warn if BigDecimal(stringToken) != BigDecimal(double)
           // BigDecimal(0.1)
-          case Apply(Select(scala_package_BigDecimal, apply_valueOf), List(Literal(Constant(d:Double))))
-            if (scala_package_BigDecimal.toString == "scala.`package`.BigDecimal") && (apply_valueOf.toString matches "apply|valueOf") =>
-            unit.warning(tree.pos, "Possible loss of precision - use a string constant")
-          // BigDecimal.valueOf(0.1)
-          case Apply(Select(math_BigDecimal, apply_valueOf), List(Literal(Constant(d:Double)))) 
-            if math_BigDecimal.toString.endsWith("math.BigDecimal") && (apply_valueOf.toString matches "apply|valueOf") =>
-            unit.warning(tree.pos, "Possible loss of precision - use a string constant")
+          case Apply(Select(bigDecimal, apply_valueOf), List(c @ Literal(Constant(d:Double))))
+            if (bigDecimal.toString == "scala.`package`.BigDecimal" || bigDecimal.toString.endsWith("math.BigDecimal")) && (apply_valueOf.toString matches "apply|valueOf") =>
+            
+            def warn() = unit.warning(tree.pos, "Possible loss of precision - use a string constant")
+            
+            //TODO: Scala BigDecimal constructor isn't as bad as the Java one... still fails with 0.555555555555555555555555555
+            try {
+              val p = c.pos
+              //TODO: There must be a less hacky way...
+              var token = p.lineContent.substring(p.column -1).takeWhile(_.toString matches "[-+0-9.edfEDF]").toLowerCase
+              if(!token.isEmpty) {
+                if(token.last == 'f' || token.last == 'd') token = token.dropRight(1)
+                //println((token, d))
+                if(BigDecimal(token) != BigDecimal(d)) {
+                  warn()
+                }
+              } else {
+                warn()
+              }
+            } catch {
+              case e: java.lang.UnsupportedOperationException =>
+                // Some trees don't have positions
+                warn()
+              case e: java.lang.NumberFormatException =>
+                warn()
+            }
           // new java.math.BigDecimal(0.1)
           case Apply(Select(New(java_math_BigDecimal), nme.CONSTRUCTOR), List(Literal(Constant(d: Double)))) 
             if java_math_BigDecimal.toString == "java.math.BigDecimal" =>

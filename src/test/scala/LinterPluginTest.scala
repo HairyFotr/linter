@@ -859,12 +859,19 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   def numeric__BigDecimalFromFloat() {
     implicit val msg = "use a string constant"
     
-    //TODO: Scala's BigDecimal isn't as bad at accuracy as Java's, but still fails at BigDecimal(0.5555555555555555555555555555555555)
-    should("""BigDecimal(0.1)""")
+    should("""BigDecimal(0.55555555555555555555555555555)""")
     should("""new java.math.BigDecimal(0.1)""")
-    should("""BigDecimal.valueOf(0.1)""")
-    should("""math.BigDecimal.valueOf(0.1)""")
+    should("""BigDecimal.valueOf(0.55555555555555555555555555555)""")
+    should("""
+      |{
+      |  println("hello")
+      |  val a = math.BigDecimal.valueOf(
+      |     -0.55555555555555555555555555555
+      |  )
+      |}
+    """)
     
+    shouldnt("""BigDecimal(0.1)""")
     shouldnt("""BigDecimal("0.1")""")
     shouldnt("""new java.math.BigDecimal("0.1")""")
     shouldnt("""BigDecimal.valueOf("0.1")""")
