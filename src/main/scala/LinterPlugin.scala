@@ -318,18 +318,6 @@ class LinterPlugin(val global: Global) extends Plugin {
             if predef.toString == "scala.this.Predef" && augmentString.toString == "augmentString" && size.toString == "size" => 
             unit.warning(pos.pos, "Taking the size of a constant string")
 
-          /// Invalid regex
-          case Select(Apply(scala_Predef_augmentString, List(pos @ Literal(Constant(reg: String)))), r) 
-            if(scala_Predef_augmentString.toString.endsWith(".augmentString")) =>
-            
-            try {
-              reg.r
-            } catch {
-              case e: java.util.regex.PatternSyntaxException =>
-                unit.warning(pos.pos, "Regex pattern syntax warning: "+e.getMessage.takeWhile(_ != '\n'))
-              case e: Exception =>
-            }
-
           /// Pattern Matching checks
           case Match(pat, cases) if pat.tpe.toString != "Any @unchecked" && cases.size >= 2 =>
             // Workaround: "Any @unchecked" seems to happen on the matching structures of actors - and all cases return true

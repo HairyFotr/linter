@@ -415,6 +415,34 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt("""{ var b = " "; val a = (b + (if(b == " ") " " else " "+b)).trim.toLowerCase; if(a.nonEmpty) "foo" }""")
   }
 
+
+  @Test
+  def regex__syntaxErrors() {
+    implicit var msg = "Regex pattern syntax warning"
+    
+    should("""
+      |"*+".r
+    """)
+    should("""
+      |"[".r
+    """)
+    should("""
+      |val a = "*+"
+      |a.r
+    """)
+    
+    shouldnt("""
+      |"3*[a]+".r
+    """)
+    shouldnt("""
+      |"[a-t]".r
+    """)
+    shouldnt("""
+      |val a = "4*a+"
+      |a.r
+    """)
+  }
+  
   @Test
   @Ignore
   def instanceOf__check() {

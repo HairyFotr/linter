@@ -861,6 +861,21 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         vals = backupVals.withDefaultValue(Values.empty)
         stringVals = backupStrs
 
+      /// Invalid regex
+      case Select(Apply(scala_Predef_augmentString, List(regExpr)), r)
+        if(scala_Predef_augmentString.toString.endsWith(".augmentString")) =>
+        
+        val reg = StringAttrs(regExpr).exactValue
+        if(reg.isDefined) {
+          try {
+            reg.get.r
+          } catch {
+            case e: java.util.regex.PatternSyntaxException =>
+              unit.warning(regExpr.pos, "Regex pattern syntax warning: "+e.getMessage.takeWhile(_ != '\n'))
+            case e: Exception =>
+          }
+        }
+
       case b @ Block(_, _) => 
         //println("block: "+b)
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
