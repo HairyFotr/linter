@@ -577,6 +577,9 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       |var a = 5
       |val b = 4 + (a-(a-1))
     }""")
+    shouldnt("""
+      |{ val a = List(1,2,3); a(a.size-3) }
+    """)
   }
   
   @Test
@@ -848,6 +851,10 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
      """)
     should("""{
       |val a = List(1,2,3)
+      |a(a.size-a.length-1)
+     }""")
+    should("""{
+      |val a = List(1,2,3)
       |val b = "a"
       |a(b.size-b.length-1)
      }""")
@@ -865,6 +872,47 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       |val b = -a.size + 1 /* -3 */
       |a(a.size/2 + b + 1) /* 2 - 3 + 1 == 0 */
      """)
+    shouldnt("""{
+      |val a = List(1,2,3)
+      |a(a.size-a.length)
+     }""")
+    shouldnt("""{
+      |val a = List(1,2,3)
+      |val b = "a"
+      |a(b.size-b.length)
+     }""")
+  }
+  @Test
+  def collections__tooLargeIndex() {
+    implicit val msg = "too large index"
+    
+    should("""{
+      |val a = List(1,2,3)
+      |a(a.size)
+     }""")
+    should("""{
+      |val a = List(1,2,3)
+      |a(a.length)
+     }""")    
+    should("""{
+      |val a = List(1,2,3)
+      |val b = 5
+      |a(b-1)
+     }""")
+     
+    shouldnt("""{
+      |val a = List(1,2,3)
+      |a(b.size-1)
+     }""")
+    shouldnt("""{
+      |val a = List(1,2,3)
+      |a(a.length-1)
+     }""")
+    shouldnt("""{
+      |val a = List(1,2,3)
+      |val b = 5
+      |a(b-3)
+     }""")
   }
   
   @Test
@@ -966,6 +1014,20 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt("""val a = 14d; math.sqrt(a*(a-1))""")
   }
 
+  @Test
+  def style__useUntil() {
+    implicit val msg = "Use (low until high) instead of (low to high-1)"
+    
+    should("""{ val a = 5; val b = (1 to a-1) }""")
+    should("""{ val a = 5; for(i <- 1 to a-1) 5 }""")
+
+    shouldnt("""{ val a = 5; val b = (a-5 to a-1) }""")
+    shouldnt("""{ val a = 5; val b = (1 to a) }""")
+    shouldnt("""{ val a = 5; for(i <- 1 to a) 5 }""")
+    shouldnt("""{ val a = 5; for(i <- 1 until a-1) 5 }""")
+    shouldnt("""{ val a = 5; for(i <- 1 until a) 5 }""")
+  }
+  
 /*
 src/main/scala/LinterPlugin.scala:        if(maybeVals.nonEmpty) unit.warning(tree.pos, "[experimental] These vars might secretly be vals: grep -rnP --include=*.scala 'var ([(][^)]*)?("+maybeVals.mkString("|")+")'")
 src/main/scala/AbstractInterpretation.scala:      if(neverHold) unit.warning(condExpr.pos, "This condition will never hold.")

@@ -288,7 +288,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         Values.empty
 
       case a => 
-        //val raw = showRaw( treePosHolder );println("applyUnary: "+treePosHolder.toString+"\n"+raw);
+        //val raw = showRaw( treePosHolder );
+        //println("applyUnary: op:"+op+" thisval:"+this+" tree:"+treePosHolder.toString+"\n"+raw);
         Values.empty
     }
     def apply(op: Name)(right: Values): Values = {
@@ -410,7 +411,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           Values.empty
         }
       } else if(left.isValue && right.isValue) {
-        if(left.getValue == right.getValue && op == nme.SUB) unit.warning(treePosHolder.pos, "Same expression on both sides of subtraction.")
+        if(left.getValue == right.getValue && op == nme.SUB && !left.name.isEmpty) unit.warning(treePosHolder.pos, "Same expression on both sides of subtraction.")
         Values(func(left.getValue, right.getValue))
       } else if(!left.isValue && right.isValue) {
         left.map(a => func(a, right.getValue), rangeSafe = isRangeSafe)
@@ -453,13 +454,13 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   //TODO: extend with more functions... and TEST TEST TEST TEST
   def computeExpr(tree: Tree): Values = {
     treePosHolder = tree
-    tree match {
+    val out = tree match {
       case Literal(Constant(value: Int)) => Values(value)
+      //TODO: I don't think this ones work at all...
       case Select(This(typeT), termName) =>
         val name = termName.toString
         val n = (if(name.contains(".this.")) name.substring(name.lastIndexOf(".")+1) else name).trim
         vals(n)
-        
       case Ident(termName) => 
         val name = termName.toString
         val n = (if(name.contains(".this.")) name.substring(name.lastIndexOf(".")+1) else name).trim
@@ -467,7 +468,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         vals(n)
         
       // String size
-      case Apply(Select(Ident(id), func), List()) if stringVals.exists(_.name == Some(id.toString)) && func.toString == "length" =>
+      case Apply(Select(Ident(id), length), List()) if stringVals.exists(_.name == Some(id.toString)) && length.toString == "length" =>
         val exactValue = stringVals.find(_.name == Some(id.toString)).map(_.exactValue)
         exactValue.map(v => if(v.isDefined) Values(v.get.size) else Values.empty).getOrElse(Values.empty)
         
@@ -477,14 +478,18 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         exactValue.map(v => Values(v.size)).getOrElse(Values.empty)
 
       // Range
-      case Apply(Select(Apply(Select(scala_Predef, intWrapper), List(Literal(Constant(low: Int)))), to_until), List(Literal(Constant(high: Int)))) if (to_until.toString matches "to|until") =>
+      case Apply(Select(Apply(scala_Predef_intWrapper, List(Literal(Constant(low: Int)))), to_until), List(Literal(Constant(high: Int)))) 
+        if (scala_Predef_intWrapper.toString endsWith "Wrapper") && (to_until.toString matches "to|until") =>
+        
         val high2 = if(to_until.toString == "to") high else high-1
         new Values(Set((low, high2)), Set(), "", isSeq = true, high2-low)
 
-      case Apply(Select(Apply(scala_Predef_intWrapper, List(expr1)), to_until), List(expr2)) => 
+      case Apply(Select(Apply(scala_Predef_intWrapper, List(expr1)), to_until), List(expr2))
+        if (scala_Predef_intWrapper.toString endsWith "Wrapper") => 
+        
         if(to_until.toString == "to") {
-          expr2 match {
-            case Apply(Select(Ident(id), nme.SUB), List(Literal(Constant(1)))) => 
+          (expr1, expr2) match {
+            case (Literal(Constant(a)), Apply(Select(Ident(id), nme.SUB), List(Literal(Constant(1))))) => 
               unit.warning(treePosHolder.pos, "Use (low until high) instead of (low to high-1)")
             case _ =>
           }
@@ -507,22 +512,19 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         val values = genVals.map(v => computeExpr(v))
         if(values.forall(_.isValue)) new Values(Set(), values.map(_.getValue).toSet, "", isSeq = true, actualSize = values.size) else Values.empty.addActualSize(genVals.size)*/
       
+      //TODO: is this for array or what?
       case Select(Apply(arrayOps @ Select(_, intArrayOps), List(expr)), op) if(arrayOps.toString == "scala.this.Predef.intArrayOps") => 
         computeExpr(expr).applyUnary(op)
       
-      case Apply(TypeApply(t @ Select(expr, op), _), List(Select(scala_math_Ordering, _Int))) if _Int.toString.endsWith("Int") => //.max .min
+      case Apply(TypeApply(t @ Select(expr, op), _), List(scala_math_Ordering_Int)) if scala_math_Ordering_Int.toString.endsWith("Int") => //.max .min
         computeExpr(t)
 
-      
       case Apply(Select(scala_math_package, op), params) if scala_math_package.toString == "scala.math.`package`" =>
         op.toString match {
           case "abs" | "signum" if params.size == 1 => computeExpr(params.head).applyUnary(op)
           case "max" | "min"    if params.size == 2 => computeExpr(params(0))(op)(computeExpr(params(1)))
           case _ => Values.empty
         }
-
-      case Apply(Select(scala_math_package, abs), List(expr)) if scala_math_package.toString == "scala.math.`package`" && abs.toString == "max" =>
-        computeExpr(expr).applyUnary(abs)
 
       case Apply(Select(scala_util_Random, nextInt), params) if nextInt.toString == "nextInt" => //if scala_util_Random.toString == "scala.util" => or rather the type
         if(params.size == 1) {
@@ -552,7 +554,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         computeExpr(expr).applyUnary(op)
 
       case Apply(Select(expr1, op), List(expr2)) =>
-        //println((op, expr1, expr2, (computeExpr(expr1))(op)(computeExpr(expr2))))
+        //println("BinaryOp: "+(op, expr1, expr2, (computeExpr(expr1))(op)(computeExpr(expr2))))
         (computeExpr(expr1))(op)(computeExpr(expr2))
       
       case Apply(Apply(TypeApply(Select(valName, map), List(_, _)), List(Function(List(ValDef(mods, paramName, _, EmptyTree)), expr))), _) if(map.toString == "map") => //List(TypeApply(Select(Select(This(newTypeName("immutable")), scala.collection.immutable.List), newTermName("canBuildFrom")), List(TypeTree()))))
@@ -585,9 +587,11 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case a => 
         //val raw = showRaw( a ); if(!exprs.contains(raw) && raw.size < 700 && raw.size > "EmptyTree".size)println("computeExpr: "+treePosHolder.toString+"\n"+raw); exprs += raw
         //for(Ident(id) <- a) if(stringVals.exists(_.name == Some(id.toString))) {println("id: "+id+"  "+showRaw( a )); }
-        //println(showRaw( a ))
+        //println("computeExpr: "+showRaw( a ))
         Values.empty
     }
+    //println(out+"  "+showRaw(tree))
+    out
   }
   //val exprs = collection.mutable.HashSet[String]()
       
@@ -831,16 +835,17 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case pos @ Apply(Select(_, op), List(expr)) if (op == nme.DIV || op == nme.MOD) && (computeExpr(expr).contains(0)) => 
         unit.warning(pos.pos, "You will likely divide by zero here.")
 
-      case pos @ Apply(Select(Ident(seq), apply), List(indexExpr)) 
-        if methodImplements(pos.symbol, SeqLikeApply) && vals.contains(seq.toString) && vals(seq.toString).actualSize != -1 && (computeExpr(indexExpr).exists { a => a >= vals(seq.toString).actualSize }) =>
+      //case pos @ Apply(Select(Ident(seq), apply), List(indexExpr)) 
+      case pos @ Apply(Select(seq, apply), List(indexExpr)) if methodImplements(pos.symbol, SeqLikeApply) =>
         //println(seq.toString)
-        //println(computeExpr(indexExpr))
-        unit.warning(pos.pos, "You will likely use a too large index for a collection here.")
-
-      case pos @ Apply(Select(seq, apply), List(indexExpr)) 
-        if methodImplements(pos.symbol, SeqLikeApply) && (computeExpr(indexExpr).exists { a => a < 0 }) =>
-        //println(computeExpr(indexExpr))
-        unit.warning(pos.pos, "You will likely use a negative index for a collection here.")
+        //println("indexExpr: "+computeExpr(indexExpr))
+        //println(showRaw(indexExpr))
+        if(vals.contains(seq.toString) && vals(seq.toString).actualSize != -1 && (computeExpr(indexExpr).exists { a => a >= vals(seq.toString).actualSize })) {
+          unit.warning(pos.pos, "You will likely use a too large index for a collection here.")
+        }
+        if(computeExpr(indexExpr).exists { a => a < 0 }) {
+          unit.warning(pos.pos, "You will likely use a negative index for a collection here.")
+        }
       
       case DefDef(_, _, _, _, _, block) => 
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)

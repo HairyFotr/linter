@@ -270,7 +270,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// Warn about using .asInstanceOf[T]
           //TODO: false positives in case class A(), and in the interpreter init
           //case aa @ Apply(a, List(b @ Apply(s @ Select(instanceOf,dd),ee))) if methodImplements(instanceOf.symbol, AsInstanceOf) =>
-          //  println((aa,instanceOf))
+            //println((aa,instanceOf))
           //case instanceOf @ Select(a, func) if methodImplements(instanceOf.symbol, AsInstanceOf) =>   
             //TODO: too much noise, maybe detect when it's completely unnecessary
             //unit.warning(tree.pos, "Avoid using asInstanceOf[T] (use pattern matching, type ascription, etc).")
@@ -443,6 +443,9 @@ class LinterPlugin(val global: Global) extends Plugin {
           case ModuleDef(mods, name, impl) => 
             abstractInterpretation.traverseBlock(impl)
 
+          case Function(params, body) =>
+            abstractInterpretation.traverseBlock(body)
+          
           case blockElem @ Block(init, last) =>
             abstractInterpretation.traverseBlock(blockElem)
 
