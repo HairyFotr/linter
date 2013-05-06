@@ -52,6 +52,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       override def traverse(tree: Tree) {
         tree match {
           case DefDef(mods: Modifiers, name, _, valDefs, typeTree, block) =>
+            /// Unused method parameters
             //TODO: This nags, when a class overrides a method, but doesn't mark it as such - check out late flags: http://harrah.github.io/browse/samples/compiler/scala/tools/nsc/symtab/Flags.scala.html
             if(name.toString != "<init>" && !block.isEmpty && !mods.hasFlag(OVERRIDE)) {
               //Get the parameters, except the implicit ones
@@ -79,7 +80,8 @@ class LinterPlugin(val global: Global) extends Plugin {
               }
             }
 
-            if(mods.hasFlag(IMPLICIT) && typeTree.isEmpty && !(name.toString matches "((i?)to).+|.+(To|2)[A-Z].*")) unit.warning(tree.pos, "Implicit method %s needs explicit return type" format name)
+            /// Implicit method needs explicit return type
+            //if(mods.hasFlag(IMPLICIT) && typeTree.isEmpty && !(name.toString matches "((i?)to).+|.*(To|2)[A-Z].*")) unit.warning(tree.pos, "Implicit method %s needs explicit return type" format name)
           case _ => 
         }
         super.traverse(tree)
