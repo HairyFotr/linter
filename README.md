@@ -23,8 +23,9 @@ Optionally, run `sbt console` in this project to see it in action.
 
 ## Currently supported warnings
 
-Note: Some of these checks currently disabled, toned down, or maybe even generalized: 
-maybe also check the [test code](https://github.com/HairyFotr/linter/blob/master/src/test/scala/LinterPluginTest.scala#L95).
+__Note:__ Some of these checks are currently disabled, toned down, or maybe generalized. Also, there are a lot of undocumented checks.
+
+Maybe check out the [test code](https://github.com/HairyFotr/linter/blob/master/src/test/scala/LinterPluginTest.scala#L95).
 
 ### Using `scala.io.Source.fromFile` without closing file
     scala> io.Source.fromFile("README.md").mkString
