@@ -481,9 +481,22 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         val high2 = if(to_until.toString == "to") high else high-1
         new Values(Set((low, high2)), Set(), "", isSeq = true, high2-low)
 
-      case Apply(Select(Apply(Select(scala_Predef, intWrapper), List(expr1)), to_until), List(expr2)) if (to_until.toString matches "to|until") && computeExpr(expr1).isValue && computeExpr(expr2).isValue =>
-        val (low, high) = (computeExpr(expr1).getValue, computeExpr(expr2).getValue + (if(to_until.toString == "to") 0 else -1))
-        new Values(Set((low, high)), Set(), "", isSeq = true, high-low)
+      case Apply(Select(Apply(scala_Predef_intWrapper, List(expr1)), to_until), List(expr2)) => 
+        if(to_until.toString == "to") {
+          expr2 match {
+            case Apply(Select(Ident(id), nme.SUB), List(Literal(Constant(1)))) => 
+              unit.warning(treePosHolder.pos, "Use (low until high) instead of (low to high-1)")
+            case _ =>
+          }
+        }
+        
+        if((to_until.toString matches "to|until") && computeExpr(expr1).isValue && computeExpr(expr2).isValue) {
+          val (low, high) = (computeExpr(expr1).getValue, computeExpr(expr2).getValue + (if(to_until.toString == "to") 0 else -1))
+          
+          new Values(Set((low, high)), Set(), "", isSeq = true, high-low)
+        } else {
+          Values.empty
+        }
 
       case t @ Apply(TypeApply(genApply @ Select(_,_), _), genVals) if methodImplements(genApply.symbol, SeqLikeGenApply) && (!t.tpe.widen.toString.contains("collection.mutable.")) =>
         val values = genVals.map(v => computeExpr(v))
