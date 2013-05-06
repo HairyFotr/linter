@@ -105,17 +105,9 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
             left.values ++ right.values,
             this.name)
 
-        case Select(Apply(scala_augmentString, List(name)), nonEmpty) if
-          scala_augmentString.toString.endsWith(".augmentString") &&
-          nonEmpty.toString == "nonEmpty" && {
-            val str = stringVals.find(_.name.exists(_ == name.toString))
-            //println("aaaaaaaaaaaaaaaaaaaaaa("+name.toString+") -"+str+"-  |"+stringVals)
-            if(str.isDefined && str.get.alwaysNonEmpty) {
-              unit.warning(condExpr.pos, "This string will never be empty.")
-            }
-            false
-          } => //
-          Values.empty
+        case expr @ Select(Apply(scala_augmentString, List(string)), func)
+        if (scala_augmentString.toString endsWith "augmentString") =>
+          computeExpr(expr)
 
         //ADD: expr op expr that handles idents right
         case Apply(Select(Ident(v), op), List(expr)) if v.toString == this.name && this.nonEmpty && computeExpr(expr).isValue => 
@@ -476,6 +468,38 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         if stringVals.exists(_.name == Some(id.toString)) && predef.toString == "scala.this.Predef" && augmentString.toString == "augmentString" && size.toString == "size" => 
         val exactValue = stringVals.find(_.name == Some(id.toString)).map(_.exactValue)
         exactValue.map(v => Values(v.size)).getOrElse(Values.empty)
+
+      /// String stuff, that probably shouldnt be here
+      case Select(Apply(scala_augmentString, List(string)), func) 
+        if (scala_augmentString.toString endsWith "augmentString") 
+        && (func.toString matches "(is|non)Empty|toInt") && {
+          var pass = false
+          
+          val str = StringAttrs(string)
+          if(str != StringAttrs.empty) {
+            func.toString match {
+              case "nonEmpty"|"isEmpty" if str.alwaysNonEmpty =>
+                unit.warning(treePosHolder.pos, "This string will never be empty.")
+              case "nonEmpty"|"isEmpty" if str.exactValue.exists(_.isEmpty) =>
+                unit.warning(treePosHolder.pos, "This string will always be empty.")
+              case "toInt" if str.exactValue.isDefined =>
+                pass = true
+              case _ =>
+                //println("aaaaaaaaaaaaaaaaaaaaaa("+showRaw(string)+") -"+str+"-  |"+stringVals)
+            }
+          }
+          //hacky... this decides if case passes
+          pass
+        } =>
+        
+          try {
+            val str = StringAttrs(string)
+            Values(str.exactValue.get.toInt)
+          } catch {
+            case e: Exception =>
+              unit.warning(treePosHolder.pos, "This String to Int conversion will fail.")
+              Values.empty
+          }
 
       // Range
       case Apply(Select(Apply(scala_Predef_intWrapper, List(Literal(Constant(low: Int)))), to_until), List(Literal(Constant(high: Int)))) 

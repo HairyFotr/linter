@@ -411,8 +411,25 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     
     msg = "string will never be empty"
     
+    //should("""{ val a = "a "; if(a.isEmpty) "foo" }""")
     should("""{ var b = " "; val a = (b + (if(b == " ") "a" else "b"+b)).trim.toLowerCase; if(a.nonEmpty) "foo" }""")
     shouldnt("""{ var b = " "; val a = (b + (if(b == " ") " " else " "+b)).trim.toLowerCase; if(a.nonEmpty) "foo" }""")
+
+    msg = "string will always be empty"
+    
+    //should("""{ val a = " ".trim; if(a.isEmpty) "foo" }""")
+    //shouldnt("""{ val a = " "; if(a.isEmpty) "foo" }""")
+
+    msg = "by zero" //div by zero
+    
+    should("""{ val a = 1/"0".toInt }""")
+    //should("""{ val a = 5; if(a == 1/"0".toInt) "foo" }""")
+    shouldnt("""{ val a = 1/"1".toInt }""")
+
+    msg = "String to Int"
+    
+    should("""{ val a = 1/"d0d".toInt }""")
+    shouldnt("""{ val a = 1/"1".toInt }""")
   }
 
 
