@@ -308,15 +308,27 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
 
           /// Processing a constant string: "hello".size
-          case Apply(Select(Literal(Constant(s: String)), func), params) =>
+          case Apply(Select(pos @ Literal(Constant(s: String)), func), params) =>
             func.toString match {
               case "$plus"|"equals"|"$eq$eq"|"toCharArray"|"matches" => //ignore
-              case "length" => unit.warning(tree.pos, "Taking the length of a constant string")
-              case _        => unit.warning(tree.pos, "Processing a constant string")
+              case "length" => unit.warning(pos.pos, "Taking the length of a constant string")
+              case _        => unit.warning(pos.pos, "Processing a constant string")
             }
-          case Select(Apply(Select(predef, augmentString), List(Literal(Constant(s: String)))), size)
+          case Select(Apply(Select(predef, augmentString), List(pos @ Literal(Constant(s: String)))), size)
             if predef.toString == "scala.this.Predef" && augmentString.toString == "augmentString" && size.toString == "size" => 
-            unit.warning(tree.pos, "Taking the size of a constant string")
+            unit.warning(pos.pos, "Taking the size of a constant string")
+
+          /// Invalid regex
+          case Select(Apply(scala_Predef_augmentString, List(pos @ Literal(Constant(reg: String)))), r) 
+            if(scala_Predef_augmentString.toString.endsWith(".augmentString")) =>
+            
+            try {
+              reg.r
+            } catch {
+              case e: java.util.regex.PatternSyntaxException =>
+                unit.warning(pos.pos, "Regex pattern syntax warning: "+e.getMessage.takeWhile(_ != '\n'))
+              case e: Exception =>
+            }
 
           /// Pattern Matching checks
           case Match(pat, cases) if pat.tpe.toString != "Any @unchecked" && cases.size >= 2 =>
