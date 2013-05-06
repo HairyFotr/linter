@@ -312,6 +312,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
 
   @Test
+  @Ignore
   def implicit__returnType() {
     implicit val msg = "needs explicit return type"
     
