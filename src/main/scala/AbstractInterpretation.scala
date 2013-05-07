@@ -11,6 +11,7 @@ import com.foursquare.lint.global._
 class AbstractInterpretation(val global: Global, val unit: GUnit) {
   import global._
 
+  //TODO: move these to utils
   def isUsed(tree: GTree, name: String): Boolean = {
     var used = 0
 
@@ -33,6 +34,16 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     (used > 0)
   }
     
+  def checkRegex(reg: String) {
+    try {
+      reg.r
+    } catch {
+      case e: java.util.regex.PatternSyntaxException =>
+        unit.warning(treePosHolder.pos, "Regex pattern syntax warning: "+e.getDescription)
+      case e: Exception =>
+    }
+  }
+
   object Values {
     lazy val empty = new Values()
     //def apply(low: Int, high: Int, name: String, isSeq: Boolean, actualSize: Int): Values = new Values(name = name, ranges = Set((low, high)), isSeq = isSeq, actualSize = actualSize)
@@ -906,19 +917,23 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         stringVals = backupStrs
 
       /// Invalid regex
+      case Apply(java_util_regex_Pattern_compile, List(regExpr)) if java_util_regex_Pattern_compile.toString == "java.util.regex.Pattern.compile" =>
+        treePosHolder = regExpr
+        StringAttrs(regExpr).exactValue.foreach(checkRegex)
+      
+      case Apply(Select(str, func), List(regExpr)) if (str.tpe.widen <:< definitions.StringClass.tpe) && (func.toString matches "matches|split") =>
+        treePosHolder = regExpr
+        StringAttrs(regExpr).exactValue.foreach(checkRegex)
+        
+      case Apply(Select(str, func), List(regExpr, str2)) if (str.tpe.widen <:< definitions.StringClass.tpe) && (func.toString matches "replace(All|First)") =>
+        treePosHolder = regExpr
+        StringAttrs(regExpr).exactValue.foreach(checkRegex)
+
       case Select(Apply(scala_Predef_augmentString, List(regExpr)), r)
         if(scala_Predef_augmentString.toString.endsWith(".augmentString") && r.toString == "r") =>
-        
-        val reg = StringAttrs(regExpr).exactValue
-        if(reg.isDefined) {
-          try {
-            reg.get.r
-          } catch {
-            case e: java.util.regex.PatternSyntaxException =>
-              unit.warning(regExpr.pos, "Regex pattern syntax warning: "+e.getMessage.takeWhile(_ != '\n'))
-            case e: Exception =>
-          }
-        }
+        treePosHolder = regExpr
+                
+        StringAttrs(regExpr).exactValue.foreach(checkRegex)
 
       case b @ Block(_, _) => 
         //println("block: "+b)

@@ -473,6 +473,16 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       |val a = "*+"
       |a.r
     """)
+    should("""
+      |"fsdfds".split("*+")
+    """)
+    should("""
+      |"fsdfds".replaceAll("*", "")
+    """)
+    should("""
+      |{ val a = "*"
+      | java.util.regex.Pattern.compile(a) }
+    """)
     
     shouldnt("""
       |"3*[a]+".r
@@ -486,6 +496,10 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     """)
     shouldnt("""
       |"3*[a]+".format("hello")
+    """)
+    shouldnt("""
+      |{ val a = "*"
+      |  java.util.regex.Pattern.compile("(pattern)"+a) }
     """)
   }
   
