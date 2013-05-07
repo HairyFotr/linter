@@ -126,6 +126,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       val AsInstanceOf = AnyClass.info.member(nme.asInstanceOf_)
       val ToString: Symbol = AnyClass.info.member(nme.toString_)
 
+      //TODO: These probably aleady exist in definitions...
       val DoubleClass: Symbol = definitions.getClass(newTermName("scala.Double"))
       val FloatClass: Symbol = definitions.getClass(newTermName("scala.Float"))
 
@@ -204,7 +205,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Apply(math_sqrt, List(Apply(Select(expr1, nme.MUL), List(expr2))))
             if (expr1 equalsStructure expr2) && math_sqrt.toString == "scala.math.`package`.sqrt" =>
             
-            unit.warning(tree.pos, "Use abs instead of sqrt(pow(x*x)).")
+            unit.warning(tree.pos, "Use abs instead of sqrt(x*x).")
 
           /// Signum function checks
           case pos @ Apply(Select(expr1, op), List(expr2)) if (op == nme.DIV) && ((expr1, expr2) match {
@@ -418,13 +419,13 @@ class LinterPlugin(val global: Global) extends Plugin {
           case If(cond, Literal(Constant(false)), Literal(Constant(true))) =>
             unit.warning(cond.pos, "Remove the if and just use the negated condition.")
           case If(cond, a, b) if (a equalsStructure b) && (a.children.nonEmpty) => //TODO: empty if statement (if(...) { }) triggers this - issue warning for that case?
+            //TODO: test if a single statement counts as children.nonEmpty
             unit.warning(a.pos, "If statement branches have the same structure.")
           case If(cond, a, If(cond2, b, c)) if (a.children.nonEmpty && ((a equalsStructure b) || (a equalsStructure c))) || (b.children.nonEmpty && (b equalsStructure c)) =>
             unit.warning(a.pos, "If statement branches have the same structure.")
 
           case If(cond @ Literal(Constant(a: Boolean)), _, _) => 
-            //TODO: try to figure out things like (false && a > 5 && ...) (btw, this works if a is a final val)
-            //TODO: there are people still doing breakable { while
+            //TODO: there are people still doing breakable { while(true) {... don't warn on while(true)?
             val warnMsg = "This condition will always be "+a+"."
             unit.warning(cond.pos, warnMsg)
           case Apply(Select(Literal(Constant(false)), term), _) if term == nme.ZAND =>
