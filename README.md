@@ -1,23 +1,22 @@
 # Linter Compiler Plugin
 
-This is a compiler plugin that adds additional lint checks to protect against sharp corners 
-in the Scala compiler and standard libraries.
+Linter is a Scala compiler plugin that adds compile-time checks to help protect against various possible bugs and style problems.
 
 It's currently very much a work in progress - some parts will need to be rewritten.
 
-For an overview of writing compiler plugins, see http://www.scala-lang.org/node/140
+For a quick overview of writing compiler plugins, see http://www.scala-lang.org/node/140
 
 ## Usage
 
-Add it as a compiler plugin in your project by editing your build.sbt file:
+Add it as a compiler plugin to your project by editing your build.sbt file:
 
     resolvers += "linter" at "http://hairyfotr.github.io/linteRepo/releases"
 
     addCompilerPlugin("com.foursquare.lint" %% "linter" % "0.1-SNAPSHOT")
 
-Or, if you're working with a local version:
+Or, if you're working with a local jar:
 
-    scalacOptions += "-Xplugin:<path-to-jar>.jar"
+    scalacOptions += "-Xplugin:<path-to-linter-jar>.jar"
 
 Optionally, run `sbt console` in this project to see it in action.
 
@@ -25,7 +24,7 @@ Optionally, run `sbt console` in this project to see it in action.
 
 __Note:__ Some of these checks are currently disabled, toned down, or maybe generalized.
 
-Also, there are a lot of undocumented checks.
+Also, there are a lot of new undocumented checks.
 Maybe check out the [test code](https://github.com/HairyFotr/linter/blob/master/src/test/scala/LinterPluginTest.scala#L95).
 
 ### Using `scala.io.Source.fromFile` without closing file
