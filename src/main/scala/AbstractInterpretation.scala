@@ -11,16 +11,25 @@ import com.foursquare.lint.global._
 class AbstractInterpretation(val global: Global, val unit: GUnit) {
   import global._
 
-  def isUsed(t: GTree, name: String): Boolean = {
+  def isUsed(tree: GTree, name: String): Boolean = {
     var used = 0
-    def usedTimes(t: GTree, name: String) { t match { //TODO: there are possible errors, but we're returning empty anyways :)
-      case a if a.toString.drop(name.size) matches "[.](size|length|head|last)" => used -= 1 //ADD: other funcs that don't change a thing
-      case a if a.toString == name => used += 1
-      case a =>
-        t.asInstanceOf[Tree].foreach(st => if(st != t) usedTimes(st, name))
-    }}
-    usedTimes(t, name)
-    //println((name, used))
+
+    /*
+    //scala 2.10+
+    for(Ident(id) <- t; if id.toString == name) used += 1
+    //TODO: Only for select types, also, maybe this doesn't belong in all uses of isUsed (e.g. Assignment right after declaration)
+    for(Select(Ident(id), func) <- t; if (func.toString matches "size|length|head|last") && (id.toString == name)) used -= 1
+    */
+    def findUsed(tree: GTree) {
+      for(Ident(id) <- tree.children; if id.toString == name) used += 1
+      //TODO: Only for select types, also, maybe this doesn't belong in all uses of isUsed (e.g. Assignment right after declaration)
+      for(Select(Ident(id), func) <- tree.children; if (func.toString matches "size|length|head|last") && (id.toString == name)) used -= 1
+      
+      for(subTree <- tree.children; if (subTree != tree)) findUsed(subTree)
+    }
+    
+    findUsed(tree)
+    
     (used > 0)
   }
     
@@ -767,7 +776,6 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     stringVals = backupStrs
   }
   def traverse(tree: GTree) {
-    //println(tree)
     if(visitedBlocks(tree)) return else visitedBlocks += tree
     treePosHolder = tree
     tree match {
@@ -887,7 +895,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
 
       /// Invalid regex
       case Select(Apply(scala_Predef_augmentString, List(regExpr)), r)
-        if(scala_Predef_augmentString.toString.endsWith(".augmentString")) =>
+        if(scala_Predef_augmentString.toString.endsWith(".augmentString") && r.toString == "r") =>
         
         val reg = StringAttrs(regExpr).exactValue
         if(reg.isDefined) {

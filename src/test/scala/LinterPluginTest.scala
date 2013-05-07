@@ -135,13 +135,13 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def equals__types() {
-    implicit val msg = "Comparing with == on instances of different types"
+    implicit val msg = "Comparing with == on instances of different types"//(%s, %s) will probably return false.
 
     should("Nil == None")
     should("""
       |val x: List[Int] = Nil
       |val y: List[String] = Nil
-      |x == y""")
+      |x == y""")//TODO: returns true, not false
 
     shouldnt(""" "foo" == "bar" """)
     shouldnt("""
@@ -404,7 +404,25 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
   
   @Test
-  def string__abstractInterpretation() {
+  def abs_interpretation__listAndCondition() {
+    implicit var msg = ""
+    
+    //isUsed is the suspect, if this fails inside the if
+    should("""{ val a = List(1,2,3); if(a.size == 3) for(i <- a) 1/i }""")("This condition will always hold.")
+    should("""{ val a = List(1,2,3); if(a.size > 3) for(i <- a) 1/i }""")("This condition will never hold.")
+    should("""{ val a = List(1,2,3); for(i <- a) 1/(i-1) }""")("You will likely divide by zero here.")
+    should("""{ val k = 3; val a = List(1,2,3); if(a.size == k) for(i <- a) 1/i }""")("This condition will always hold.")
+    should("""{ val k = 4; val a = List(1,2,3); if(a.size == k) for(i <- a) 1/i }""")("This condition will never hold.")
+    should("""{ val k = 1; val a = List(1,2,3); for(i <- a) 1/(i-k) }""")("You will likely divide by zero here.")
+    
+    //TODO: I hope these will be shoulds one day - need to interpret vars as well
+    shouldnt("""{ var k = 3; val a = List(1,2,3); if(a.size == k) for(i <- a) 1/i }""")("This condition will always hold.")
+    shouldnt("""{ var k = 4; val a = List(1,2,3); if(a.size == k) for(i <- a) 1/i }""")("This condition will never hold.")
+    shouldnt("""{ var k = 1; val a = List(1,2,3); for(i <- a) 1/(i-k) }""")("You will likely divide by zero here.")
+  }
+  
+  @Test
+  def abs_interpretation__string() {
     implicit var msg = ""
     
     //TODO:
@@ -457,6 +475,9 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt("""
       |val a = "4*a+"
       |a.r
+    """)
+    shouldnt("""
+      |"3*[a]+".format("hello")
     """)
   }
   
@@ -808,6 +829,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     """)
 
     // Most of the real-world cases are like this - use var to compute new value
+    // If fails, look at isUsed first
     shouldnt("""
       |var a = "A6"
       |println(a)

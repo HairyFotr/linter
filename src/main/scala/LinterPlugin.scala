@@ -78,7 +78,19 @@ class LinterPlugin(val global: Global) extends Plugin {
                   case _ => unit.warning(tree.pos, "Parameters (%s) are not used in method %s" format (unused.mkString(", "), name))
                 }
               }
+              
+              /// Recursive call with exactly the same params
+              //TODO: doesn't cover shadowing (of either the params, or the method shadowing/overriding)
+              for (
+                call @ Apply(Ident(funcCall), funcParams) <- block; 
+                if (funcCall.toString == name.toString)
+                && (funcParams.forall(_.isInstanceOf[Ident]))
+                && (funcParams.map(_.toString).toList == params.map(_.toString).toList)
+              ) {
+                unit.warning(call.pos, "Possible infinite recursive call.")
+              }
             }
+            
 
             /// Implicit method needs explicit return type
             //if(mods.hasFlag(IMPLICIT) && typeTree.isEmpty && !(name.toString matches "((i?)to).+|.*(To|2)[A-Z].*")) unit.warning(tree.pos, "Implicit method %s needs explicit return type" format name)
