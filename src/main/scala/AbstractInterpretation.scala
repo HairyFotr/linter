@@ -716,8 +716,20 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           
           new StringAttrs(minLength = math.min(e1.getMinLength, e2.getMinLength), trimmedMinLength = math.min(e1.getTrimmedMinLength, e2.getTrimmedMinLength))
 
-        case Apply(augmentString, List(Literal(Constant(s:String)))) if(augmentString.toString == "scala.this.Predef.augmentString") =>
-          new StringAttrs(Some(s))
+        case Select(Apply(augmentString, List(expr)), func) if(augmentString.toString == "scala.this.Predef.augmentString") =>
+          val str = StringAttrs(expr)
+          
+          func.toString match {
+            case "init" if str.exactValue.isDefined => new StringAttrs(str.exactValue.map(_.init))
+            case "tail" if str.exactValue.isDefined => new StringAttrs(str.exactValue.map(_.tail))
+            case "capitalize" if str.exactValue.isDefined => new StringAttrs(str.exactValue.map(_.capitalize))
+            case "distinct" if str.exactValue.isDefined => new StringAttrs(str.exactValue.map(_.distinct))
+            case "reverse" if str.exactValue.isDefined => new StringAttrs(str.exactValue.map(_.reverse))
+            case _ => empty
+          }
+
+        case Apply(augmentString, List(expr)) if(augmentString.toString == "scala.this.Predef.augmentString") =>
+          StringAttrs(expr)
           
         case a => 
           //println(showRaw(a))

@@ -430,11 +430,19 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     msg = "string will never be empty"
     
     //should("""{ val a = "a "; if(a.isEmpty) "foo" }""")
+    should("""{ val r = "a    b".distinct.tail; if(r.nonEmpty) "foo" }""")
     should("""{ var b = " "; val a = (b + (if(b == " ") "a" else "b"+b)).trim.toLowerCase; if(a.nonEmpty) "foo" }""")
     shouldnt("""{ var b = " "; val a = (b + (if(b == " ") " " else " "+b)).trim.toLowerCase; if(a.nonEmpty) "foo" }""")
 
     msg = "string will always be empty"
     
+    should("""{ val r = " "; if(r.trim.nonEmpty) "foo" }""")
+    should("""{ val r = " ".tail; if(r.nonEmpty) "foo" }""")
+    should("""{ val r = " ".init; if(r.nonEmpty) "foo" }""")
+    should("""{ val r = "a a".init.tail.trim; if(r.nonEmpty) "foo" }""")
+    should("""{ val r = "a a".capitalize.reverse.init.tail.trim; if(r.nonEmpty) "foo" }""")
+    should("""{ val r = "    ".distinct.tail; if(r.nonEmpty) "foo" }""")
+    shouldnt("""{ val r = "a    b".distinct.tail; if(r.nonEmpty) "foo" }""")
     //should("""{ val a = " ".trim; if(a.isEmpty) "foo" }""")
     //shouldnt("""{ val a = " "; if(a.isEmpty) "foo" }""")
 
