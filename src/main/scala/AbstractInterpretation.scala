@@ -2,7 +2,7 @@ package com.foursquare.lint
 
 import scala.tools.nsc.{Global}
 import scala.tools.nsc.plugins.{Plugin, PluginComponent}
-import scala.tools.nsc.symtab.Flags.{IMPLICIT, OVERRIDE, MUTABLE, CASE, LAZY}
+import scala.tools.nsc.symtab.Flags.{IMPLICIT, OVERRIDE, MUTABLE, CASE, LAZY, FINAL}
 import com.foursquare.lint.global._
 
 // Warning: Don't try too hard to understand this code, it's a mess and needs
@@ -125,9 +125,14 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
             left.values ++ right.values,
             this.name)
 
-        case expr @ Select(Apply(scala_augmentString, List(string)), func)
-        if (scala_augmentString.toString endsWith "augmentString") =>
-          computeExpr(expr)
+        /// String stuff
+        case strFun @ Apply(Select(string, func), params) if string.tpe <:< definitions.StringClass.tpe =>
+          computeExpr(strFun)
+          
+        case strFun @ Select(Apply(scala_augmentString, List(string)), func)
+          if (scala_augmentString.toString endsWith "augmentString") =>
+
+          computeExpr(strFun)
 
         //ADD: expr op expr that handles idents right
         case Apply(Select(Ident(v), op), List(expr)) if v.toString == this.name && this.nonEmpty && computeExpr(expr).isValue => 
@@ -466,7 +471,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   //TODO: extend with more functions... and TEST TEST TEST TEST
   def computeExpr(tree: Tree): Values = {
     treePosHolder = tree
-    val out = tree match {
+    val out: Values = tree match {
       case Literal(Constant(value: Int)) => Values(value)
       //TODO: I don't think this ones work at all...
       case Select(This(typeT), termName) =>
@@ -489,37 +494,19 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         val exactValue = stringVals.find(_.name == Some(id.toString)).map(_.exactValue)
         exactValue.map(v => Values(v.size)).getOrElse(Values.empty)
 
-      /// String stuff, that probably shouldnt be here
-      case Select(Apply(scala_augmentString, List(string)), func) 
-        if (scala_augmentString.toString endsWith "augmentString") 
-        && (func.toString matches "(is|non)Empty|toInt") && {
-          var pass = false
-          
-          val str = StringAttrs(string)
-          if(str != StringAttrs.empty) {
-            func.toString match {
-              case "nonEmpty"|"isEmpty" if str.alwaysNonEmpty =>
-                unit.warning(treePosHolder.pos, "This string will never be empty.")
-              case "nonEmpty"|"isEmpty" if str.exactValue.exists(_.isEmpty) =>
-                unit.warning(treePosHolder.pos, "This string will always be empty.")
-              case "toInt" if str.exactValue.isDefined =>
-                pass = true
-              case _ =>
-                //println("aaaaaaaaaaaaaaaaaaaaaa("+showRaw(string)+") -"+str+"-  |"+stringVals)
-            }
-          }
-          //hacky... this decides if case passes
-          pass
-        } =>
+      /// String stuff (TODO: there's a copy up at applyCond)
+      case strFun @ Apply(Select(string, func), params) if string.tpe <:< definitions.StringClass.tpe =>
+        StringAttrs.stringFunc(string, func, params).right.getOrElse(Values.empty)
         
-          try {
-            val str = StringAttrs(string)
-            Values(str.exactValue.get.toInt)
-          } catch {
-            case e: Exception =>
-              unit.warning(treePosHolder.pos, "This String to Int conversion will fail.")
-              Values.empty
-          }
+      case strFun @ Select(Apply(scala_augmentString, List(string)), func)
+        if (scala_augmentString.toString endsWith "augmentString") =>
+        
+        StringAttrs.stringFunc(string, func).right.getOrElse(Values.empty)
+
+      /// Division by zero
+      case pos @ Apply(Select(_, op), List(expr)) if (op == nme.DIV || op == nme.MOD) && (computeExpr(expr).contains(0)) => 
+        unit.warning(pos.pos, "You will likely divide by zero here.")
+        Values.empty
 
       // Range
       case Apply(Select(Apply(scala_Predef_intWrapper, List(Literal(Constant(low: Int)))), to_until), List(Literal(Constant(high: Int)))) 
@@ -692,6 +679,80 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   object StringAttrs {
     //TODO: when merging, save known chunks - .contains then partially works
     def empty = new StringAttrs()
+    
+    /// Tries to execute string functions and return either a String or Int representation
+    def stringFunc(string: Tree, func: Name, params: List[Tree] = List[Tree]()): Either[StringAttrs, Values] = {
+      val str = StringAttrs(string)
+      val intParam = if(params.size == 1 && params.head.tpe <:< definitions.IntClass.tpe) computeExpr(params.head) else Values.empty
+
+      //println((string, func, params, str, intParam))
+      //println(str.exactValue)
+      if(str == StringAttrs.empty) {
+        Left(empty)
+      } else func.toString match {
+        case "$plus" if params.size == 1 =>
+          val param = params.head
+          if(intParam.isValue) {
+            //println((str, intParam))
+            //println(Left(str + new StringAttrs(Some(intParam.getValue.toString))))
+            Left(str + new StringAttrs(Some(intParam.getValue.toString)))
+          } else {
+            Left(str + StringAttrs(param))
+          }
+        case "$times" if params.size == 1 && computeExpr(params.head).isValue =>
+          Left(str * computeExpr(params.head).getValue)
+
+        case "init"       if str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.init)))
+        case "tail"       if str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.tail)))
+        case "capitalize" if str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.capitalize)))
+        case "distinct"   if str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.distinct)))
+        case "reverse"    if str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.reverse)))
+        case "toUpperCase" => Left(new StringAttrs(str.exactValue.map(_.toUpperCase), None, str.minLength, str.trimmedMinLength))
+        case "toLowerCase" => Left(new StringAttrs(str.exactValue.map(_.toLowerCase), None, str.minLength, str.trimmedMinLength))
+        case "trim" => 
+          val newExactValue = str.exactValue.map(_.trim)
+          val newLength = str.exactValue.map(_.trim.size).getOrElse(str.getTrimmedMinLength)
+          Left(new StringAttrs(newExactValue, None, newLength, newLength))
+        case "nonEmpty"|"isEmpty" => 
+          if(str.alwaysNonEmpty) unit.warning(treePosHolder.pos, "This string will never be empty.")
+          if(str.exactValue.exists(_.isEmpty)) unit.warning(treePosHolder.pos, "This string will always be empty.")
+          Left(empty)
+        case "toInt" if str.exactValue.isDefined =>
+          try {
+            Right(Values(str.exactValue.get.toInt))
+          } catch {
+            case e: Exception =>
+              unit.warning(treePosHolder.pos, "This String toInt conversion will likely fail.")
+              Left(empty)
+          }
+        case f @ ("charAt"|"codePointAt"|"codePointBefore"|"substring") if params.size == 1 && computeExpr(params.head).isValue =>
+          val param = computeExpr(params.head).getValue
+          lazy val string = str.exactValue.get 
+
+          //println((string, param))
+          
+          //TODO use reflection, dummy :)
+          try {
+            f match {
+              case "charAt"          => if(str.exactValue.isDefined) { string.charAt(param); Left(empty) } else if(param < 0) throw new IndexOutOfBoundsException else Left(empty)
+              case "codePointAt"     => if(str.exactValue.isDefined) Right(Values(string.codePointAt(param))) else if(param < 0) throw new IndexOutOfBoundsException else Left(empty)
+              case "codePointBefore" => if(str.exactValue.isDefined) Right(Values(string.codePointBefore(param))) else if(param < 1) throw new IndexOutOfBoundsException else Left(empty)
+              case "substring"       => if(str.exactValue.isDefined) Left(new StringAttrs(Some(string.substring(param)))) else if(param < 0) throw new IndexOutOfBoundsException else Left(empty)
+              case a => Left(empty)
+            }
+          } catch {
+            case e: IndexOutOfBoundsException =>
+              unit.warning(params.head.pos, "This index will likely cause an IndexOutOfBoundsException.")
+              Left(empty)
+            case e: Exception =>
+              Left(empty)
+          }
+        case _ =>
+          Left(empty)
+      }
+    }
+
+    
     def apply(tree: Tree): StringAttrs = {
       def traverse(tree: Tree): StringAttrs = tree match {
         case Literal(Constant(null)) => new StringAttrs(exactValue = Some("null"))
@@ -702,52 +763,23 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
 
           new StringAttrs(exactValue = Some(c.toString))
           
-        case Apply(Select(expr1, nme.ADD), List(expr2)) => 
-          val (e1, e2) = (traverse(expr1), traverse(expr2))
-          
-          e1 + e2
-          
-        case Apply(Select(expr1, nme.MUL), List(expr2)) if computeExpr(expr2).isValue =>
-          val (e1, n) = (traverse(expr1), computeExpr(expr2).getValue)
-                    
-          e1 * n
-
         case Ident(name) => stringVals.find(_.name.exists(_ == name.toString)).getOrElse(empty)
-        case Apply(Select(expr, func), List()) if func.toString matches "trim|to(Upper|Lower)Case" =>
-          val res = traverse(expr)
-          
-          func.toString match {
-            case "trim" => 
-              val newExactValue = res.exactValue.map(_.trim)
-              val newLength = res.exactValue.map(_.trim.size).getOrElse(res.getTrimmedMinLength)
-              new StringAttrs(newExactValue, None, newLength, newLength)
-            case "toUpperCase" =>
-              new StringAttrs(res.exactValue.map(_.toUpperCase), None, res.minLength, res.trimmedMinLength)
-            case "toLowerCase" =>
-              new StringAttrs(res.exactValue.map(_.toLowerCase), None, res.minLength, res.trimmedMinLength)
-            case _ =>
-              empty
-          }
         case If(cond, expr1, expr2) =>
           val (e1, e2) = (traverse(expr1), traverse(expr2))
           
           new StringAttrs(minLength = math.min(e1.getMinLength, e2.getMinLength), trimmedMinLength = math.min(e1.getTrimmedMinLength, e2.getTrimmedMinLength))
 
-        case Select(Apply(augmentString, List(expr)), func) if(augmentString.toString == "scala.this.Predef.augmentString") =>
-          val str = StringAttrs(expr)
-          
-          func.toString match {
-            case "init" if str.exactValue.isDefined => new StringAttrs(str.exactValue.map(_.init))
-            case "tail" if str.exactValue.isDefined => new StringAttrs(str.exactValue.map(_.tail))
-            case "capitalize" if str.exactValue.isDefined => new StringAttrs(str.exactValue.map(_.capitalize))
-            case "distinct" if str.exactValue.isDefined => new StringAttrs(str.exactValue.map(_.distinct))
-            case "reverse" if str.exactValue.isDefined => new StringAttrs(str.exactValue.map(_.reverse))
-            case _ => empty
-          }
-
         case Apply(augmentString, List(expr)) if(augmentString.toString == "scala.this.Predef.augmentString") =>
           StringAttrs(expr)
           
+        /// Pass on functions on strings
+        //TODO: maybe check if some return string and can be computed
+        case Apply(Select(str, func), params) => 
+          stringFunc(str, func, params).left.getOrElse(empty)
+
+        case Select(Apply(scala_augmentString, List(string)), func) if (scala_augmentString.toString endsWith "augmentString") =>
+          stringFunc(string, func).left.getOrElse(empty)
+            
         case a => 
           //println(showRaw(a))
           empty
@@ -772,6 +804,12 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     def getMinLength = math.max(minLength, exactValue.getOrElse("").length)
     def getTrimmedMinLength = math.max(trimmedMinLength, exactValue.getOrElse("").trim.length)
     
+    def +(s: String) = 
+      new StringAttrs(
+        exactValue = if(this.exactValue.isDefined) Some(this.exactValue.get + s) else None,
+        minLength = this.getMinLength + s.length,
+        trimmedMinLength = this.getTrimmedMinLength + s.trim.length //ADD: can be made more exact
+      )
     def +(s: StringAttrs) = 
       new StringAttrs(
         exactValue = if(this.exactValue.isDefined && s.exactValue.isDefined) Some(this.exactValue.get + s.exactValue.get) else None,
@@ -792,7 +830,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case _ => false
     }
     
-    override def toString = (exactValue, name, minLength).toString
+    override def toString = (exactValue, name, getMinLength, getTrimmedMinLength).toString
   }
  
   def traverseBlock(tree: GTree) {
@@ -824,7 +862,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
         visitedBlocks += s
 
-      case ValDef(m: Modifiers, valName, _, s @ Literal(Constant(str: String))) if(!m.hasFlag(MUTABLE)) =>
+      case ValDef(m: Modifiers, valName, _, s @ Literal(Constant(str: String))) if(!m.hasFlag(MUTABLE) && !m.hasFlag(FINAL)) =>
         if(stringVals.exists(_.exactValue == Some(str))) unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
         //stringVals += str
         visitedBlocks += s
@@ -902,9 +940,6 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         stringVals = backupStrs
         //println(vals)
 
-      case pos @ Apply(Select(_, op), List(expr)) if (op == nme.DIV || op == nme.MOD) && (computeExpr(expr).contains(0)) => 
-        unit.warning(pos.pos, "You will likely divide by zero here.")
-
       //case pos @ Apply(Select(Ident(seq), apply), List(indexExpr)) 
       case pos @ Apply(Select(seq, apply), List(indexExpr)) if methodImplements(pos.symbol, SeqLikeApply) =>
         //println(seq.toString)
@@ -957,6 +992,13 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         tree.children.foreach(traverse)
         vals = backupVals.withDefaultValue(Values.empty)
         stringVals = backupStrs
+
+      /// Pass on expressions
+      case pos @ Apply(Select(_, op), List(expr)) =>
+        //if (op == nme.DIV || op == nme.MOD) && (computeExpr(expr).contains(0)) => 
+        
+        computeExpr(pos)
+        tree.children.foreach(traverse)
 
       case _ => 
         //if(vals.nonEmpty)println("in: "+showRaw(tree))

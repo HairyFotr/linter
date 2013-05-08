@@ -74,8 +74,8 @@ class LinterPlugin(val global: Global) extends Plugin {
                 
                 unused.size match { //TODO: scalaz is a good codebase for finding interesting false positives
                   case 0 => //
-                  case 1 => unit.warning(tree.pos, "Parameter %s is not used in method %s" format (unused.mkString(", "), name))
-                  case _ => unit.warning(tree.pos, "Parameters (%s) are not used in method %s" format (unused.mkString(", "), name))
+                  case 1 => unit.warning(tree.pos, "Parameter %s is not used in method %s. (Add override if that's the reason)" format (unused.mkString(", "), name))
+                  case _ => unit.warning(tree.pos, "Parameters (%s) are not used in method %s. (Add override if that's the reason)" format (unused.mkString(", "), name))
                 }
               }
               
@@ -87,7 +87,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 && (funcParams.forall(_.isInstanceOf[Ident]))
                 && (funcParams.map(_.toString).toList == params.map(_.toString).toList)
               ) {
-                unit.warning(call.pos, "Possible infinite recursive call.")
+                unit.warning(call.pos, "Possible infinite recursive call. (Except if params are mutable, or the names are shadowed)")
               }
             }
             
@@ -210,6 +210,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             
           /// log1p and expm -- see http://www.johndcook.com/blog/2010/06/07/math-library-functions-that-seem-unnecessary/
           //TODO: maybe make checks to protect against potentially wrong fixes, e.g. log1p(a + 1) or log1p(a - 1)
+          // also, check 1-exp(x) and other negated versions
           case Apply(log, List(Apply(Select(Literal(Constant(one)), nme.ADD), _))) if log.toString == "scala.math.`package`.log" && one == 1 => 
             unit.warning(tree.pos, "Use math.log1p(x) instead of math.log(1 + x) for added accuracy (if x is near 0")
           case Apply(log, List(Apply(Select(_, nme.ADD), List(Literal(Constant(one)))))) if log.toString == "scala.math.`package`.log" && one == 1 => 
@@ -331,7 +332,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// Processing a constant string: "hello".size
           case Apply(Select(pos @ Literal(Constant(s: String)), func), params) =>
             func.toString match {
-              case "$plus"|"equals"|"$eq$eq"|"toCharArray"|"matches" => //ignore
+              case "$plus"|"equals"|"$eq$eq"|"toCharArray"|"matches"|"getBytes" => //ignore
               case "length" => unit.warning(pos.pos, "Taking the length of a constant string")
               case _        => unit.warning(pos.pos, "Processing a constant string")
             }
@@ -444,10 +445,14 @@ class LinterPlugin(val global: Global) extends Plugin {
           case If(cond, a, If(cond2, b, c)) if (a.children.nonEmpty && ((a equalsStructure b) || (a equalsStructure c))) || (b.children.nonEmpty && (b equalsStructure c)) =>
             unit.warning(a.pos, "If statement branches have the same structure.")
 
+          //Ignore: ignores while(true)... I mean, one can't accidentally use while(true), can they? :)
+          /*case LabelDef(whileName, List(), If(cond @ Literal(Constant(a: Boolean)), _, _)) =>
+            //TODO: doesn't actually ignore, but that test is trivial anyway, commenting both
+          
           case If(cond @ Literal(Constant(a: Boolean)), _, _) => 
             //TODO: there are people still doing breakable { while(true) {... don't warn on while(true)?
             val warnMsg = "This condition will always be "+a+"."
-            unit.warning(cond.pos, warnMsg)
+            unit.warning(cond.pos, warnMsg)*/
           case Apply(Select(Literal(Constant(false)), term), _) if term == nme.ZAND =>
             val warnMsg = "This part of boolean expression will always be false."
             unit.warning(tree.pos, warnMsg)

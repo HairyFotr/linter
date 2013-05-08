@@ -216,9 +216,12 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
   
   @Test
+  @Ignore
   def if__condition() {
     should("""if(1 > 5) 7 else 8""")("This condition will always be false.")
     should("""if(1 < 5) 7 else 8""")("This condition will always be true.")
+
+    shouldnt("""while(1 < 5) { 7; 8 }""")("This condition will always be true.")
   }
 
   @Test
@@ -470,7 +473,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     
     msg = "string will never be empty"
     
-    //should("""{ val a = "a "; if(a.isEmpty) "foo" }""")
+    should("""{ val a = "a "; if(a.isEmpty) "foo" }""")
     should("""{ val r = "a    b".distinct.tail; if(r.nonEmpty) "foo" }""")
     should("""{ var b = " "; val a = (b + (if(b == " ") "a" else "b"+b)).trim.toLowerCase; if(a.nonEmpty) "foo" }""")
     shouldnt("""{ var b = " "; val a = (b + (if(b == " ") " " else " "+b)).trim.toLowerCase; if(a.nonEmpty) "foo" }""")
@@ -484,16 +487,16 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should("""{ val r = "a a".capitalize.reverse.init.tail.trim; if(r.nonEmpty) "foo" }""")
     should("""{ val r = "    ".distinct.tail; if(r.nonEmpty) "foo" }""")
     shouldnt("""{ val r = "a    b".distinct.tail; if(r.nonEmpty) "foo" }""")
-    //should("""{ val a = " ".trim; if(a.isEmpty) "foo" }""")
-    //shouldnt("""{ val a = " "; if(a.isEmpty) "foo" }""")
+    should("""{ val a = " ".trim; if(a.isEmpty) "foo" }""")
+    shouldnt("""{ val a = " "; if(a.isEmpty) "foo" }""")
 
     msg = "by zero" //div by zero
     
     should("""{ val a = 1/"0".toInt }""")
-    //should("""{ val a = 5; if(a == 1/"0".toInt) "foo" }""")
+    should("""{ val a = 5; if(a == 1/"0".toInt) "foo" }""")
     shouldnt("""{ val a = 1/"1".toInt }""")
 
-    msg = "String to Int"
+    msg = "String toInt"
     
     should("""{ val a = 1/"d0d".toInt }""")
     shouldnt("""{ val a = 1/"1".toInt }""")
@@ -1129,6 +1132,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       |val a = 5
       |println(a/(a-5))
     """)
+    should("""{ val a = 5; if(a == 1/(a-5)) "foo" }""")
     should("""
       |val a = List(1,2,3)
       |println(a.size/(a.size-3))
