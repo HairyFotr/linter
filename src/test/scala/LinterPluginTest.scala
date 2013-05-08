@@ -404,6 +404,47 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
   
   @Test
+  def abs_interpretation__assert() {
+    implicit var msg = "will never hold"
+    
+    should("""
+      |val a = 5
+      |assert(a == 6)
+    """)
+    should("""
+      |val a,b = 5
+      |assert(a == b+1)
+    """)
+    shouldnt("""
+      |val a = 5
+      |assert(a == 5)
+    """)
+    shouldnt("""
+      |val a,b = 5
+      |assert(a == b)
+    """)
+
+    msg = "will always hold"
+    
+    shouldnt("""
+      |val a = 5
+      |assert(a == 6)
+    """)
+    shouldnt("""
+      |val a,b = 5
+      |assert(a == b+1)
+    """)
+    should("""
+      |val a = 5
+      |assert(a == 5)
+    """)
+    should("""
+      |val a,b = 5
+      |assert(a == b)
+    """)
+  }
+
+  @Test
   def abs_interpretation__listAndCondition() {
     implicit var msg = ""
     
@@ -544,8 +585,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   
   @Test
   def numeric_log1p() {
-    implicit val msg = "Use math.log1p instead of math.log"
-
+    implicit var msg = "Use math.log1p(x) instead of"// math.log(1 + x) for added accuracy"
     should("""
       |val a = 4d
       |math.log(1 + a)
@@ -554,7 +594,6 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       |val a = 4d
       |math.log(1d + a)
     """)
-
     shouldnt("""
       |val a = 4d
       |math.log(2d + a)
@@ -563,8 +602,61 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       |val a = 4d
       |math.log1p(1 + a)
     """)
+    
+    should("""
+      |val a = 4d
+      |math.log(1d + a)
+    """)
+    should("""
+      |val a,b = 4d
+      |math.log((a+b) + 1)
+    """)
+    shouldnt("""
+      |val a = 4d
+      |math.log(a + 2d)
+    """)
+    shouldnt("""
+      |val a = 4d
+      |math.log1p(a + 1)
+    """)
   }
 
+  def numeric_exp1m() {
+    implicit var msg = "Use math.expm1(x) instead of"// math.exp(x) - 1 for added accuracy (if x is near 1).
+    should("""
+      |val a = 4d
+      |math.exp(a) - 1
+    """)
+    should("""
+      |val a = 4d
+      |math.exp(a) - 1d
+    """)
+    shouldnt("""
+      |val a = 4d
+      |math.exp(a) - 2d
+    """)
+    shouldnt("""
+      |val a = 4d
+      |math.expm1(a) - 1d
+    """)
+    
+    should("""
+      |val a = 4d
+      |-1 + math.exp(a)
+    """)
+    should("""
+      |val a,b = 4d
+      |-1 + math.exp(a + b)
+    """)
+    shouldnt("""
+      |val a = 4d
+      |-2 + math.exp(a)
+    """)
+    shouldnt("""
+      |val a = 4d
+      |-1 + math.exp1m(a)
+    """)
+  }
 
   @Test
   def probableBugs__selfAssign() {

@@ -805,6 +805,15 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, _, _, _)), _))) =>
         forLoop(forloop)
       
+      /// Assertions checks
+      case Apply(Select(scala_Predef, assert), List(condExpr)) 
+        if (scala_Predef.tpe <:< definitions.PredefModule.tpe) && (assert.toString matches "assert|assume|require") => 
+        
+        // we can apply these conditions to vals - if they don't hold, it'll throw an exception anyway
+        // and they'll reset at the end of the current block
+        vals = vals.map(a => (a._1, a._2.applyCond(condExpr)._1)).withDefaultValue(Values.empty)
+      
+      /// String checks
       case s @ Literal(Constant(str: String)) if stringVals.find(_.exactValue == Some(str)).isDefined =>
         unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
         visitedBlocks += s

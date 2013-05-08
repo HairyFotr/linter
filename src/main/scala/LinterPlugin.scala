@@ -208,9 +208,17 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             //unit.warning(tree.pos, "Exact comparison of floating point values is potentially unsafe.")
             
-          case Apply(log, List(Apply(Select(Literal(Constant(const)), nme.ADD), _))) if log.toString == "scala.math.`package`.log" && const == 1 => 
-            unit.warning(tree.pos, "Use math.log1p instead of math.log for added accuracy.")
-            
+          /// log1p and expm -- see http://www.johndcook.com/blog/2010/06/07/math-library-functions-that-seem-unnecessary/
+          //TODO: maybe make checks to protect against potentially wrong fixes, e.g. log1p(a + 1) or log1p(a - 1)
+          case Apply(log, List(Apply(Select(Literal(Constant(one)), nme.ADD), _))) if log.toString == "scala.math.`package`.log" && one == 1 => 
+            unit.warning(tree.pos, "Use math.log1p(x) instead of math.log(1 + x) for added accuracy (if x is near 0")
+          case Apply(log, List(Apply(Select(_, nme.ADD), List(Literal(Constant(one)))))) if log.toString == "scala.math.`package`.log" && one == 1 => 
+            unit.warning(tree.pos, "Use math.log1p(x) instead of math.log(x + 1) for added accuracy (if x is near 0")
+          case Apply(Select(Apply(exp, _), nme.SUB), List(Literal(Constant(one)))) if exp.toString == "scala.math.`package`.exp" && one == 1 => 
+            unit.warning(tree.pos, "Use math.expm1(x) instead of math.exp(x) - 1 for added accuracy (if x is near 1).")
+          case Apply(Select(Literal(Constant(mone)), nme.ADD), List(Apply(exp, _))) if exp.toString == "scala.math.`package`.exp" && mone == -1 =>
+            unit.warning(tree.pos, "Use math.expm1(x) instead of -1 + math.exp(x) for added accuracy (if x is near 1).")
+
           case Apply(sqrt, List(Apply(pow, List(expr, Literal(Constant(two)))))) if two == 2 && sqrt.toString == "scala.math.`package`.sqrt" && pow.toString == "scala.math.`package`.pow" =>
             unit.warning(tree.pos, "Use abs instead of sqrt(pow(_, 2)).")
 
