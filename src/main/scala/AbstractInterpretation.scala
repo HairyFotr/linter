@@ -533,8 +533,14 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         
         if(to_until.toString == "to") {
           (expr1, expr2) match {
-            case (Literal(Constant(a)), Apply(Select(Ident(id), nme.SUB), List(Literal(Constant(1))))) => 
-              unit.warning(treePosHolder.pos, "Use (low until high) instead of (low to high-1)")
+            case (Literal(Constant(a)), Apply(Select(expr, nme.SUB), List(Literal(Constant(1))))) => 
+              if(expr match {
+                case Ident(id) => true
+                case Select(Ident(id), size) if size.toString matches "size|length" => true //size value
+                case Apply(Select(Ident(id), size), List()) if size.toString matches "size|length" => true //size getter
+                case Select(Apply(implicitWrapper, List(Ident(id))), size) if size.toString matches "size|length" => true//wrapped size
+                case _ => false
+              }) unit.warning(treePosHolder.pos, "Use (low until high) instead of (low to high-1)")
             case _ =>
           }
         }
