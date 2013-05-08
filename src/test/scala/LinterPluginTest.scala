@@ -1169,7 +1169,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
 
   @Test
-  def style__find_isDefined() {
+  def style__find_isDefined_to_exists() {
     implicit val msg = "Use exists(...) instead of find(...).isDefined"
     
     should("""List(1,2,3).find(_ == 2).isDefined""")
@@ -1180,6 +1180,17 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
     shouldnt("""List(1,2,3).headOption.isDefined""")
     shouldnt("""List(1,2,3).exists(_ == 2)""")
+  }
+
+  @Test
+  def style__flatMap_to_filter() {
+    implicit val msg = /*filter*/"instead of this flatMap"
+    
+    //should("""{ List(1,2,3).flatMap(x => if(x == 2) Some(x) else None) }""")
+    should("""{ List(1,2,3).flatMap(x => if(x == 2) Nil else List(x)) }""")
+
+    //shouldnt("""{ List(1,2,3).flatMap(x => if(x == 2) Some(x+1) else None) }""")
+    shouldnt("""{ List(1,2,3).flatMap(x => if(x == 2) Nil else List(x+1)) }""")
   }
 
   @Test
@@ -1202,6 +1213,8 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     
     should("""{ val a = 5; val b = (1 to a-1) }""")
     should("""{ val a = 5; for(i <- 1 to a-1) 5 }""")
+    should("""{ val a = List(1,2,3); val b = (1 to a.size-1) }""")
+    should("""{ val a = "fdsfd"; val b = (1 to a.size-1) }""")
 
     shouldnt("""{ val a = 5; val b = (a-5 to a-1) }""")
     shouldnt("""{ val a = 5; val b = (1 to a) }""")

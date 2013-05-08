@@ -501,10 +501,39 @@ class LinterPlugin(val global: Global) extends Plugin {
               case _ =>
             }
 
+          /// find(...).isDefined is better written as exists(...)
           case Select(Apply(pos @ Select(collection, find), func), isDefined) 
             if find.toString == "find" && isDefined.toString == "isDefined" && (collection.toString.startsWith("scala.") || collection.toString.startsWith("immutable.")) =>
             
             unit.warning(pos.pos, "Use exists(...) instead of find(...).isDefined")
+
+          /// flatMap(if() x else Nil/None) is better written as filter(...)
+          case Apply(TypeApply(Select(collection, flatMap), _), List(Function(List(ValDef(flags, param, _, _)), If(cond, e1, e2))))
+            if flatMap.toString == "flatMap" =>
+
+            // swap branches, to save some copy-pasting of huge patterns below
+            val (expr1, expr2) = if((e1.toString endsWith ".Nil") || (e1.toString endsWith ".None")) (e1, e2) else (e2, e1)
+
+            (expr1, expr2) match {
+              case (nil,Apply(TypeApply(Select(collection, apply), _), List(Ident(id))))
+                if ((collection.toString startsWith "scala.collection.immutable.") || (collection.toString startsWith "immutable."))
+                && (nil.toString endsWith ".Nil") 
+                && (id.toString == param.toString) =>
+                
+                unit.warning(tree.pos, "Use filter(x => cond) instead of this flatMap(x => if(cond) ... else ...)")
+
+              //TODO: this check makes scalac 2.9 pattern matcher explode
+              /*case (Apply(option2Iterable1, List(none)),Apply(option2Iterable2, List(Apply(TypeApply(Select(some, apply), _), List(Ident(id))))))
+                if (none.toString == "scala.None")
+                && (some.toString == "scala.Some")
+                && (id.toString == param.toString) =>
+                
+                unit.warning(tree.pos, "Use filter(x => cond) instead of this flatMap(x => if(cond) ... else ...)")*/
+                
+              case a => 
+                //println((expr1, expr2))
+                //println((showRaw(expr1), showRaw(expr2)))
+            }
 
           case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, param, _, _)), body))) if { //if (foreach_map.toString matches "foreach|map") && {
             abstractInterpretation.forLoop(forloop)
