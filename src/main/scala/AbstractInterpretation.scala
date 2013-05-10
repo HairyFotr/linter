@@ -126,7 +126,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
             this.name)
 
         /// String stuff
-        case strFun @ Apply(Select(string, func), params) if string.tpe <:< definitions.StringClass.tpe =>
+        case strFun @ Apply(Select(string, func), params) if string.tpe.widen <:< definitions.StringClass.tpe =>
           computeExpr(strFun)
           
         case strFun @ Select(Apply(scala_augmentString, List(string)), func)
@@ -495,7 +495,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         exactValue.map(v => Values(v.size)).getOrElse(Values.empty)
 */
       /// String stuff (TODO: there's a copy up at applyCond)
-      case strFun @ Apply(Select(string, func), params) if string.tpe <:< definitions.StringClass.tpe =>
+      case strFun @ Apply(Select(string, func), params) if string.tpe.widen <:< definitions.StringClass.tpe =>
         StringAttrs.stringFunc(string, func, params).right.getOrElse(Values.empty)
         
       case strFun @ Select(Apply(scala_augmentString, List(string)), func)
@@ -683,15 +683,32 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     /// Tries to execute string functions and return either a String or Int representation
     def stringFunc(string: Tree, func: Name, params: List[Tree] = List[Tree]()): Either[StringAttrs, Values] = {
       val str = StringAttrs(string)
-      lazy val intParam = if(params.size == 1 && params.head.tpe <:< definitions.IntClass.tpe) computeExpr(params.head) else Values.empty
-      lazy val stringParam = if(params.size == 1 && params.head.tpe <:< definitions.StringClass.tpe) StringAttrs(params.head) else empty
+      lazy val intParam = if(params.size == 1 && params.head.tpe.widen <:< definitions.IntClass.tpe) computeExpr(params.head) else Values.empty
+      lazy val stringParam = if(params.size == 1 && params.head.tpe.widen <:< definitions.StringClass.tpe) StringAttrs(params.head) else empty
 
       //println((string, func, params, str, intParam))
       //println(str.exactValue)
-      if(str == StringAttrs.empty) {
-        Left(empty)
-      } else func.toString match {
-        case "size"|"length" if params.size == 0 => Right(str.exactValue.map(v => Values(v.size)).getOrElse(Values.empty))
+      //if(!(string.tpe.widen <:< definitions.StringClass.tpe))
+        //println((string, func, params, str, intParam))
+            
+      // We can get some information, even if the string is unknown
+      //if(str == StringAttrs.empty) {
+      //  Left(empty)
+      //} else 
+      func.toString match {
+        case "size"|"length" if params.size == 0 => 
+          Right(
+            str.exactValue
+              .map(v => Values(v.size))
+              .getOrElse(
+                if(str.getMinLength == str.getMaxLength) 
+                  Values(str.getMinLength)
+                else if(str.getMinLength > 0 && str.getMaxLength < Int.MaxValue) 
+                  Values(str.getMinLength, str.getMaxLength)
+                else
+                  Values.empty
+              )
+          )
         case "$plus" if params.size == 1 =>
           val param = params.head
           if(intParam.isValue) {
@@ -704,8 +721,17 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         case "$times" if params.size == 1 && computeExpr(params.head).isValue =>
           Left(str * computeExpr(params.head).getValue)
 
-        case "init"       if str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.init)))
-        case "tail"       if str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.tail)))
+        case "init" => 
+          if(str.exactValue.isDefined)
+            Left(new StringAttrs(str.exactValue.map(_.init)))
+          else
+            Left(new StringAttrs(minLength = math.max(str.minLength-1, 0), maxLength = if(str.maxLength != Int.MaxValue) math.max(str.maxLength-1, 0) else Int.MaxValue))
+        case "tail" => 
+          if(str.exactValue.isDefined)
+            Left(new StringAttrs(str.exactValue.map(_.tail)))
+          else
+            Left(new StringAttrs(minLength = math.max(str.minLength-1, 0), maxLength = if(str.maxLength != Int.MaxValue) math.max(str.maxLength-1, 0) else Int.MaxValue))
+
         case "capitalize" if str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.capitalize)))
         case "distinct"   if str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.distinct)))
         case "reverse"    if str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.reverse)))
@@ -719,11 +745,17 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         case "toLowerCase" => Left(new StringAttrs(str.exactValue.map(_.toLowerCase), None, str.minLength, str.trimmedMinLength))
         case "trim" => 
           val newExactValue = str.exactValue.map(_.trim)
-          val newLength = str.exactValue.map(_.trim.size).getOrElse(str.getTrimmedMinLength)
-          Left(new StringAttrs(newExactValue, None, newLength, newLength))
+          val newMinLength = str.exactValue.map(_.trim.size).getOrElse(str.getTrimmedMinLength)
+          val newMaxLength = str.exactValue.map(_.trim.size).getOrElse(str.getTrimmedMaxLength)
+          Left(new StringAttrs(
+            exactValue = newExactValue, 
+            minLength = newMinLength, 
+            trimmedMinLength = newMinLength, 
+            maxLength = newMaxLength, 
+            trimmedMaxLength = newMaxLength))
         case "nonEmpty"|"isEmpty" => 
           if(str.alwaysNonEmpty) unit.warning(treePosHolder.pos, "This string will never be empty.")
-          if(str.exactValue.exists(_.isEmpty)) unit.warning(treePosHolder.pos, "This string will always be empty.")
+          if(str.alwaysIsEmpty) unit.warning(treePosHolder.pos, "This string will always be empty.")
           Left(empty)
         case "toInt" if str.exactValue.isDefined =>
           try {
@@ -742,18 +774,36 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           //println((string, param))
           
           //TODO use reflection, dummy :)
-          try {
-            f match {
-              case "charAt"|"apply"  => if(str.exactValue.isDefined) { string.charAt(param); Left(empty) } else if(param < 0) throw new IndexOutOfBoundsException else Left(empty)
-              case "codePointAt"     => if(str.exactValue.isDefined) Right(Values(string.codePointAt(param))) else if(param < 0) throw new IndexOutOfBoundsException else Left(empty)
-              case "codePointBefore" => if(str.exactValue.isDefined) Right(Values(string.codePointBefore(param))) else if(param < 1) throw new IndexOutOfBoundsException else Left(empty)
-              case "substring"       => if(str.exactValue.isDefined) Left(new StringAttrs(Some(string.substring(param)))) else if(param < 0) throw new IndexOutOfBoundsException else Left(empty)
-              case "drop"            => if(str.exactValue.isDefined) Left(new StringAttrs(Some(string.drop(param)))) else Left(empty)
-              case "take"            => if(str.exactValue.isDefined) Left(new StringAttrs(Some(string.take(param)))) else Left(empty)
-              case "dropRight"       => if(str.exactValue.isDefined) Left(new StringAttrs(Some(string.dropRight(param)))) else Left(empty)
-              case "takeRight"       => if(str.exactValue.isDefined) Left(new StringAttrs(Some(string.takeRight(param)))) else Left(empty)
-              case a => Left(empty)
-            }
+          try f match {
+            case "charAt"|"apply" => 
+              if(str.exactValue.isDefined) { string.charAt(param); Left(empty) } else if(param < 0) throw new IndexOutOfBoundsException else Left(empty)
+            case "codePointAt" => 
+              if(str.exactValue.isDefined) Right(Values(string.codePointAt(param))) else if(param < 0) throw new IndexOutOfBoundsException else Left(empty)
+            case "codePointBefore" => 
+              if(str.exactValue.isDefined) Right(Values(string.codePointBefore(param))) else if(param < 1) throw new IndexOutOfBoundsException else Left(empty)
+            case "substring" => 
+              if(str.exactValue.isDefined) Left(new StringAttrs(Some(string.substring(param)))) else if(param < 0) throw new IndexOutOfBoundsException else Left(empty)
+            case "drop" => 
+              if(str.exactValue.isDefined) 
+                Left(new StringAttrs(Some(string.drop(param)))) 
+              else 
+                Left(new StringAttrs(minLength = math.max(str.minLength-param, 0), maxLength = if(str.maxLength != Int.MaxValue) math.max(str.maxLength-param, 0) else Int.MaxValue))
+            case "take" => 
+              if(str.exactValue.isDefined) 
+                Left(new StringAttrs(Some(string.take(param))))
+              else
+                Left(new StringAttrs(minLength = math.max(param, 0), maxLength = math.max(param, 0)))
+            case "dropRight" => 
+              if(str.exactValue.isDefined)
+                Left(new StringAttrs(Some(string.dropRight(param))))
+              else 
+                Left(new StringAttrs(minLength = math.max(str.minLength-param, 0), maxLength = if(str.maxLength != Int.MaxValue) math.max(str.maxLength-param, 0) else Int.MaxValue))
+            case "takeRight" => 
+              if(str.exactValue.isDefined) 
+                Left(new StringAttrs(Some(string.takeRight(param))))
+              else 
+                Left(new StringAttrs(minLength = math.max(param, 0), maxLength = math.max(param, 0)))
+            case a => Left(empty)
           } catch {
             case e: IndexOutOfBoundsException =>
               unit.warning(params.head.pos, "This index will likely cause an IndexOutOfBoundsException.")
@@ -794,7 +844,11 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         case If(cond, expr1, expr2) =>
           val (e1, e2) = (traverse(expr1), traverse(expr2))
           
-          new StringAttrs(minLength = math.min(e1.getMinLength, e2.getMinLength), trimmedMinLength = math.min(e1.getTrimmedMinLength, e2.getTrimmedMinLength))
+          new StringAttrs(
+            minLength = math.min(e1.getMinLength, e2.getMinLength), 
+            trimmedMinLength = math.min(e1.getTrimmedMinLength, e2.getTrimmedMinLength),
+            maxLength = math.max(e1.getMaxLength, e2.getMaxLength), 
+            trimmedMaxLength = math.max(e1.getTrimmedMaxLength, e2.getTrimmedMaxLength))
 
         case Apply(augmentString, List(expr)) if(augmentString.toString == "scala.this.Predef.augmentString") =>
           StringAttrs(expr)
@@ -821,43 +875,55 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       val exactValue: Option[String] = None,
       val name: Option[String] = None,
       val minLength: Int = 0,
-      val trimmedMinLength: Int = 0) {
+      val trimmedMinLength: Int = 0,
+      val maxLength: Int = Int.MaxValue,
+      val trimmedMaxLength: Int = Int.MaxValue) {
     
-    def addName(name: String): StringAttrs = new StringAttrs(exactValue, Some(name), minLength, trimmedMinLength)
+    def addName(name: String): StringAttrs = new StringAttrs(exactValue, Some(name), minLength, trimmedMinLength, maxLength, trimmedMaxLength)
     
     //println(this)
 
+    def alwaysIsEmpty = getMaxLength == 0
     def alwaysNonEmpty = getMinLength > 0
-    def getMinLength = math.max(minLength, exactValue.getOrElse("").length)
-    def getTrimmedMinLength = math.max(trimmedMinLength, exactValue.getOrElse("").trim.length)
+    
+    def getMinLength = exactValue.map(_.size).getOrElse(minLength)
+    def getMaxLength = exactValue.map(_.size).getOrElse(maxLength)
+    def getTrimmedMinLength = exactValue.map(_.trim.size).getOrElse(trimmedMinLength)
+    def getTrimmedMaxLength = exactValue.map(_.trim.size).getOrElse(trimmedMaxLength)
     
     def +(s: String) = 
       new StringAttrs(
         exactValue = if(this.exactValue.isDefined) Some(this.exactValue.get + s) else None,
         minLength = this.getMinLength + s.length,
-        trimmedMinLength = this.getTrimmedMinLength + s.trim.length //ADD: can be made more exact
+        trimmedMinLength = this.getTrimmedMinLength + s.trim.length, //ADD: can be made more exact
+        maxLength = if(this.maxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength + s.length,
+        trimmedMaxLength = if(this.trimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.trim.length 
       )
     def +(s: StringAttrs) = 
       new StringAttrs(
         exactValue = if(this.exactValue.isDefined && s.exactValue.isDefined) Some(this.exactValue.get + s.exactValue.get) else None,
         minLength = this.getMinLength + s.getMinLength,
-        trimmedMinLength = this.getTrimmedMinLength + s.getTrimmedMinLength //ADD: can be made more exact
+        trimmedMinLength = this.getTrimmedMinLength + s.getTrimmedMinLength, //ADD: can be made more exact
+        maxLength = if(this.maxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength + s.getMaxLength,
+        trimmedMaxLength = if(this.trimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.getTrimmedMaxLength
       )
     def *(n: Int) = 
       new StringAttrs(
         exactValue = if(this.exactValue.isDefined) Some(this.exactValue.get*n) else None,
         minLength = this.getMinLength*n,
-        trimmedMinLength = this.getTrimmedMinLength*n //ADD: can be made more exact
+        trimmedMinLength = this.getTrimmedMinLength*n, //ADD: can be made more exact
+        maxLength = if(this.maxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength*n,
+        trimmedMaxLength = if(this.trimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength*n
       )
     
-    override def hashCode: Int = /*if(exactValue.isDefined) exactValue.hashCode else */exactValue.hashCode + name.hashCode + minLength + trimmedMinLength
+    override def hashCode: Int = /*if(exactValue.isDefined) exactValue.hashCode else */exactValue.hashCode + name.hashCode + minLength + trimmedMinLength + maxLength + trimmedMaxLength
     override def equals(that: Any): Boolean = that match {
       case s: StringAttrs => (this.exactValue.isDefined && s.exactValue.isDefined && this.exactValue.get == s.exactValue.get)
       case s: String => exactValue.exists(_ == s)
       case _ => false
     }
     
-    override def toString = (exactValue, name, getMinLength, getTrimmedMinLength).toString
+    override def toString = (exactValue, name, getMinLength, getTrimmedMinLength, maxLength, trimmedMaxLength).toString
   }
  
   def traverseBlock(tree: GTree) {
@@ -878,7 +944,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       
       /// Assertions checks
       case Apply(Select(scala_Predef, assert), List(condExpr)) 
-        if (scala_Predef.tpe <:< definitions.PredefModule.tpe) && (assert.toString matches "assert|assume|require") => 
+        if (scala_Predef.tpe.widen <:< definitions.PredefModule.tpe) && (assert.toString matches "assert|assume|require") => 
         
         // we can apply these conditions to vals - if they don't hold, it'll throw an exception anyway
         // and they'll reset at the end of the current block

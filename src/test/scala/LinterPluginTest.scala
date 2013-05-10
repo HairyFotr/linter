@@ -523,6 +523,9 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
     should("""1/"fszdf".drop(10).size""")
     shouldnt("""1/"fszdf".drop(1).size""")
+    
+    should("""{ var a = "5"; val b = a.take(2).tail.tail.size; 1/b }""")
+    shouldnt("""{ var a = "5"; val b = a.take(2).tail.size; 1/b }""")
 
     msg = "String toInt"
     
