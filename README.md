@@ -6,26 +6,40 @@ It's currently very much a work in progress - some parts will need to be rewritt
 
 For a quick overview of writing compiler plugins, see http://www.scala-lang.org/node/140
 
-## Usage
+To see it in action, try running `sbt console` in this project's folder.
 
+## Usage
+### From sbt
 Add it as a compiler plugin to your project by editing your build.sbt file:
 
     resolvers += "linter" at "http://hairyfotr.github.io/linteRepo/releases"
 
     addCompilerPlugin("com.foursquare.lint" %% "linter" % "0.1-SNAPSHOT")
 
-Or, if you're working with a local jar:
+### Manually
+You can download the lateset snapshot here:
+[scala 2.11-M2](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar?raw=true), 
+[scala 2.10](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar?raw=true), 
+[scala 2.9.3](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.9.3/0.1-SNAPSHOT/linter_2.9.3-0.1-SNAPSHOT.jar?raw=true)
 
-    scalacOptions += "-Xplugin:<path-to-linter-jar>.jar"
+    scalac -Xplugin:<path-to-linter-jar>.jar ...
 
-Optionally, run `sbt console` in this project to see it in action.
+    sbt: (in build.sbt)
+      scalacOptions += "-Xplugin:<path-to-linter-jar>.jar"
+    
+    maven: (in pom.xml inside scala-maven-plugin configuration)
+      <configuration>
+        <args>
+          <arg>-Xplugin:<path-to-linter-jar>.jar</arg>
+        </args>
+      </configuration>
 
 ## Currently supported warnings
 
 __Note:__ Some of these checks are currently disabled, toned down, or maybe generalized.
 
-Also, there are a lot of new undocumented checks.
-Maybe check out the [test code](https://github.com/HairyFotr/linter/blob/master/src/test/scala/LinterPluginTest.scala#L95).
+But there are a lot of new undocumented checks.
+Check out the [test code](https://github.com/HairyFotr/linter/blob/master/src/test/scala/LinterPluginTest.scala#L95).
 
 ### Using `scala.io.Source.fromFile` without closing file
     scala> io.Source.fromFile("README.md").mkString
