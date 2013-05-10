@@ -507,6 +507,14 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   
   def abs_interpretation__StringAndInt() {
     implicit var msg = ""
+    msg = "string will never be empty"
+    should("""{ var a = 3; val b = ""+a; if(b.isEmpty) "foo" }""")
+    shouldnt("""{ var a = 3; val b = " "+a; if(b.isEmpty) "foo" }""")
+    
+    msg = "never hold"
+    should("""{ val a = 3; val b = ""+a; if(b.size != 1) "foo" }""")
+    should("""{ var a = 3; val b = ""+a; if(b.size > 15) "foo" }""")
+    
     msg = "by zero" //div by zero
     
     should("""{ val a = 1/"0".toInt }""")

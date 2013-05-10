@@ -72,7 +72,9 @@ class LinterPlugin(val global: Global) extends Plugin {
                 val used = for(Ident(name) <- tree if params contains name.toString) yield name.toString
                 val unused = params -- used
                 
-                unused.size match { //TODO: scalaz is a good codebase for finding interesting false positives
+                //TODO: scalaz is a good codebase for finding interesting false positives
+                //TODO: macro impl is special case?
+                unused.size match {
                   case 0 => //
                   case 1 => unit.warning(tree.pos, "Parameter %s is not used in method %s. (Add override if that's the reason)" format (unused.mkString(", "), name))
                   case _ => unit.warning(tree.pos, "Parameters (%s) are not used in method %s. (Add override if that's the reason)" format (unused.mkString(", "), name))

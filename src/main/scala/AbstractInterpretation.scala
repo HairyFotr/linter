@@ -711,11 +711,21 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           )
         case "$plus" if params.size == 1 =>
           val param = params.head
+          //println((str, intParam, param.tpe.widen))
           if(intParam.isValue) {
-            //println((str, intParam))
-            //println(Left(str + new StringAttrs(Some(intParam.getValue.toString))))
             Left(str + new StringAttrs(Some(intParam.getValue.toString)))
+          } else if(param.tpe.widen <:< definitions.IntClass.tpe) {
+            //println("IT HAPPENED")
+            //println((str, str + new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 11, trimmedMaxLength = 11)))
+            Left(str + new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 11, trimmedMaxLength = 11))
+          } else if(param.tpe.widen <:< definitions.LongClass.tpe) {
+            Left(str + new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 20, trimmedMaxLength = 20))
+          } else if(param.tpe.widen <:< definitions.DoubleClass.tpe || param.tpe.widen <:< definitions.FloatClass.tpe) {
+            //maxLength is possibly 154 for floats, but not sure
+            //http://stackoverflow.com/questions/1701055/what-is-the-maximum-length-in-chars-needed-to-represent-any-double-value :)
+            Left(str + new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 1079, trimmedMaxLength = 1079))
           } else {
+          //TODO: collections: minimal is Nil or Type()
             Left(str + StringAttrs(param))
           }
         case "$times" if params.size == 1 && computeExpr(params.head).isValue =>
@@ -897,23 +907,23 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         minLength = this.getMinLength + s.length,
         trimmedMinLength = this.getTrimmedMinLength + s.trim.length, //ADD: can be made more exact
         maxLength = if(this.maxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength + s.length,
-        trimmedMaxLength = if(this.trimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.trim.length 
+        trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.trim.length 
       )
     def +(s: StringAttrs) = 
       new StringAttrs(
         exactValue = if(this.exactValue.isDefined && s.exactValue.isDefined) Some(this.exactValue.get + s.exactValue.get) else None,
         minLength = this.getMinLength + s.getMinLength,
         trimmedMinLength = this.getTrimmedMinLength + s.getTrimmedMinLength, //ADD: can be made more exact
-        maxLength = if(this.maxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength + s.getMaxLength,
-        trimmedMaxLength = if(this.trimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.getTrimmedMaxLength
+        maxLength = if(this.getMaxLength == Int.MaxValue || s.getMaxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength + s.getMaxLength,
+        trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue || s.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.getTrimmedMaxLength
       )
     def *(n: Int) = 
       new StringAttrs(
         exactValue = if(this.exactValue.isDefined) Some(this.exactValue.get*n) else None,
         minLength = this.getMinLength*n,
         trimmedMinLength = this.getTrimmedMinLength*n, //ADD: can be made more exact
-        maxLength = if(this.maxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength*n,
-        trimmedMaxLength = if(this.trimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength*n
+        maxLength = if(this.getMaxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength*n,
+        trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength*n
       )
     
     override def hashCode: Int = /*if(exactValue.isDefined) exactValue.hashCode else */exactValue.hashCode + name.hashCode + minLength + trimmedMinLength + maxLength + trimmedMaxLength
@@ -923,7 +933,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case _ => false
     }
     
-    override def toString = (exactValue, name, getMinLength, getTrimmedMinLength, maxLength, trimmedMaxLength).toString
+    override def toString = (exactValue, name, getMinLength, getTrimmedMinLength, getMaxLength, getTrimmedMaxLength).toString
   }
  
   def traverseBlock(tree: GTree) {
