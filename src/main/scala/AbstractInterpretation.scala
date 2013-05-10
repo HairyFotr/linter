@@ -680,6 +680,32 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     //TODO: when merging, save known chunks - .contains then partially works
     def empty = new StringAttrs()
     
+    def toStringAttrs(param: Tree): StringAttrs = {
+      val intParam = computeExpr(param)
+      
+      if(intParam.isValue) new StringAttrs(Some(intParam.getValue.toString))
+      else if(param.tpe.widen <:< definitions.IntClass.tpe) new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 11, trimmedMaxLength = 11)
+      else if(param.tpe.widen <:< definitions.LongClass.tpe) new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 20, trimmedMaxLength = 20)
+      //http://stackoverflow.com/questions/1701055/what-is-the-maximum-length-in-chars-needed-to-represent-any-double-value :)
+      else if(param.tpe.widen <:< definitions.DoubleClass.tpe) new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 1079, trimmedMaxLength = 1079)
+      else if(param.tpe.widen <:< definitions.FloatClass.tpe) new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 154, trimmedMaxLength = 154)
+      else {
+        //TODO: not sure if this is the right way, but <:< definitions.TraversableClass.tpe does not work directly
+        if((param.tpe.baseClasses.exists(_.tpe =:= definitions.TraversableClass.tpe)) && !(param.tpe.widen <:< definitions.StringClass.tpe)) {
+          // collections: minimal is Nil or Type()
+          //TODO: Surely I can do moar... intParam.isSeq, etc
+          val minLen = 3
+          //println(Left(str + new StringAttrs(minLength = minLen, trimmedMinLength = minLen)))
+          new StringAttrs(minLength = minLen, trimmedMinLength = minLen)
+        } else {
+          //TODO:discover moar
+          //if(!(param.tpe.widen <:< definitions.StringClass.tpe) && !(param.tpe.widen <:< definitions.AnyClass.tpe))println(((str, param), (param.tpe, param.tpe.widen)))
+        
+          StringAttrs(param)
+        }
+      }
+    }
+    
     /// Tries to execute string functions and return either a String or Int representation
     def stringFunc(string: Tree, func: Name, params: List[Tree] = List[Tree]()): Either[StringAttrs, Values] = {
       val str = StringAttrs(string)
@@ -703,31 +729,14 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
               .getOrElse(
                 if(str.getMinLength == str.getMaxLength) 
                   Values(str.getMinLength)
-                else if(str.getMinLength > 0 && str.getMaxLength < Int.MaxValue) 
+                else 
                   Values(str.getMinLength, str.getMaxLength)
-                else
-                  Values.empty
               )
           )
+        case "toString" if params.size == 0 =>
+          Left(toStringAttrs(string))
         case "$plus" if params.size == 1 =>
-          val param = params.head
-          //println((str, intParam, param.tpe.widen))
-          if(intParam.isValue) {
-            Left(str + new StringAttrs(Some(intParam.getValue.toString)))
-          } else if(param.tpe.widen <:< definitions.IntClass.tpe) {
-            //println("IT HAPPENED")
-            //println((str, str + new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 11, trimmedMaxLength = 11)))
-            Left(str + new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 11, trimmedMaxLength = 11))
-          } else if(param.tpe.widen <:< definitions.LongClass.tpe) {
-            Left(str + new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 20, trimmedMaxLength = 20))
-          } else if(param.tpe.widen <:< definitions.DoubleClass.tpe || param.tpe.widen <:< definitions.FloatClass.tpe) {
-            //maxLength is possibly 154 for floats, but not sure
-            //http://stackoverflow.com/questions/1701055/what-is-the-maximum-length-in-chars-needed-to-represent-any-double-value :)
-            Left(str + new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 1079, trimmedMaxLength = 1079))
-          } else {
-          //TODO: collections: minimal is Nil or Type()
-            Left(str + StringAttrs(param))
-          }
+          Left(str + toStringAttrs(params.head))
         case "$times" if params.size == 1 && computeExpr(params.head).isValue =>
           Left(str * computeExpr(params.head).getValue)
 
@@ -835,6 +844,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           Left(empty)
           
         case _ =>
+          //if(str.exactValue.isDefined)println((str, func, params))
           Left(empty)
       }
     }
