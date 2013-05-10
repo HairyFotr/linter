@@ -689,7 +689,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       //println((string, func, params, str, intParam))
       //println(str.exactValue)
       //if(!(string.tpe.widen <:< definitions.StringClass.tpe))
-        //println((string, func, params, str, intParam))
+      //if((string.tpe.widen <:< definitions.StringClass.tpe))println((string, func, params, str, intParam))
             
       // We can get some information, even if the string is unknown
       //if(str == StringAttrs.empty) {
@@ -792,7 +792,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
               if(str.exactValue.isDefined) 
                 Left(new StringAttrs(Some(string.take(param))))
               else
-                Left(new StringAttrs(minLength = math.max(param, 0), maxLength = math.max(param, 0)))
+                Left(new StringAttrs(minLength = math.min(param, str.minLength), maxLength = math.max(param, 0)))
             case "dropRight" => 
               if(str.exactValue.isDefined)
                 Left(new StringAttrs(Some(string.dropRight(param))))
@@ -802,7 +802,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
               if(str.exactValue.isDefined) 
                 Left(new StringAttrs(Some(string.takeRight(param))))
               else 
-                Left(new StringAttrs(minLength = math.max(param, 0), maxLength = math.max(param, 0)))
+                Left(new StringAttrs(minLength = math.min(param, str.minLength), maxLength = math.max(param, 0)))
             case a => Left(empty)
           } catch {
             case e: IndexOutOfBoundsException =>
@@ -879,7 +879,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       val maxLength: Int = Int.MaxValue,
       val trimmedMaxLength: Int = Int.MaxValue) {
     
-    def addName(name: String): StringAttrs = new StringAttrs(exactValue, Some(name), minLength, trimmedMinLength, maxLength, trimmedMaxLength)
+    def addName(name: String): StringAttrs = new StringAttrs(exactValue, Some(name), getMinLength, trimmedMinLength, getMaxLength, trimmedMaxLength)
     
     //println(this)
 
@@ -976,7 +976,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         //ADD: aliasing... val a = i, where i is an iterator, then 1/i-a is divbyzero
         //ADD: isSeq and actualSize
 
-        if(expr.tpe.toString == "String") {
+        if(expr.tpe.widen <:< definitions.StringClass.tpe) {
           val str = StringAttrs(expr).addName(valName.toString)
           //println("str1: "+str)
           if(str.exactValue.isDefined || str.getMinLength > 0) {

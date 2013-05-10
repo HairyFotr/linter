@@ -526,6 +526,11 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     
     should("""{ var a = "5"; val b = a.take(2).tail.tail.size; 1/b }""")
     shouldnt("""{ var a = "5"; val b = a.take(2).tail.size; 1/b }""")
+    
+    should("""{ var b = "" ; val a = b.take(5)+" "; 1/(a.size-1); b.size }""")
+    should("""{ var b = "" ; val a = b.take(5)+" "; 1/(a.size-6); b.size }""")
+    shouldnt("""{ var b = "" ; val a = b.take(5)+" "; 1/(a.size-0); b.size }""")
+    shouldnt("""{ var b = "" ; val a = b.take(5)+" "; 1/(a.size-7); b.size }""")
 
     msg = "String toInt"
     

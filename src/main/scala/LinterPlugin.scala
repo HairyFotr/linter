@@ -367,7 +367,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             /// Checks if pattern matching on Option or Boolean
             var optionCase, booleanCase = false
-            val (optionCaseReg, booleanCaseReg) = ("(Some[\\[].*[\\]]|None[.]type)", "Boolean[(](true|false)[)]") //TODO: Hacky hack hack -_-, sorry
+            val (optionCaseReg, booleanCaseReg) = ("(Some[\\[].*[\\]]|None[.]type)", "Boolean[(](true|false)[)]") //TODO: Hacky hack hack -_-, sorry. use tpe <:< definitions.xxx.tpe
             def checkCase(caseTree: CaseDef) {
               val caseStr = caseTree.pat.toString
               val caseTypeStr = caseTree.pat.tpe.toString
