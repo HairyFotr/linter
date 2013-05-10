@@ -466,7 +466,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
   
   @Test
-  def abs_interpretation__string() {
+  def abs_interpretation__String() {
     implicit var msg = ""
     
     //TODO:
@@ -489,17 +489,46 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt("""{ val r = "a    b".distinct.tail; if(r.nonEmpty) "foo" }""")
     should("""{ val a = " ".trim; if(a.isEmpty) "foo" }""")
     shouldnt("""{ val a = " "; if(a.isEmpty) "foo" }""")
+    
+    msg = "return true"
+    should(""""fszd".startsWith("f")""")
+    shouldnt(""""fszd".startsWith("a")""")
+    should(""""fszd".endsWith("zd")""")
+    shouldnt(""""fszd".endsWith("a")""")
+    should(""""fszd".reverse.endsWith("sf")""")
 
+    msg = "return false"
+    shouldnt(""""fszd".startsWith("f")""")
+    should(""""fszd".startsWith("a")""")
+    shouldnt(""""fszd".endsWith("zd")""")
+    should(""""fszd".endsWith("a")""")
+    shouldnt(""""fszd".reverse.endsWith("sf")""")
+  }
+  
+  def abs_interpretation__StringAndInt() {
+    implicit var msg = ""
     msg = "by zero" //div by zero
     
     should("""{ val a = 1/"0".toInt }""")
     should("""{ val a = 5; if(a == 1/"0".toInt) "foo" }""")
     shouldnt("""{ val a = 1/"1".toInt }""")
 
+    should("""{ val a = "abc"; val b = 1/(a.size-3) }""")
+    should("""{ val a = "abc"; val b = a*a.size; 1/(b.size-(a*a.size).size) }""")
+    shouldnt("""{ val a = "abc"; val b = 1/(a.size-1) }""")
+    shouldnt("""{ val a = "abc"; val b = a*a.size; 1/(b.size-(a*a.size).size+1) }""")
+    
+    should("""1/"fszdf".take(0).size""")
+    shouldnt("""1/"fszdf".take(1).size""")
+
+    should("""1/"fszdf".drop(10).size""")
+    shouldnt("""1/"fszdf".drop(1).size""")
+
     msg = "String toInt"
     
     should("""{ val a = 1/"d0d".toInt }""")
     shouldnt("""{ val a = 1/"1".toInt }""")
+
   }
 
 
@@ -1227,6 +1256,16 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt("""{ val a = 5; for(i <- 1 until a) 5 }""")
   }
   
+  @Test
+  def def__recursion() {
+    implicit val msg = "infinite recursive call"
+    
+    should("""def k(a:Int):Int = 1 + k(a)""")
+    
+    shouldnt("""def k(a:Int):Int = 1 + k(a+1)""")
+  }
+
+
 /*
 src/main/scala/LinterPlugin.scala:        if(maybeVals.nonEmpty) unit.warning(tree.pos, "[experimental] These vars might secretly be vals: grep -rnP --include=*.scala 'var ([(][^)]*)?("+maybeVals.mkString("|")+")'")
 src/main/scala/AbstractInterpretation.scala:      if(neverHold) unit.warning(condExpr.pos, "This condition will never hold.")

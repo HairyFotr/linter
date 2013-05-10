@@ -485,7 +485,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         vals(n)
         
       // String size
-      case Apply(Select(Ident(id), length), List()) if stringVals.exists(_.name == Some(id.toString)) && length.toString == "length" =>
+      /*case Apply(Select(Ident(id), length), List()) if stringVals.exists(_.name == Some(id.toString)) && length.toString == "length" =>
         val exactValue = stringVals.find(_.name == Some(id.toString)).map(_.exactValue)
         exactValue.map(v => if(v.isDefined) Values(v.get.size) else Values.empty).getOrElse(Values.empty)
         
@@ -493,7 +493,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         if stringVals.exists(_.name == Some(id.toString)) && predef.toString == "scala.this.Predef" && augmentString.toString == "augmentString" && size.toString == "size" => 
         val exactValue = stringVals.find(_.name == Some(id.toString)).map(_.exactValue)
         exactValue.map(v => Values(v.size)).getOrElse(Values.empty)
-
+*/
       /// String stuff (TODO: there's a copy up at applyCond)
       case strFun @ Apply(Select(string, func), params) if string.tpe <:< definitions.StringClass.tpe =>
         StringAttrs.stringFunc(string, func, params).right.getOrElse(Values.empty)
@@ -683,13 +683,15 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     /// Tries to execute string functions and return either a String or Int representation
     def stringFunc(string: Tree, func: Name, params: List[Tree] = List[Tree]()): Either[StringAttrs, Values] = {
       val str = StringAttrs(string)
-      val intParam = if(params.size == 1 && params.head.tpe <:< definitions.IntClass.tpe) computeExpr(params.head) else Values.empty
+      lazy val intParam = if(params.size == 1 && params.head.tpe <:< definitions.IntClass.tpe) computeExpr(params.head) else Values.empty
+      lazy val stringParam = if(params.size == 1 && params.head.tpe <:< definitions.StringClass.tpe) StringAttrs(params.head) else empty
 
       //println((string, func, params, str, intParam))
       //println(str.exactValue)
       if(str == StringAttrs.empty) {
         Left(empty)
       } else func.toString match {
+        case "size"|"length" if params.size == 0 => Right(str.exactValue.map(v => Values(v.size)).getOrElse(Values.empty))
         case "$plus" if params.size == 1 =>
           val param = params.head
           if(intParam.isValue) {
@@ -707,6 +709,12 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         case "capitalize" if str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.capitalize)))
         case "distinct"   if str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.distinct)))
         case "reverse"    if str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.reverse)))
+        
+        //These come in (Char/String) versions
+        case "stringPrefix" if params.size == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stringPrefix)))
+        case "stripLineEnd" if params.size == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stripLineEnd)))
+        case "stripMargin"  if params.size == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stripMargin)))
+        
         case "toUpperCase" => Left(new StringAttrs(str.exactValue.map(_.toUpperCase), None, str.minLength, str.trimmedMinLength))
         case "toLowerCase" => Left(new StringAttrs(str.exactValue.map(_.toLowerCase), None, str.minLength, str.trimmedMinLength))
         case "trim" => 
@@ -725,19 +733,25 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
               unit.warning(treePosHolder.pos, "This String toInt conversion will likely fail.")
               Left(empty)
           }
-        case f @ ("charAt"|"codePointAt"|"codePointBefore"|"substring") if params.size == 1 && computeExpr(params.head).isValue =>
+        //str.func(Int)
+        case f @ ("charAt"|"codePointAt"|"codePointBefore"|"substring"
+                 |"apply"|"drop"|"take"|"dropRight"|"takeRight") if params.size == 1 && computeExpr(params.head).isValue =>
           val param = computeExpr(params.head).getValue
-          lazy val string = str.exactValue.get 
+          lazy val string = str.exactValue.get //lazy to avoid None.get... didn't use monadic, because I was lazy
 
           //println((string, param))
           
           //TODO use reflection, dummy :)
           try {
             f match {
-              case "charAt"          => if(str.exactValue.isDefined) { string.charAt(param); Left(empty) } else if(param < 0) throw new IndexOutOfBoundsException else Left(empty)
+              case "charAt"|"apply"  => if(str.exactValue.isDefined) { string.charAt(param); Left(empty) } else if(param < 0) throw new IndexOutOfBoundsException else Left(empty)
               case "codePointAt"     => if(str.exactValue.isDefined) Right(Values(string.codePointAt(param))) else if(param < 0) throw new IndexOutOfBoundsException else Left(empty)
               case "codePointBefore" => if(str.exactValue.isDefined) Right(Values(string.codePointBefore(param))) else if(param < 1) throw new IndexOutOfBoundsException else Left(empty)
               case "substring"       => if(str.exactValue.isDefined) Left(new StringAttrs(Some(string.substring(param)))) else if(param < 0) throw new IndexOutOfBoundsException else Left(empty)
+              case "drop"            => if(str.exactValue.isDefined) Left(new StringAttrs(Some(string.drop(param)))) else Left(empty)
+              case "take"            => if(str.exactValue.isDefined) Left(new StringAttrs(Some(string.take(param)))) else Left(empty)
+              case "dropRight"       => if(str.exactValue.isDefined) Left(new StringAttrs(Some(string.dropRight(param)))) else Left(empty)
+              case "takeRight"       => if(str.exactValue.isDefined) Left(new StringAttrs(Some(string.takeRight(param)))) else Left(empty)
               case a => Left(empty)
             }
           } catch {
@@ -747,6 +761,19 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
             case e: Exception =>
               Left(empty)
           }
+          
+        //str.func(String)
+        case f @ ("contains"|"startsWith"|"endsWith") if str.exactValue.isDefined && params.size == 1 && stringParam.exactValue.isDefined =>
+          val (string, param) = (str.exactValue.get, stringParam.exactValue.get)
+          
+          f match {
+            case "contains"   => unit.warning(params.head.pos, "This contains will always return "+string.contains(param)+".")
+            case "startsWith" => unit.warning(params.head.pos, "This startsWith will always return "+string.startsWith(param)+".")
+            case "endsWith"   => unit.warning(params.head.pos, "This endsWith will always return "+string.endsWith(param)+".")
+            case _ =>
+          }
+          Left(empty)
+          
         case _ =>
           Left(empty)
       }
