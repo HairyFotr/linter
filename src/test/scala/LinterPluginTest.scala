@@ -374,6 +374,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
   
   @Test
+  @Ignore
   def string__alreadyDefined() {
     implicit val msg = "You have defined that string as a val already"
     
@@ -753,7 +754,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     implicit val msg = "else-if has the same condition"
 
     should("""
-      |var a = "b"
+      |var a = "b"+util.Random.nextInt
       |if(a.size == 5) 
       |  println("hi")
       |else if(a.size == 5) 
@@ -793,7 +794,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should("""
       |var a = "b"
       |if(a.size == a.size) "foo"
-    """)
+    """)("will always hold")
     should("""
       |var a = "b"
       |val b = (a != a)
@@ -1350,6 +1351,7 @@ src/main/scala/AbstractInterpretation.scala:        unit.warning(pos.pos, "You w
 src/main/scala/AbstractInterpretation.scala:        unit.warning(pos.pos, "You will likely use a negative index for a collection here.")
 src/main/scala/AbstractInterpretation.scala:            unit.warning(pos.pos, "This function always returns the same value.")
 
+src/main/scala/LinterPlugin.scala:            val warnMsg = "You should close the file stream after use."
 src/main/scala/LinterPlugin.scala:            //val warnMsg = "Exact comparison of floating point values is potentially unsafe."
 src/main/scala/LinterPlugin.scala:            val warnMsg = "Comparing with == on instances of different types (%s, %s) will probably return false."
 src/main/scala/LinterPlugin.scala:            val warnMsg = "%s.contains(%s) will probably return false."

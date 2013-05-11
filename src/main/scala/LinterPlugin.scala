@@ -326,10 +326,10 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
             
             //TODO: Doesn't this already reach the abs-interpreter anyway?
-            if(abstractInterpretation.stringVals.exists(_.exactValue == Some(str))) {
+            /*if(abstractInterpretation.stringVals.exists(_.exactValue == Some(str))) {
               unit.warning(tree.pos, "You have defined that string as a val already, maybe use that?")
               abstractInterpretation.visitedBlocks += tree
-            }
+            }*/
 
           /// Processing a constant string: "hello".size
           case Apply(Select(pos @ Literal(Constant(s: String)), func), params) =>

@@ -914,7 +914,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       def traverse(tree: Tree): StringAttrs = tree match {
         case Literal(Constant(null)) => new StringAttrs(exactValue = Some("null"))
         case Literal(Constant(c)) => 
-          if(stringVals.exists(_.exactValue == Some(c.toString))) {
+          if(stringVals.filter(s => s.name.isDefined && !(vars contains s.name.get)).exists(_.exactValue == Some(c.toString))) {
             unit.warning(tree.pos, "You have defined that string as a val already, maybe use that?")
           }
 
@@ -1031,11 +1031,11 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     treePosHolder = tree
     tree match {
       /// Very hacky support for some var interpretion
-      case ValDef(m: Modifiers, varName, _, value) if(m.hasFlag(MUTABLE)) =>
+      /*case ValDef(m: Modifiers, varName, _, value) if(m.hasFlag(MUTABLE)) =>
         vars += varName.toString
         vals(varName.toString) = computeExpr(value)
         visitedBlocks += tree
-        //println("assign: "+(vals))
+        //println("assign: "+(vals))*/
       case Assign(varName, value) if vars contains varName.toString =>
         vals(varName.toString) = computeExpr(value)
         //println("reassign: "+(vals))
@@ -1075,12 +1075,12 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         vals = vals.map(a => (a._1, a._2.applyCond(condExpr)._1)).withDefaultValue(Values.empty)
       
       /// String checks
-      case s @ Literal(Constant(str: String)) if stringVals.find(_.exactValue == Some(str)).isDefined =>
+      case s @ Literal(Constant(str: String)) if stringVals.filter(s => s.name.isDefined && !(vars contains s.name.get)).find(_.exactValue == Some(str)).isDefined =>
         unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
         visitedBlocks += s
 
       case ValDef(m: Modifiers, valName, _, s @ Literal(Constant(str: String))) if(!m.hasFlag(MUTABLE) && !m.hasFlag(FINAL)) =>
-        if(stringVals.exists(_.exactValue == Some(str))) unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
+        if(stringVals.filter(s => s.name.isDefined && !(vars contains s.name.get)).exists(_.exactValue == Some(str))) unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
         //stringVals += str
         visitedBlocks += s
         
@@ -1096,7 +1096,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         vals += valNameStr -> Values(a, valNameStr)
         //println(vals(valName.toString))
 
-      case v@ValDef(m: Modifiers, valName, _, expr) if !m.hasFlag(MUTABLE) /*&& !m.hasFlag(LAZY)) && !computeExpr(expr).isEmpty*/ => //&& computeExpr(expr).isValue =>
+      case v@ValDef(m: Modifiers, valName, _, expr) => //if !m.hasFlag(MUTABLE) /*&& !m.hasFlag(LAZY)) && !computeExpr(expr).isEmpty*/ => //&& computeExpr(expr).isValue =>
         //ADD: aliasing... val a = i, where i is an iterator, then 1/i-a is divbyzero
         //ADD: isSeq and actualSize
 
@@ -1113,6 +1113,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         val valNameStr = valName.toString
         val res = computeExpr(expr).addName(valNameStr)
         vals += valNameStr -> res
+        if(m.hasFlag(MUTABLE)) vars += valNameStr
+        
        
         //println("newVal: "+computeExpr(expr).addName(valNameStr))
         //println("newVal: "+vals(valName.toString))
