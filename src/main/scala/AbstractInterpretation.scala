@@ -33,6 +33,31 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     
     (used > 0)
   }
+  
+  def getUsed(tree: GTree): collection.mutable.HashSet[String] = {
+    val used = collection.mutable.HashSet[String]()
+
+    def findUsed(tree: GTree) {
+      for(Ident(id) <- tree.children) used += id.toString
+
+      for(subTree <- tree.children; if (subTree != tree)) findUsed(subTree)
+    }
+    
+    findUsed(tree)
+    
+    used
+  }
+
+  def isAssigned(tree: GTree, name: String): Boolean = {
+    def findUsed(tree: GTree): Boolean = {
+      for(Assign(Ident(id), _) <- tree.children; if id.toString == name) return true
+      var out = false
+      for(subTree <- tree.children; if (subTree != tree)) out |= findUsed(subTree)
+      out
+    }
+    
+    findUsed(tree)
+  }
     
   def checkRegex(reg: String) {
     try {
@@ -43,6 +68,11 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case e: Exception =>
     }
   }
+
+  //Data structure ideas:
+  //1. common trait for Value, Collection, StringAttrs
+  //2. for Values: empty -> any, and add "nonValues" or "conditions" to cover
+  //   if(a == 0) ..., if(a%2 == 0) ... even for huge collections
 
   object Values {
     lazy val empty = new Values()
@@ -62,17 +92,42 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     //TODO implement interval tree
     //println(this)
    
-    def contains(i: Int): Boolean = (values contains i) || (ranges exists { case (low, high) => i >= low && i <= high })
+    def rangesContain(i: Int): Boolean = (ranges exists { case (low, high) => i >= low && i <= high })
+   
+    def contains(i: Int): Boolean = (values contains i) || rangesContain(i)
     def apply(i: Int) = contains(i)
-    def exists(func: Int => Boolean) = (values exists func) || (ranges exists { case (low, high) => (low to high) exists func })
-    def forall(func: Int => Boolean) = (values forall func) && (ranges forall { case (low, high) => (low to high) forall func })
+    //TODO: this crashes if (high-low) > Int.MaxValue - code manually, or break large ranges into several parts
+    //def exists(func: Int => Boolean) = (values exists func) || (ranges exists { case (low, high) => (low to high) exists func })
+    //def forall(func: Int => Boolean) = (values forall func) && (ranges forall { case (low, high) => (low to high) forall func })
+    def existsLower(i: Int) = (values exists { _ < i }) || (ranges exists { case (low, high) => low < i })
+    def existsGreater(i: Int) = (values exists { _ > i }) || (ranges exists { case (low, high) => high > i })
+    def forallEquals(i: Int) = (values forall { _ == i }) && (ranges forall { case (low, high) => (low == high) && (i == low) })
     
     def addRange(low: Int, high: Int): Values = new Values(ranges + (if(low > high) (high, low) else (low, high)), values, name, false, -1)
     def addValue(i: Int): Values = new Values(ranges, values + i, name, false, -1)
     def addSet(s: Set[Int]): Values = new Values(ranges, values ++ s, name, false, -1)
     def addName(s: String): Values = new Values(ranges, values, s, isSeq, actualSize)
     def addActualSize(s: Int): Values = new Values(ranges, values, name, isSeq, s)
-    def toValues = new Values(values = values ++ ranges.flatMap { case (low, high) => (low to high) }, name = name, isSeq = isSeq, actualSize = actualSize)
+    //TODO: this can go wrong in many ways - (low to high) limit, freeze on huge collection, etc
+    
+    def distinct: Values = {
+      val t = this.optimizeValues
+      //ADD: optimizeranges that makes them non-overlapping
+      if(values.size == 0 && ranges.size == 1) {
+        new Values(ranges = ranges, /*name = name,*/ isSeq = isSeq, actualSize = actualSize)
+      } else {
+        new Values(values = values ++ ranges.flatMap { case (low, high) => (low to high) }, /*name = name,*/ isSeq = isSeq, actualSize = actualSize)
+      }
+    }
+    //TODO: Is this correct for weird code?
+    def sum: Int = {
+      val t = this.distinct
+      t.values.sum + ranges.foldLeft(0)((acc, n) => acc + (n._1 to n._2).sum)
+    }
+    
+    // discard values, that are inside ranges
+    def optimizeValues = new Values(values = values.filter(v => !rangesContain(v)), ranges = ranges, name = name, isSeq = isSeq, actualSize = actualSize)
+    //def optimizeRanges = new Values(values = values, ranges = ranges.)
     
     def isEmpty = this.size == 0
     def nonEmpty = this.size > 0
@@ -115,10 +170,10 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       //println("expr: "+showRaw(condExpr))
       var alwaysHold, neverHold = false
       val out = condExpr match {
-        case Apply(Select(expr1, op), List(expr2)) if op == nme.ZAND => //&&
+        case Apply(Select(expr1, nme.ZAND), List(expr2)) => //&&
           this.applyCond(expr1)._1.applyCond(expr2)._1
           
-        case Apply(Select(expr1, op), List(expr2)) if op == nme.ZOR => //&&
+        case Apply(Select(expr1, nme.ZOR), List(expr2)) => //||
           val (left,right) = (this.applyCond(expr1)._1, this.applyCond(expr2)._1)
           new Values(
             left.ranges ++ right.ranges,
@@ -140,15 +195,15 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           val value = computeExpr(expr).getValue
           val out = op match {
             case nme.EQ => 
-              if(this.exists(_ == value)) {
-                if(this.forall(_ == value)) alwaysHold = true
+              if(this.contains(value)) {
+                if(this.forallEquals(value)) alwaysHold = true
                 Values(value).addName(name)
               } else { 
                 neverHold = true
                 Values.empty
               }
             case nme.NE => 
-              if(this.exists(_ == value)) {
+              if(this.contains(value)) {
                 val out = this.dropValue(value) 
                 if(out.isEmpty) neverHold = true
                 out
@@ -291,11 +346,14 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         }
       
       case to if (to.toString matches "toIndexedSeq|toList|toSeq|toVector") => this //only immutable
-      case distinct if (distinct.toString == "distinct") && this.actualSize != -1 => this.toValues.addActualSize(this.size)
+      case distinct if (distinct.toString == "distinct") && this.actualSize != -1 => 
+        val out = this.distinct
+        out.addActualSize(out.size)
+      
       case id if (id.toString matches "reverse") => this //Will hold, while Set is used for values
       case max if (max.toString == "max") && this.nonEmpty => Values(this.max)
       case min if (min.toString == "min") && this.nonEmpty => Values(this.min)
-      case sum if (sum.toString == "sum") && this.nonEmpty && this.toValues.size == this.actualSize => Values(this.toValues.values.sum)
+      case sum if (sum.toString == "sum") && this.nonEmpty && this.distinct.size == this.actualSize => Values(this.sum)
 
       case empty if (empty.toString == "isEmpty") && (this.actualSize != -1) => 
         unit.warning(treePosHolder.pos, "This condition will " + (if(this.actualSize == 0) "always" else "never") + " hold.")
@@ -729,6 +787,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
               .getOrElse(
                 if(str.getMinLength == str.getMaxLength) 
                   Values(str.getMinLength)
+                else if(str.getMinLength == 0 && str.getMaxLength == Int.MaxValue)
+                  Values.empty
                 else 
                   Values(str.getMinLength, str.getMaxLength)
               )
@@ -946,19 +1006,63 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     override def toString = (exactValue, name, getMinLength, getTrimmedMinLength, getMaxLength, getTrimmedMaxLength).toString
   }
  
+  var vars = collection.mutable.HashSet[String]()
+  var labels = collection.mutable.HashMap[String, GTree]()        
+  def discardVars(tree: GTree, force: String*) {
+    for(v <- vars; if isAssigned(tree, v) || (force contains v)) {
+      vals(v) = Values.empty
+      //println("discard: "+(vals))
+    }
+  }
+
   def traverseBlock(tree: GTree) {
     val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
+    val backupVars = vars.map(a=> a)
     val backupStrs = stringVals.clone
     
     traverse(tree)
     
     vals = backupVals.withDefaultValue(Values.empty)
+    vars = backupVars
     stringVals = backupStrs
   }
   def traverse(tree: GTree) {
     if(visitedBlocks(tree)) return else visitedBlocks += tree
     treePosHolder = tree
     tree match {
+      /// Very hacky support for some var interpretion
+      case ValDef(m: Modifiers, varName, _, value) if(m.hasFlag(MUTABLE)) =>
+        vars += varName.toString
+        vals(varName.toString) = computeExpr(value)
+        visitedBlocks += tree
+        //println("assign: "+(vals))
+      case Assign(varName, value) if vars contains varName.toString =>
+        vals(varName.toString) = computeExpr(value)
+        //println("reassign: "+(vals))
+        visitedBlocks += tree
+      
+      case LabelDef(label, List(), If(cond, body, unit)) if {
+        //discardVars(cond, (vars & getUsed(cond)).toSeq:_*)
+        //discardVars(body)
+        discardVars(tree, (vars & getUsed(tree)).toSeq:_*)
+        labels += label.toString -> tree
+        visitedBlocks += tree        
+        false
+      } => //Fallthrough
+      case Apply(label, List()) if (labels contains label.toString) && {
+        // TODO: check if there is an infinite...
+        // vals.filter(a => vars contains a._1).map(a => println(a._1, a._2.applyCond(labels(label.toString))._2))
+        
+        discardVars(labels(label.toString))//, (vars & getUsed(labels(label.toString))).toSeq:_*)
+
+        labels -= label.toString
+        false
+      } => //Fallthrough
+      case e if { //throw away assigns inside other blocks
+        discardVars(e)
+        false
+      } => //Fallthrough
+
       case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, _, _, _)), _))) =>
         forLoop(forloop)
       
@@ -1058,22 +1162,31 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         //println(seq.toString)
         //println("indexExpr: "+computeExpr(indexExpr))
         //println(showRaw(indexExpr))
-        if(vals.contains(seq.toString) && vals(seq.toString).actualSize != -1 && (computeExpr(indexExpr).exists { a => a >= vals(seq.toString).actualSize })) {
+        if(vals.contains(seq.toString) && vals(seq.toString).actualSize != -1 && (computeExpr(indexExpr).existsGreater(vals(seq.toString).actualSize-1))) {
           unit.warning(pos.pos, "You will likely use a too large index for a collection here.")
         }
-        if(computeExpr(indexExpr).exists { a => a < 0 }) {
+        if(computeExpr(indexExpr).existsLower(0)) {
           unit.warning(pos.pos, "You will likely use a negative index for a collection here.")
         }
       
       case DefDef(_, _, _, _, _, block) => 
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
         val backupStrs = stringVals.clone
-        traverse(block)
+        
+        if(block.children.isEmpty)
+          traverse(block)
+        else
+          block.children.foreach(traverse)
+          
         block match {
           //case Block(_, pos @ Literal(Constant(returnVal))) => 
             //unit.warning(pos.pos, "This function returns a constant.")
-          case Block(_, pos @ Ident(returnVal)) if vals(returnVal.toString).size == 1 && !vals(returnVal.toString).isSeq => 
-            unit.warning(pos.pos, "This function always returns the same value.")
+          //case Block(_, pos @ Ident(returnVal)) if vals(returnVal.toString).size == 1 && !vals(returnVal.toString).isSeq => 
+          case Block(_, returnVal) => 
+            if(computeExpr(returnVal).isValue) {
+              unit.warning(returnVal.pos, "This method always returns the same value. "+computeExpr(returnVal).getValue)
+            } else {
+            }
           case _ =>
         }
         vals = backupVals.withDefaultValue(Values.empty)
@@ -1098,11 +1211,30 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
                 
         StringAttrs(regExpr).exactValue.foreach(checkRegex)
 
-      case b @ Block(_, _) => 
+      case b @ Block(stmts, ret) => 
         //println("block: "+b)
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
         val backupStrs = stringVals.clone
-        tree.children.foreach(traverse)
+        b.children.foreach(traverse)
+        
+        /// Try to use vars - TODO: is probably buggy
+        /*val block = stmts :+ ret
+        val vars = collection.mutable.HashSet[String]()
+        block foreach {
+          case ValDef(m: Modifiers, varName, _, value) if(m.hasFlag(MUTABLE)) =>
+            vars += varName.toString
+            vals(varName.toString) = computeExpr(value)
+            println("assign: "+(vals))
+          case Assign(varName, value) if vars contains varName.toString =>
+            vals(varName.toString) = computeExpr(value)
+            println("reassign: "+(vals))
+          case e => //throw away assigns inside other blocks
+            for(v <- vars; if isAssigned(e, v)) {
+              vals(v) = Values.empty
+              println("discard: "+(vals))
+            }
+        }
+        */
         vals = backupVals.withDefaultValue(Values.empty)
         stringVals = backupStrs
 
@@ -1113,7 +1245,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         computeExpr(pos)
         tree.children.foreach(traverse)
 
-      case _ => 
+      case _ =>
         //if(vals.nonEmpty)println("in: "+showRaw(tree))
         //if(vals.nonEmpty)println(">   "+vals);
         //if(showRaw(tree).startsWith("Literal") || showRaw(tree).startsWith("Constant"))println("in: "+showRaw(tree))

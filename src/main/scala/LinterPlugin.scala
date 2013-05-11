@@ -481,6 +481,8 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             val block = init :+ last
             //TODO: var v; ...non v related stuff...; v = 4 <-- this is the same thing, really
+            
+            /// Checks on two subsequent statements
             (block zip block.tail) foreach { 
               case (ValDef(modifiers, id1, _, _), Assign(id2, assign)) if id1.toString == id2.toString && !abstractInterpretation.isUsed(assign, id2.toString)=>
                 unit.warning(id2.pos, "Assignment right after declaration is most likely a bug (unless you side-effect like a boss)")

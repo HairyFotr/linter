@@ -459,10 +459,9 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should("""{ val k = 4; val a = List(1,2,3); if(a.size == k) for(i <- a) 1/i }""")("This condition will never hold.")
     should("""{ val k = 1; val a = List(1,2,3); for(i <- a) 1/(i-k) }""")("You will likely divide by zero here.")
     
-    //TODO: I hope these will be shoulds one day - need to interpret vars as well
-    shouldnt("""{ var k = 3; val a = List(1,2,3); if(a.size == k) for(i <- a) 1/i }""")("This condition will always hold.")
-    shouldnt("""{ var k = 4; val a = List(1,2,3); if(a.size == k) for(i <- a) 1/i }""")("This condition will never hold.")
-    shouldnt("""{ var k = 1; val a = List(1,2,3); for(i <- a) 1/(i-k) }""")("You will likely divide by zero here.")
+    should("""{ var k = 3; val a = List(1,2,3); if(a.size == k) for(i <- a) 1/i }""")("This condition will always hold.")
+    should("""{ var k = 4; val a = List(1,2,3); if(a.size == k) for(i <- a) 1/i }""")("This condition will never hold.")
+    should("""{ var k = 1; val a = List(k,2,3); for(i <- a) 1/(i-k) }""")("You will likely divide by zero here.")
   }
   
   @Test
@@ -552,7 +551,19 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt("""{ val a = 1/("1"+0).toInt }""")
   }
 
+  @Test
+  def abs_interpretation__vartests() {
+    implicit var msg = ""
+    
+    //TODO: this should read both as test, and an invitation to improve where the value is actually obvious
+    
+    should("""{ var b = 3; 1/(b-3) }""")("divide by zero")
+    shouldnt("""{ var b = 3; { b = 3; 1+1; }; 1/(b-3) }""")("divide by zero") //but could
+    shouldnt("""{ var b = 3; { b = 4; 1+1; }; 1/(b-3) }""")("divide by zero")
 
+    should("""{ var b = 3; for(i <- 1 to 10) { b = i; 1/(b-3) } }""")("divide by zero")
+  }
+  
   @Test
   def regex__syntaxErrors() {
     implicit var msg = "Regex pattern syntax warning"
@@ -750,6 +761,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     """)
     should("""
       |var a = 5
+      |a = util.Random.nextInt
       |val b = 
       |  if(a == 4) 
       |    println("hi")
@@ -821,11 +833,11 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     implicit val msg = "Yoda conditions"
 
     should("""
-      |var a = 5
+      |var a = util.Random.nextInt
       |if(5 == a) "foo"
     """)
     shouldnt("""
-      |var a = 5
+      |var a = util.Random.nextInt
       |if(a == 5) "foo"
     """)
   }
@@ -1285,7 +1297,27 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     
     shouldnt("""def k(a:Int):Int = 1 + k(a+1)""")
   }
-
+  
+  @Test
+  def def__constant() {
+    implicit val msg = "This method always returns the same value."
+    
+    should("""{ def k:Int = { val a = 0; val b = a+2; a+1 } }""")
+    shouldnt("""{ def k(x:Int):Int = { val a = 0; val b = a+2; b+x } }""")
+  }
+  
+  
+  //stuff that doesn't work and I don't know why
+  @Test 
+  def broken() {
+  
+    //doesn't warn if you delete 'def precision = '
+    shouldnt("""def a { val a = 0; def precision = if (a == 0) 1.0 else 5 / a }""")("You will likely divide by zero here.")
+    
+    //room for optimization (or rewritting) of Values class
+    //this doesn't freeze anymore, but it's not good
+    //{ val a = (1 to 2000000).sum }
+  }
 
 /*
 src/main/scala/LinterPlugin.scala:        if(maybeVals.nonEmpty) unit.warning(tree.pos, "[experimental] These vars might secretly be vals: grep -rnP --include=*.scala 'var ([(][^)]*)?("+maybeVals.mkString("|")+")'")
@@ -1318,7 +1350,6 @@ src/main/scala/AbstractInterpretation.scala:        unit.warning(pos.pos, "You w
 src/main/scala/AbstractInterpretation.scala:        unit.warning(pos.pos, "You will likely use a negative index for a collection here.")
 src/main/scala/AbstractInterpretation.scala:            unit.warning(pos.pos, "This function always returns the same value.")
 
-src/main/scala/LinterPlugin.scala:            val warnMsg = "You should close the file stream after use."
 src/main/scala/LinterPlugin.scala:            //val warnMsg = "Exact comparison of floating point values is potentially unsafe."
 src/main/scala/LinterPlugin.scala:            val warnMsg = "Comparing with == on instances of different types (%s, %s) will probably return false."
 src/main/scala/LinterPlugin.scala:            val warnMsg = "%s.contains(%s) will probably return false."
