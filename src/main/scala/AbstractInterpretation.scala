@@ -1225,7 +1225,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           //case Block(_, pos @ Ident(returnVal)) if vals(returnVal.toString).size == 1 && !vals(returnVal.toString).isSeq => 
           case Block(_, returnVal) => 
             if(computeExpr(returnVal).isValue) {
-              unit.warning(returnVal.pos, "This method always returns the same value. "+computeExpr(returnVal).getValue)
+              unit.warning(returnVal.pos, "This method always returns the same value: "+computeExpr(returnVal).getValue)
             } else {
             }
           case _ =>
@@ -1252,6 +1252,14 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
                 
         StringAttrs(regExpr).exactValue.foreach(checkRegex)
 
+      /// Option checks
+      /// Checks for Option[Traversable[A]].size, which is probably a bug (use .isDefined instead)
+      case t @ Select(Apply(option2Iterable, List(opt)), size)
+        if (option2Iterable.toString contains "Option.option2Iterable") && size.toString == "size" 
+        && opt.tpe.widen.typeArguments.exists(tp => tp.widen <:< definitions.StringClass.tpe || tp.widen.baseClasses.exists(_.tpe =:= definitions.TraversableClass.tpe)) =>
+        
+        unit.warning(t.pos, "Did you mean to take the size of the collection inside the Option?")
+        
       //ADD: Generalize... move to applyCond completely, make it less hacky
       case t @ Apply(Select(Select(Apply(option2Iterable, List(opt)), size), op), List(expr))
         if (option2Iterable.toString contains "Option.option2Iterable") && size.toString == "size" && t.tpe.widen <:< definitions.BooleanClass.tpe =>

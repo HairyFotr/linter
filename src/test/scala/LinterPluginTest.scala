@@ -507,7 +507,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     msg = "IndexOutOfBoundsException"
     should(""""abcd".substring(2,77).endsWith("cd")""")
     should(""""abcd".substring(2,1).endsWith("cd")""")
-    should("""{ val a = "abcd"; a.substring(2,2).tail }""")("Taking the tail of an empty string.")
+    should("""{ val a = "abcd"; val b = a.substring(2,2).tail }""")("Taking the tail of an empty string.")
     should(""""abcd".substring(0,2).charAt(6)""")
     should(""""abcd".substring(-1,2).endsWith("cd")""")
     should(""""abcd".substring(78,89).endsWith("cd")""")
@@ -529,6 +529,11 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt("""List(2).headOption.size == 1""")("will never hold")
     shouldnt("""List(2).headOption.size == 1""")("will always hold")
   
+    implicit val msg = "Did you mean to take the size of the collection inside the Option?"
+    should("""Option(List(2)).size""")
+    should("""Option("fdsfd").size""")
+    should("""List(List(2)).headOption.size""")
+    shouldnt("""List(2).headOption.size""")
   }
   
   def abs_interpretation__StringAndInt() {
@@ -1330,7 +1335,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   
   @Test
   def def__constant() {
-    implicit val msg = "This method always returns the same value."
+    implicit val msg = "This method always returns the same value"
     
     should("""{ def k:Int = { val a = 0; val b = a+2; a+1 } }""")
     shouldnt("""{ def k(x:Int):Int = { val a = 0; val b = a+2; b+x } }""")
