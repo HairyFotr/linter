@@ -61,7 +61,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     
   def checkRegex(reg: String) {
     try {
-      reg.r
+      val regex = reg.r
     } catch {
       case e: java.util.regex.PatternSyntaxException =>
         unit.warning(treePosHolder.pos, "Regex pattern syntax warning: "+e.getDescription)
@@ -113,10 +113,10 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     def distinct: Values = {
       val t = this.optimizeValues
       //ADD: optimizeranges that makes them non-overlapping
-      if(values.size == 0 && ranges.size == 1) {
-        new Values(ranges = ranges, /*name = name,*/ isSeq = isSeq, actualSize = actualSize)
+      if(t.values.size == 0 && t.ranges.size == 1) {
+        new Values(ranges = t.ranges, /*name = name,*/ isSeq = isSeq, actualSize = actualSize)
       } else {
-        new Values(values = values ++ ranges.flatMap { case (low, high) => (low to high) }, /*name = name,*/ isSeq = isSeq, actualSize = actualSize)
+        new Values(values = t.values ++ t.ranges.flatMap { case (low, high) => (low to high) }, /*name = name,*/ isSeq = isSeq, actualSize = actualSize)
       }
     }
     //TODO: Is this correct for weird code?
@@ -181,7 +181,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
             this.name)
 
         /// String stuff
-        case strFun @ Apply(Select(string, func), params) if string.tpe.widen <:< definitions.StringClass.tpe =>
+        case strFun @ Apply(Select(string, func), params) if string.tpe != null && string.tpe.widen <:< definitions.StringClass.tpe =>
           computeExpr(strFun)
           
         case strFun @ Select(Apply(scala_augmentString, List(string)), func)
@@ -768,6 +768,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     def stringFunc(string: Tree, func: Name, params: List[Tree] = List[Tree]()): Either[StringAttrs, Values] = {
       val str = StringAttrs(string)
       lazy val intParam = if(params.size == 1 && params.head.tpe.widen <:< definitions.IntClass.tpe) computeExpr(params.head) else Values.empty
+      lazy val intParams = if(params.forall(_.tpe.widen <:< definitions.IntClass.tpe)) params.map(computeExpr).toList else List() //option?
       lazy val stringParam = if(params.size == 1 && params.head.tpe.widen <:< definitions.StringClass.tpe) StringAttrs(params.head) else empty
 
       //println((string, func, params, str, intParam))
@@ -797,18 +798,18 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           Left(toStringAttrs(string))
         case "$plus" if params.size == 1 =>
           Left(str + toStringAttrs(params.head))
-        case "$times" if params.size == 1 && computeExpr(params.head).isValue =>
-          Left(str * computeExpr(params.head).getValue)
+        case "$times" if intParam.isValue =>
+          Left(str * intParam.getValue)
 
-        case "init" => 
-          if(str.exactValue.isDefined)
-            Left(new StringAttrs(str.exactValue.map(_.init)))
-          else
-            Left(new StringAttrs(minLength = math.max(str.minLength-1, 0), maxLength = if(str.maxLength != Int.MaxValue) math.max(str.maxLength-1, 0) else Int.MaxValue))
-        case "tail" => 
-          if(str.exactValue.isDefined)
-            Left(new StringAttrs(str.exactValue.map(_.tail)))
-          else
+        case f @ ("init"|"tail") => 
+          if(str.exactValue.isDefined) {
+            if(str.exactValue.get.isEmpty) {
+              unit.warning(treePosHolder.pos, "Taking the "+f+" of an empty string.")
+              Left(empty)
+            } else {
+              Left(new StringAttrs(str.exactValue.map(a => if(f=="init") a.init else a.tail)))
+            }
+          } else
             Left(new StringAttrs(minLength = math.max(str.minLength-1, 0), maxLength = if(str.maxLength != Int.MaxValue) math.max(str.maxLength-1, 0) else Int.MaxValue))
 
         case "capitalize" if str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.capitalize)))
@@ -846,8 +847,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           }
         //str.func(Int)
         case f @ ("charAt"|"codePointAt"|"codePointBefore"|"substring"
-                 |"apply"|"drop"|"take"|"dropRight"|"takeRight") if params.size == 1 && computeExpr(params.head).isValue =>
-          val param = computeExpr(params.head).getValue
+                 |"apply"|"drop"|"take"|"dropRight"|"takeRight") if intParam.isValue =>
+          val param = intParam.getValue
           lazy val string = str.exactValue.get //lazy to avoid None.get... didn't use monadic, because I was lazy
 
           //println((string, param))
@@ -892,17 +893,54 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           }
           
         //str.func(String)
-        case f @ ("contains"|"startsWith"|"endsWith") if str.exactValue.isDefined && params.size == 1 && stringParam.exactValue.isDefined =>
+        case f @ ("contains"|"startsWith"|"endsWith") if str.exactValue.isDefined && stringParam.exactValue.isDefined =>
           val (string, param) = (str.exactValue.get, stringParam.exactValue.get)
+          
+          //TODO: calculate with lengths - (maxLength == 5) will never contain (minLength == 7)
           
           f match {
             case "contains"   => unit.warning(params.head.pos, "This contains will always return "+string.contains(param)+".")
             case "startsWith" => unit.warning(params.head.pos, "This startsWith will always return "+string.startsWith(param)+".")
             case "endsWith"   => unit.warning(params.head.pos, "This endsWith will always return "+string.endsWith(param)+".")
+            case "compare"    => unit.warning(params.head.pos, "This compare will always return "+string.compare(param)+".")
+            case "compareTo"  => unit.warning(params.head.pos, "This compare will always return "+string.compareTo(param)+".")
             case _ =>
           }
           Left(empty)
           
+        //str.func(X, X)
+        case f @ ("substring"|"codePointCount") if intParams.size == 2 && intParams.forall(_.isValue) =>
+          lazy val string = str.exactValue.get //lazy to avoid None.get... didn't use monadic, because I was lazy
+          val param = intParams.map(_.getValue)
+
+          //println((string, param))
+          
+          try f match {
+            case "substring" =>
+              if(str.exactValue.isDefined) 
+                Left(new StringAttrs(Some(string.substring(param(0), param(1)))))
+              else if(param(0) < 0 || param(1) < param(0) || param(0) >= str.getMaxLength || param(1) >= str.getMaxLength)
+                throw new IndexOutOfBoundsException
+              else if(param(0) == param(1))
+                Left(new StringAttrs(Some("")))
+              else
+                Left(empty)
+            case "codePointCount" =>
+              if(str.exactValue.isDefined) 
+                Right(Values(string.codePointCount(param(0), param(1))))
+              else if(param(0) < 0 || param(1) < param(0) || param(0) >= str.getMaxLength || param(1) >= str.getMaxLength)
+                throw new IndexOutOfBoundsException
+              else
+                Left(empty)
+            case a => Left(empty)
+          } catch {
+            case e: IndexOutOfBoundsException =>
+              unit.warning(params.head.pos, "This index will likely cause an IndexOutOfBoundsException.")
+              Left(empty)
+            case e: Exception =>
+              Left(empty)
+          }        
+        
         case _ =>
           //if(str.exactValue.isDefined)println((str, func, params))
           Left(empty)
@@ -1011,6 +1049,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   def discardVars(tree: GTree, force: String*) {
     for(v <- vars; if isAssigned(tree, v) || (force contains v)) {
       vals(v) = Values.empty
+      stringVals = stringVals.filter(v => v.name.isDefined && !(vars contains v.name.get))
       //println("discard: "+(vals))
     }
   }
@@ -1212,6 +1251,25 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         treePosHolder = regExpr
                 
         StringAttrs(regExpr).exactValue.foreach(checkRegex)
+
+      //ADD: Generalize... move to applyCond completely, make it less hacky
+      case t @ Apply(Select(Select(Apply(option2Iterable, List(opt)), size), op), List(expr))
+        if (option2Iterable.toString contains "Option.option2Iterable") && size.toString == "size" && t.tpe.widen <:< definitions.BooleanClass.tpe =>
+
+        val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
+        val backupStrs = stringVals.clone
+
+        val valName = "__foobar__" //shoot me :P
+        
+        vals += valName -> (new Values(values = Set(0,1)))
+        
+        val cond = Apply(Select(Ident(newTermName(valName)), op), List(expr))
+        cond.pos = t.pos
+        
+        vals(valName).applyCond(cond)
+        
+        vals = backupVals.withDefaultValue(Values.empty)
+        stringVals = backupStrs
 
       case b @ Block(stmts, ret) => 
         //println("block: "+b)

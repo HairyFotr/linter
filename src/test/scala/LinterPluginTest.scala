@@ -450,8 +450,6 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def abs_interpretation__listAndCondition() {
-    implicit var msg = ""
-    
     //isUsed is the suspect, if this fails inside the if
     should("""{ val a = List(1,2,3); if(a.size == 3) for(i <- a) 1/i }""")("This condition will always hold.")
     should("""{ val a = List(1,2,3); if(a.size > 3) for(i <- a) 1/i }""")("This condition will never hold.")
@@ -489,6 +487,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt("""{ val r = "a    b".distinct.tail; if(r.nonEmpty) "foo" }""")
     should("""{ val a = " ".trim; if(a.isEmpty) "foo" }""")
     shouldnt("""{ val a = " "; if(a.isEmpty) "foo" }""")
+    should("""{ val a = "   ".substring(2,2); if(a.isEmpty) "foo" }""")
     
     msg = "return true"
     should(""""fszd".startsWith("f")""")
@@ -496,6 +495,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should(""""fszd".endsWith("zd")""")
     shouldnt(""""fszd".endsWith("a")""")
     should(""""fszd".reverse.endsWith("sf")""")
+    should(""""abcd".substring(2,4).endsWith("cd")""")
 
     msg = "return false"
     shouldnt(""""fszd".startsWith("f")""")
@@ -503,6 +503,32 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt(""""fszd".endsWith("zd")""")
     should(""""fszd".endsWith("a")""")
     shouldnt(""""fszd".reverse.endsWith("sf")""")
+
+    msg = "IndexOutOfBoundsException"
+    should(""""abcd".substring(2,77).endsWith("cd")""")
+    should(""""abcd".substring(2,1).endsWith("cd")""")
+    should("""{ val a = "abcd"; a.substring(2,2).tail }""")("Taking the tail of an empty string.")
+    should(""""abcd".substring(0,2).charAt(6)""")
+    should(""""abcd".substring(-1,2).endsWith("cd")""")
+    should(""""abcd".substring(78,89).endsWith("cd")""")
+    shouldnt(""""abcd".substring(2,4).endsWith("cd")""")
+
+    should(""""abcd".charAt(22)""")
+    shouldnt(""""abcd".charAt(2)""")
+
+    should(""""abcd"(22)""")
+    shouldnt(""""abcd"(2)""")
+  }
+  
+  def abs_interpretation__Option() {
+    
+    should("""List(2).headOption.size < 0""")("will never hold")
+    should("""List(2).headOption.size > 1""")("will never hold")
+    should("""val a = 55; List(2).headOption.size < a""")("will always hold")
+    
+    shouldnt("""List(2).headOption.size == 1""")("will never hold")
+    shouldnt("""List(2).headOption.size == 1""")("will always hold")
+  
   }
   
   def abs_interpretation__StringAndInt() {
@@ -554,8 +580,6 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def abs_interpretation__vartests() {
-    implicit var msg = ""
-    
     //TODO: this should read both as test, and an invitation to improve where the value is actually obvious
     
     should("""{ var b = 3; 1/(b-3) }""")("divide by zero")
@@ -563,11 +587,16 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt("""{ var b = 3; { b = 4; 1+1; }; 1/(b-3) }""")("divide by zero")
 
     should("""{ var b = 3; for(i <- 1 to 10) { b = i; 1/(b-3) } }""")("divide by zero")
+
+    should("""{ var b = "3"; 1/(b.toInt-3) }""")("divide by zero")
+    //TODO: in the for loop it doesn't warn even if there is a problem, because range to string is not covered
+    shouldnt("""{ var b = "0"; for(i <- 1 to 10) { b = i.toString; 1/(b.toInt-333) }; 1/b.toInt }""")("divide by zero")
+    shouldnt("""{ var b = "0"; for(i <- -4 to 0) { b = i.toString; 1/(b.toInt-333) }; 1/b.toInt }""")("divide by zero")
   }
   
   @Test
   def regex__syntaxErrors() {
-    implicit var msg = "Regex pattern syntax warning"
+    implicit val msg = "Regex pattern syntax warning"
     
     should("""
       |"*+".r
@@ -650,7 +679,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   
   @Test
   def numeric_log1p() {
-    implicit var msg = "Use math.log1p(x) instead of"// math.log(1 + x) for added accuracy"
+    implicit val msg = "Use math.log1p(x) instead of"// math.log(1 + x) for added accuracy"
     should("""
       |val a = 4d
       |math.log(1 + a)
@@ -687,7 +716,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
 
   def numeric_exp1m() {
-    implicit var msg = "Use math.expm1(x) instead of"// math.exp(x) - 1 for added accuracy (if x is near 1).
+    implicit val msg = "Use math.expm1(x) instead of"// math.exp(x) - 1 for added accuracy (if x is near 1).
     should("""
       |val a = 4d
       |math.exp(a) - 1
@@ -1313,10 +1342,14 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   def broken() {
   
     //doesn't warn if you delete 'def precision = '
+    shouldnt("""def a { val a = 0; if (a == 0) 1.0 else 5 / a }""")("You will likely divide by zero here.") //passes
     shouldnt("""def a { val a = 0; def precision = if (a == 0) 1.0 else 5 / a }""")("You will likely divide by zero here.")
     
+    //works in the console, doesn't if you put { } around it
+    should("""val a = "abcd"; a.substring(2,2).tail""")("Taking the tail of an empty string.")
+    
     //room for optimization (or rewritting) of Values class
-    //this doesn't freeze anymore, but it's not good
+    //this simple doesn't freeze anymore, but it can be done
     //{ val a = (1 to 2000000).sum }
   }
 

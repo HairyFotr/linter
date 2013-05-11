@@ -19,7 +19,7 @@ name := "linter"
 
 organization := "com.foursquare.lint"
 
-crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.11.0-M2", "2.10.1", "2.9.2", "2.9.3") }
+crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.9.2", "2.9.3", "2.10.1", "2.11.0-M2") }
 
 publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
 
@@ -27,6 +27,6 @@ publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
 
 scalacOptions ++= Seq("-unchecked", "-Xlint")
 
-//scalacOptions ++= Seq("-Ywarn-all", "-Ywarn-dead-code", "-Ywarn-inaccessible", "-Ywarn-nullary-override", "-Ywarn-nullary-unit", "-Ywarn-value-discard")
+scalacOptions ++= Seq(/*"-Ywarn-all",*/ "-Ywarn-dead-code", "-Ywarn-inaccessible", "-Ywarn-nullary-override", "-Ywarn-nullary-unit", "-Ywarn-value-discard")
 
 //scalacOptions += "-Xplugin:../linteRepo/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar"
