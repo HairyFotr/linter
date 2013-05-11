@@ -1256,8 +1256,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       /// Checks for Option[Traversable[A]].size, which is probably a bug (use .isDefined instead)
       case t @ Select(Apply(option2Iterable, List(opt)), size)
         if (option2Iterable.toString contains "Option.option2Iterable") && size.toString == "size" 
-        && opt.tpe.widen.typeArguments.exists(tp => tp.widen <:< definitions.StringClass.tpe || tp.widen.baseClasses.exists(_.tpe =:= definitions.TraversableClass.tpe)) =>
-        
+        && opt.tpe.widen.typeArgs.exists(tp => tp.widen <:< definitions.StringClass.tpe || tp.widen.baseClasses.exists(_.tpe =:= definitions.TraversableClass.tpe)) =>
+
         unit.warning(t.pos, "Did you mean to take the size of the collection inside the Option?")
         
       //ADD: Generalize... move to applyCond completely, make it less hacky
