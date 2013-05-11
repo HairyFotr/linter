@@ -31,4 +31,11 @@ scalacOptions ++= Seq(/*"-Ywarn-all",*/ "-Ywarn-dead-code", "-Ywarn-inaccessible
 
 //scalacOptions += "-Xplugin:../linteRepo/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar"
 
+//Also, what others are doing ;)
+
 org.scalastyle.sbt.ScalastylePlugin.Settings
+
+
+//import de.johoop.findbugs4sbt.FindBugs._
+
+seq(findbugsSettings : _*)
