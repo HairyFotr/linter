@@ -1108,8 +1108,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         forLoop(forloop)
       
       /// Assertions checks
-      case Apply(Select(scala_Predef, assert), List(condExpr)) 
-        if (scala_Predef.tpe.widen <:< definitions.PredefModule.tpe) && (assert.toString matches "assert|assume|require") => 
+      case Apply(Select(scala_Predef, assertion), List(condExpr)) 
+        if (scala_Predef.tpe.widen <:< definitions.PredefModule.tpe) && (assertion.toString matches "assert|assume|require") => 
         
         // we can apply these conditions to vals - if they don't hold, it'll throw an exception anyway
         // and they'll reset at the end of the current block
