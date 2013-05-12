@@ -4,9 +4,7 @@ Linter is a Scala compiler plugin that adds compile-time checks to help protect 
 
 It's currently very much a work in progress - some parts will need to be rewritten.
 
-For a quick overview of writing compiler plugins, see http://www.scala-lang.org/node/140
-
-To see it in action, try running `sbt console` in this project's folder.
+To see it in action, run `sbt console` in this project's folder, or try it out on your code.
 
 ## Usage
 ### From sbt
@@ -36,10 +34,9 @@ You can download the latest snapshot here:
 
 ## Currently supported warnings
 
-__Note:__ Some of these checks are currently disabled, toned down, or maybe generalized.
+__Note:__ This list is out of date. There are many new checks, and some of those listed below are currently disabled or modified.
 
-But there are a lot of new undocumented checks.
-Check out the [test code](https://github.com/HairyFotr/linter/blob/master/src/test/scala/LinterPluginTest.scala#L95).
+Please check out the [test code](https://github.com/HairyFotr/linter/blob/master/src/test/scala/LinterPluginTest.scala#L95) for a more current view.
 
 ### Using `scala.io.Source.fromFile` without closing file
     scala> io.Source.fromFile("README.md").mkString
@@ -153,7 +150,7 @@ Check out the [test code](https://github.com/HairyFotr/linter/blob/master/src/te
 
 ## Future Work
 
-* Add more warnings
+* Add more checks
 * Add more tests, report false positives
 * Pick and choose which warnings you want
 * Choose whether they should be warnings or errors
@@ -163,14 +160,21 @@ Check out the [test code](https://github.com/HairyFotr/linter/blob/master/src/te
 
 Feel free to implement these, or add your own ideas. Pull requests welcome!
 
-* Modularize the wildcard import warnings like the "Avoid Star Import" configuration of checkstyle
- (http://checkstyle.sourceforge.net/config_imports.html)
-* Require explicit `override` whenever a method is being overwritten
+* Require explicit `override` whenever a method is being overridden
 * Expressions spanning multiple lines should be enclosed in parentheses
-* Warn on unrestricted catch clauses (`case e => ...`)
 * Traversable#head, Traversable#last, Traversable#maxBy
 * Warn on shadowing variables, especially those of the same type (`var a = 4; { val a = 5 }`)
 * Warn on inexhaustive pattern matching
 * Boolean function parameters should be named (`func("arg1", force = true)`)
-* Detect vars, that could easily be vals (no assignments)
-* Warn about using log(1+x),exp(x)-1 instead of log1p(x),expm(x)
+* Detect vars, that could easily be vals (done in scala 2.11 -Xlint)
+
+* Rule lists from other static analysis tools:
+ * ScalaStyle - https://github.com/scalastyle/scalastyle/wiki
+ * CheckStyle(Java) - http://checkstyle.sourceforge.net/availablechecks.html
+ * PMD(Java) - http://pmd.sourceforge.net/pmd-5.0.3/rules/index.html
+ * PVS-Studio(C++) - http://www.viva64.com/en/d/
+ 
+### Some resources
+* A quick overview of writing compiler plugins: http://www.scala-lang.org/node/140
+* Yuvi Masory's notes and compiler plugin from a while ago: https://github.com/ymasory/alacs/blob/master/dev/resources.md
+
