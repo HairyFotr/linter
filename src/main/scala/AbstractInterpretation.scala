@@ -95,13 +95,13 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     def rangesContain(i: Int): Boolean = (ranges exists { case (low, high) => i >= low && i <= high })
    
     def contains(i: Int): Boolean = (values contains i) || rangesContain(i)
-    def apply(i: Int) = contains(i)
+    def apply(i: Int): Boolean = contains(i)
     //TODO: this crashes if (high-low) > Int.MaxValue - code manually, or break large ranges into several parts
     //def exists(func: Int => Boolean) = (values exists func) || (ranges exists { case (low, high) => (low to high) exists func })
     //def forall(func: Int => Boolean) = (values forall func) && (ranges forall { case (low, high) => (low to high) forall func })
-    def existsLower(i: Int) = (values exists { _ < i }) || (ranges exists { case (low, high) => low < i })
-    def existsGreater(i: Int) = (values exists { _ > i }) || (ranges exists { case (low, high) => high > i })
-    def forallEquals(i: Int) = (values forall { _ == i }) && (ranges forall { case (low, high) => (low == high) && (i == low) })
+    def existsLower(i: Int): Boolean = (values exists { _ < i }) || (ranges exists { case (low, high) => low < i })
+    def existsGreater(i: Int): Boolean = (values exists { _ > i }) || (ranges exists { case (low, high) => high > i })
+    def forallEquals(i: Int): Boolean = (values forall { _ == i }) && (ranges forall { case (low, high) => (low == high) && (i == low) })
     
     def addRange(low: Int, high: Int): Values = new Values(ranges + (if(low > high) (high, low) else (low, high)), values, name, false, -1)
     def addValue(i: Int): Values = new Values(ranges, values + i, name, false, -1)
@@ -126,18 +126,18 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     }
     
     // discard values, that are inside ranges
-    def optimizeValues = new Values(values = values.filter(v => !rangesContain(v)), ranges = ranges, name = name, isSeq = isSeq, actualSize = actualSize)
+    def optimizeValues: Values = new Values(values = values.filter(v => !rangesContain(v)), ranges = ranges, name = name, isSeq = isSeq, actualSize = actualSize)
     //def optimizeRanges = new Values(values = values, ranges = ranges.)
     
-    def isEmpty = this.size == 0
-    def nonEmpty = this.size > 0
-    def isValue = this.values.size == 1 && this.ranges.isEmpty // TODO: this is stupid and buggy, and woudn't exist if I didn't mix all types into one class
-    def getValue = if(isValue) values.head else throw new Exception()
-    def isValueForce = (this.values.size == 1 && this.ranges.isEmpty) || (ranges.size == 1 && this.size == 1)
-    def getValueForce = if(isValue) values.head else if(ranges.size == 1 && this.size == 1) ranges.head._1 else throw new Exception()
+    def isEmpty: Boolean = this.size == 0
+    def nonEmpty: Boolean = this.size > 0
+    def isValue: Boolean = this.values.size == 1 && this.ranges.isEmpty // TODO: this is stupid and buggy, and woudn't exist if I didn't mix all types into one class
+    def getValue: Int = if(isValue) values.head else throw new Exception()
+    def isValueForce: Boolean = (this.values.size == 1 && this.ranges.isEmpty) || (ranges.size == 1 && this.size == 1)
+    def getValueForce: Int = if(isValue) values.head else if(ranges.size == 1 && this.size == 1) ranges.head._1 else throw new Exception()
 
-    def max = (values ++ ranges.map(_._2)).max
-    def min = (values ++ ranges.map(_._1)).min
+    def max: Int = math.max(if(values.nonEmpty) values.max else Int.MinValue, if(ranges.nonEmpty) ranges.maxBy(_._2)._2 else Int.MinValue)
+    def min: Int = math.min(if(values.nonEmpty) values.min else Int.MaxValue, if(ranges.nonEmpty) ranges.minBy(_._1)._1 else Int.MaxValue)
 
     def dropValue(i: Int): Values = new Values(
       ranges.flatMap { case (low, high) =>
@@ -310,12 +310,14 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       
       if(!isUsed(condExpr, this.name)) (this, this) else (out, if(neverHold) this else if(alwaysHold) Values.empty else this - out)
     }
-    def -(v: Values) = { 
-      if(this.isEmpty || v.isEmpty) {
+    
+    //TODO: does this even work? the v map is suspect and ugly
+    def -(value: Values): Values = {
+      if(this.isEmpty || value.isEmpty) {
         Values.empty
       } else {
         var out = this
-        v map { a => out = out.dropValue(a); a }
+        value map({ v => out = out.dropValue(v); v }, rangeSafe = false)
         out
       }
     }
@@ -652,7 +654,9 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         //println("BinaryOp: "+(op, expr1, expr2, (computeExpr(expr1))(op)(computeExpr(expr2))))
         (computeExpr(expr1))(op)(computeExpr(expr2))
       
-      case Apply(Apply(TypeApply(Select(valName, map), List(_, _)), List(Function(List(ValDef(mods, paramName, _, EmptyTree)), expr))), _) if(map.toString == "map") => //List(TypeApply(Select(Select(This(newTypeName("immutable")), scala.collection.immutable.List), newTermName("canBuildFrom")), List(TypeTree()))))
+      case Apply(Apply(TypeApply(Select(valName, map), List(_, _)), List(Function(List(ValDef(mods, paramName, _, EmptyTree)), expr))), _) if(map.toString == "map") => 
+        //List(TypeApply(Select(Select(This(newTypeName("immutable")), scala.collection.immutable.List), newTermName("canBuildFrom")), List(TypeTree()))))
+        
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
         val backupStrs = stringVals.clone
         val res = computeExpr(valName)
@@ -736,7 +740,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   //implicit def String2StringAttrs(s: String) = new StringAttrs(exactValue = Some(s))
   object StringAttrs {
     //TODO: when merging, save known chunks - .contains then partially works
-    def empty = new StringAttrs()
+    def empty: StringAttrs = new StringAttrs()
     
     def toStringAttrs(param: Tree): StringAttrs = {
       val intParam = computeExpr(param)
@@ -991,25 +995,23 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   }
   class StringAttrs(
       val exactValue: Option[String] = None,
-      val name: Option[String] = None,
-      val minLength: Int = 0,
-      val trimmedMinLength: Int = 0,
-      val maxLength: Int = Int.MaxValue,
-      val trimmedMaxLength: Int = Int.MaxValue) {
+      val name: Option[String] = None, //Move to outer map?
+      private val minLength: Int = 0,
+      private val trimmedMinLength: Int = 0,
+      private val maxLength: Int = Int.MaxValue,
+      private val trimmedMaxLength: Int = Int.MaxValue) {
     
     def addName(name: String): StringAttrs = new StringAttrs(exactValue, Some(name), getMinLength, trimmedMinLength, getMaxLength, trimmedMaxLength)
     
-    //println(this)
-
-    def alwaysIsEmpty = getMaxLength == 0
-    def alwaysNonEmpty = getMinLength > 0
+    def alwaysIsEmpty: Boolean = getMaxLength == 0
+    def alwaysNonEmpty: Boolean = getMinLength > 0
     
-    def getMinLength = exactValue.map(_.size).getOrElse(minLength)
-    def getMaxLength = exactValue.map(_.size).getOrElse(maxLength)
-    def getTrimmedMinLength = exactValue.map(_.trim.size).getOrElse(trimmedMinLength)
-    def getTrimmedMaxLength = exactValue.map(_.trim.size).getOrElse(trimmedMaxLength)
+    def getMinLength: Int = exactValue.map(_.size).getOrElse(minLength)
+    def getMaxLength: Int = exactValue.map(_.size).getOrElse(maxLength)
+    def getTrimmedMinLength: Int = exactValue.map(_.trim.size).getOrElse(trimmedMinLength)
+    def getTrimmedMaxLength: Int = exactValue.map(_.trim.size).getOrElse(trimmedMaxLength)
     
-    def +(s: String) = 
+    def +(s: String): StringAttrs = 
       new StringAttrs(
         exactValue = if(this.exactValue.isDefined) Some(this.exactValue.get + s) else None,
         minLength = this.getMinLength + s.length,
@@ -1017,7 +1019,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         maxLength = if(this.maxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength + s.length,
         trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.trim.length 
       )
-    def +(s: StringAttrs) = 
+    def +(s: StringAttrs): StringAttrs = 
       new StringAttrs(
         exactValue = if(this.exactValue.isDefined && s.exactValue.isDefined) Some(this.exactValue.get + s.exactValue.get) else None,
         minLength = this.getMinLength + s.getMinLength,
@@ -1025,7 +1027,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         maxLength = if(this.getMaxLength == Int.MaxValue || s.getMaxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength + s.getMaxLength,
         trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue || s.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.getTrimmedMaxLength
       )
-    def *(n: Int) = 
+    def *(n: Int): StringAttrs = 
       new StringAttrs(
         exactValue = if(this.exactValue.isDefined) Some(this.exactValue.get*n) else None,
         minLength = this.getMinLength*n,
@@ -1041,7 +1043,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case _ => false
     }
     
-    override def toString = (exactValue, name, getMinLength, getTrimmedMinLength, getMaxLength, getTrimmedMaxLength).toString
+    override def toString: String = (exactValue, name, getMinLength, getTrimmedMinLength, getMaxLength, getTrimmedMaxLength).toString
   }
  
   var vars = collection.mutable.HashSet[String]()

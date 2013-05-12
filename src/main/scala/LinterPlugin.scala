@@ -59,7 +59,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               val params = valDefs.flatMap(_.filterNot(_.mods.hasFlag(IMPLICIT))).map(_.name.toString).toBuffer
 
               //TODO: Put into utils
-              def isBlockEmpty(block: Tree) = block match {
+              def isBlockEmpty(block: Tree): Boolean = block match {
                 case Literal(Constant(a: Unit)) => true
                 case Ident(qmarks) if qmarks.toString == "$qmark$qmark$qmark" => true
                 case Select(scala_Predef, qmarks) if qmarks.toString == "$qmark$qmark$qmark" => true
@@ -246,7 +246,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Apply(Select(bigDecimal, apply_valueOf), List(c @ Literal(Constant(d:Double))))
             if (bigDecimal.toString == "scala.`package`.BigDecimal" || bigDecimal.toString.endsWith("math.BigDecimal")) && (apply_valueOf.toString matches "apply|valueOf") =>
             
-            def warn() = unit.warning(tree.pos, "Possible loss of precision - use a string constant")
+            def warn() { unit.warning(tree.pos, "Possible loss of precision - use a string constant") }
             
             //TODO: Scala BigDecimal constructor isn't as bad as the Java one... still fails with 0.555555555555555555555555555
             try {
@@ -347,7 +347,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             // Workaround: "Any @unchecked" seems to happen on the matching structures of actors - and all cases return true
 
             //TODO: Put into utils
-            def isLiteral(t:Tree) = t match {
+            def isLiteral(t:Tree): Boolean = t match {
               case Literal(_) => true
               case _ => false
             }
