@@ -1,9 +1,10 @@
 <scalastyle>
- <name>Scalastyle standard configuration</name>
+ <name>Scalastyle configuration</name>
+ <check enabled="true" class="org.scalastyle.scalariform.VarFieldChecker" level="warning"></check>
  <check level="warning" class="org.scalastyle.file.FileTabChecker" enabled="true"></check>
  <check level="warning" class="org.scalastyle.file.FileLengthChecker" enabled="true">
   <parameters>
-   <parameter name="maxFileLength"><![CDATA[1000]]></parameter>
+   <parameter name="maxFileLength"><![CDATA[1500]]></parameter>
   </parameters>
  </check>
 <check level="warning" class="org.scalastyle.file.HeaderMatchesChecker" enabled="true">
