@@ -1,8 +1,11 @@
  language: scala
  scala:
-   - "2.10.1"
-   - "2.9.3"
-   - "2.11.0-M2"
+   - 2.10.1
+   - 2.9.3
+   - 2.11.0-M2
+ matrix:
+   allow_failures:
+     - scala: 2.11.0-M2
  jdk:
    - oraclejdk7
    - openjdk7
