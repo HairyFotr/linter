@@ -2,7 +2,7 @@
 
 Linter is a Scala compiler plugin that adds compile-time checks to help protect against various possible bugs and style problems.
 
-It's currently very much a work in progress - some parts will need to be rewritten.
+It's currently very much a work in progress - some parts will probably need to be rewritten.
 
 To see it in action, run `sbt console` in this project's folder, or try it out on your code.
 
@@ -168,11 +168,11 @@ Feel free to implement these, or add your own ideas. Pull requests welcome!
 * Boolean function parameters should be named (`func("arg1", force = true)`)
 * Detect vars, that could easily be vals (done in scala 2.11 -Xlint)
 
-* Rule lists from other static analysis tools:
- * ScalaStyle - https://github.com/scalastyle/scalastyle/wiki
- * CheckStyle(Java) - http://checkstyle.sourceforge.net/availablechecks.html
- * PMD(Java) - http://pmd.sourceforge.net/pmd-5.0.3/rules/index.html
- * PVS-Studio(C++) - http://www.viva64.com/en/d/
+Rule lists from other static analysis tools:
+* ScalaStyle - https://github.com/scalastyle/scalastyle/wiki
+* CheckStyle(Java) - http://checkstyle.sourceforge.net/availablechecks.html
+* PMD(Java) - http://pmd.sourceforge.net/pmd-5.0.3/rules/index.html
+* PVS-Studio(C++) - http://www.viva64.com/en/d/
  
 ### Some resources
 * A quick overview of writing compiler plugins: http://www.scala-lang.org/node/140
