@@ -59,6 +59,20 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     findUsed(tree)
   }
     
+  def returnCount(tree: GTree): Int = {
+    var used = 0
+
+    def findUsed(tree: GTree) {
+      for(Return(id) <- tree.children) used += 1
+
+      for(subTree <- tree.children; if (subTree != tree)) findUsed(subTree)
+    }
+    
+    findUsed(tree)
+    
+    used
+  }
+
   def checkRegex(reg: String) {
     try {
       val regex = reg.r
@@ -82,18 +96,26 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     def apply(low: Int, high: Int): Values = new Values(ranges = Set((low, high)))
   }
   class Values(
-      val ranges: Set[(Int, Int)] = Set[(Int, Int)](),
-      val values: Set[Int] = Set[Int](),
+      val ranges: Set[(Int, Int)] = Set(),
+      val values: Set[Int] = Set(),
+      val conditions: Set[Int => Boolean] = Set(),//Currently obeyed only ifEmpty otherwise
       val name: String = "",
       val isSeq: Boolean = false,
       val actualSize: Int = -1
     ) {
 
-    //TODO implement interval tree
+    //require(isEmpty || isValue || isSeq || (ranges.size == 1 && values.size == 0) || (ranges.size == 0 && values.size > 0))
     //println(this)
+    
+    def conditionsContain(i: Int): Boolean = conditions.forall(c => c(i))
+    
+    // experimental alternative to empty
+    def makeUnknown = new Values(conditions = conditions)
    
     def rangesContain(i: Int): Boolean = (ranges exists { case (low, high) => i >= low && i <= high })
-   
+    
+    def notSeq = new Values(ranges, values, conditions, name, false)
+    
     def contains(i: Int): Boolean = (values contains i) || rangesContain(i)
     def apply(i: Int): Boolean = contains(i)
     //TODO: this crashes if (high-low) > Int.MaxValue - code manually, or break large ranges into several parts
@@ -103,20 +125,22 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     def existsGreater(i: Int): Boolean = (values exists { _ > i }) || (ranges exists { case (low, high) => high > i })
     def forallEquals(i: Int): Boolean = (values forall { _ == i }) && (ranges forall { case (low, high) => (low == high) && (i == low) })
     
-    def addRange(low: Int, high: Int): Values = new Values(ranges + (if(low > high) (high, low) else (low, high)), values, name, false, -1)
-    def addValue(i: Int): Values = new Values(ranges, values + i, name, false, -1)
-    def addSet(s: Set[Int]): Values = new Values(ranges, values ++ s, name, false, -1)
-    def addName(s: String): Values = new Values(ranges, values, s, isSeq, actualSize)
-    def addActualSize(s: Int): Values = new Values(ranges, values, name, isSeq, s)
+    def addRange(low: Int, high: Int): Values = new Values(ranges + (if(low > high) (high, low) else (low, high)), values, conditions, name, false, -1)
+    def addValue(i: Int): Values = new Values(ranges, values + i, conditions, name, false, -1)
+    def addSet(s: Set[Int]): Values = new Values(ranges, values ++ s, conditions, name, false, -1) //TODO: are these false, -1 ok?
+    def addCondition(c: Int => Boolean): Values = new Values(ranges, values, conditions + c, name, isSeq, actualSize)
+    def addConditions(c: Set[Int => Boolean]): Values = new Values(ranges, values, conditions ++ c, name, isSeq, actualSize)
+    def addName(s: String): Values = new Values(ranges, values, conditions, s, isSeq, actualSize)
+    def addActualSize(s: Int): Values = new Values(ranges, values, conditions, name, isSeq, s)
     //TODO: this can go wrong in many ways - (low to high) limit, freeze on huge collection, etc
     
     def distinct: Values = {
       val t = this.optimizeValues
       //ADD: optimizeranges that makes them non-overlapping
       if(t.values.size == 0 && t.ranges.size == 1) {
-        new Values(ranges = t.ranges, /*name = name,*/ isSeq = isSeq, actualSize = actualSize)
+        new Values(ranges = t.ranges, conditions = conditions, /*name = name,*/ isSeq = isSeq, actualSize = actualSize)
       } else {
-        new Values(values = t.values ++ t.ranges.flatMap { case (low, high) => (low to high) }, /*name = name,*/ isSeq = isSeq, actualSize = actualSize)
+        new Values(values = t.values ++ t.ranges.flatMap { case (low, high) => (low to high) }, conditions = conditions, /*name = name,*/ isSeq = isSeq, actualSize = actualSize)
       }
     }
     //TODO: Is this correct for weird code?
@@ -126,7 +150,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     }
     
     // discard values, that are inside ranges
-    def optimizeValues: Values = new Values(values = values.filter(v => !rangesContain(v)), ranges = ranges, name = name, isSeq = isSeq, actualSize = actualSize)
+    def optimizeValues: Values = new Values(values = values.filter(v => !rangesContain(v)), ranges = ranges, conditions = conditions, name = name, isSeq = isSeq, actualSize = actualSize)
     //def optimizeRanges = new Values(values = values, ranges = ranges.)
     
     def isEmpty: Boolean = this.size == 0
@@ -148,10 +172,11 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         List((low, high))
       }, 
       values - i,
+      Set(),//ADD: conditions?
       name)
 
     //beware of some operations over ranges.
-    def map(func: Int => Int, rangeSafe: Boolean = true): Values =
+    def map(func: Int => Int, rangeSafe: Boolean = true): Values = //ADD: conditions?
       if(rangeSafe) {
         new Values(
           ranges
@@ -167,6 +192,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       }
     
     def applyCond(condExpr: Tree): (Values, Values) = {//TODO: return (true, false) ValueSets in one go - applyInverseCond sucks //TODO: true and false cound be possible returns for error msgs
+      //TODO: check out if you're using 'this' for things that aren't... this method shouldn't be here anyways
       //println("expr: "+showRaw(condExpr))
       var alwaysHold, neverHold = false
       val out = condExpr match {
@@ -178,6 +204,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           new Values(
             left.ranges ++ right.ranges,
             left.values ++ right.values,
+            left.conditions ++ right.conditions,
             this.name)
 
         /// String stuff
@@ -190,49 +217,62 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           computeExpr(strFun)
 
         //ADD: expr op expr that handles idents right
-        case Apply(Select(Ident(v), op), List(expr)) if v.toString == this.name && this.nonEmpty && computeExpr(expr).isValue => 
+        case Apply(Select(Ident(v), op), List(expr)) if v.toString == this.name && computeExpr(expr).isValue => 
         
           val value = computeExpr(expr).getValue
-          val out = op match {
+          val out: Values = op match {
             case nme.EQ => 
-              if(this.contains(value)) {
-                if(this.forallEquals(value)) alwaysHold = true
-                Values(value).addName(name)
-              } else { 
+              (if(this.nonEmpty) { 
+                if(this.contains(value)) {
+                  if(this.forallEquals(value)) alwaysHold = true
+                  Values(value).addName(name)
+                } else {
+                  neverHold = true
+                  this.makeUnknown
+                }
+              } else if(!this.conditionsContain(value)) {
                 neverHold = true
-                Values.empty
-              }
+                this.makeUnknown
+              } else {
+                this.makeUnknown
+              }).addCondition(_ == value)
             case nme.NE => 
-              if(this.contains(value)) {
+              (if(this.contains(value)) {
                 val out = this.dropValue(value) 
                 if(out.isEmpty) neverHold = true
                 out
-              } else {
+              } else if(this.nonEmpty) {
                 alwaysHold = true
                 this
-              }
+              } else {
+                this.makeUnknown
+              }).addCondition(_ != value)
             case nme.GT => new Values(
                 ranges.flatMap { case (low, high) => if(low > value) Some((low, high)) else if(high > value) Some((value+1, high)) else None },
                 values.filter { _ > value },
+                Set(_ > value),
                 this.name)
             case nme.GE => new Values(
                 ranges.flatMap { case (low, high) => if(low >= value) Some((low, high)) else if(high >= value) Some((value, high)) else None },
                 values.filter { _ >= value },
+                Set(_ >= value),
                 this.name)
             case nme.LT => new Values(
                 ranges.flatMap { case (low, high) => if(high < value) Some((low, high)) else if(low < value) Some((low, value-1)) else None },
                 values.filter { _ < value },
+                Set(_ < value),
                 this.name)
             case nme.LE => new Values(
                 ranges.flatMap { case (low, high) => if(high <= value) Some((low, high)) else if(low <= value) Some((low, value)) else None },
                 values.filter { _ <= value },
+                Set(_ <= value),
                 this.name)
             case a => 
               //println("applyCond: "+showRaw( a ));
-              Values.empty
+              this.makeUnknown
           }
           
-          if(Set[Name](nme.GT, nme.GE, nme.LT, nme.LE) contains op) {
+          if((Set[Name](nme.GT, nme.GE, nme.LT, nme.LE) contains op) && this.nonEmpty) {
             if(out.isEmpty) neverHold = true
             if(out.size == this.size) alwaysHold = true
           }
@@ -241,6 +281,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         case Apply(Select(expr1, op), List(expr2)) =>
           val (left, right) = (computeExpr(expr1), computeExpr(expr2))
           var out = Values.empty.addActualSize(this.actualSize)
+          val startOut = out
           op match {
             case nme.EQ | nme.NE =>
               if(left.isValue && right.isValue && left.getValue == right.getValue) {
@@ -249,8 +290,13 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
               } else if(left.nonEmpty && right.nonEmpty && (left.min > right.max || right.min > left.max)) {
                 if(op != nme.EQ) alwaysHold = true else neverHold = true
                 if(op != nme.EQ && (left.name == this.name || right.name == this.name)) out = this
+              } else if(left.name == this.name && right.isValueForce && op == nme.EQ) {
+                out = Values(right.getValueForce).addName(this.name)
               } else if(right.name == this.name && left.isValueForce && op == nme.EQ) { //Yoda conditions 
                 out = Values(left.getValueForce).addName(this.name)
+              }
+              if(left.isEmpty && left.conditions.nonEmpty && right.isValue && !left.conditionsContain(right.getValue)) {
+                neverHold = true
               }
 
             case nme.GT | nme.LE => 
@@ -293,8 +339,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
               
             case _ =>
           }
-          
-          out
+
+          if(this.name == out.name) out.addConditions(this.conditions) else out
         case Select(expr, op) =>
           computeExpr(expr).applyUnary(op)
           Values.empty.addActualSize(this.actualSize)
@@ -326,15 +372,15 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case nme.UNARY_+ => this
       case nme.UNARY_- => this.map(a => -a)
       case nme.UNARY_~ => this.map(a => ~a, rangeSafe = false)
-      case signum if signum.toString == "signum" => this.map(a => math.signum(a))
+      case signum if signum.toString == "signum" => this.map(a => math.signum(a)).addCondition({ a => Set(-1,0,1) contains a })
       case abs if abs.toString == "abs" =>
-        new Values(
+        new Values(//ADD: conditions
           ranges
             .map { case (low, high) => (if(low > 0) low else 0, math.max(math.abs(low), math.abs(high))) }
             .map { case (low, high) if low > high => (high, low); case (low, high) => (low, high) },
-          values.map(a => math.abs(a)))
+          values.map(a => math.abs(a))).addCondition(_ >= 0)
 
-      case size if (size.toString matches "size|length") && (this.actualSize != -1) => Values(this.actualSize)
+      case size if (size.toString matches "size|length") => if(this.actualSize != -1) Values(this.actualSize) else Values.empty.addCondition(_ >= 0)
       case head_last if (head_last.toString matches "head|last") => 
         //Only works for one element :)
         if(this.actualSize == 0) unit.warning(treePosHolder.pos, "Taking the "+head_last.toString+" of an empty collection.")
@@ -390,126 +436,143 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           case _ => return Values.empty
       }
       
-      if(left.isEmpty || right.isEmpty) {
-        //ADD: x & 2^n is Set(2^n,0) and stuff like that :)
-        if(left.contains(0) || right.contains(0)) {
-          if(Set[Name](nme.MUL, nme.AND) contains op) Values(0) else Values.empty
-        } else {
-          Values.empty
-        }
-      } else if(op.toString == "apply") {
-        //TODO: if you wanted actual values, you need to save seq type and refactor values from Set to Seq
-        if(left.isSeq && left.actualSize == 1 && left.size == 1 && right.isValueForce && right.getValueForce == 0) Values(left.getValueForce) else left
-      } else if(op.toString == "map") {
-        right
-      } else if(op.toString == "contains") {
-        if(right.isValue) {
-          if(left.contains(right.getValue)) {
-            unit.warning(treePosHolder.pos, "This contains will always return true")
-          } else {
-            unit.warning(treePosHolder.pos, "This contains will never return true")
-          }
-        }
-        Values.empty
-      } else if(op.toString == "max") {
-        if(left.isValue && right.isValue) { 
-          Values(math.max(left.getValue, right.getValue))
-        } else if(left.isValue && !right.isValue) {
-          if(left.getValue >= right.max) {
-            unit.warning(treePosHolder.pos, "This max will always return the first value")
-            Values(left.getValue)
-          } else if(left.getValue <= right.min) {
-            unit.warning(treePosHolder.pos, "This max will always return the second value")
-            right
+      val out: Values = (
+        if(left.isEmpty || right.isEmpty) {
+          //ADD: x & 2^n is Set(2^n,0) and stuff like that :)
+          if(left.contains(0) || right.contains(0)) {
+            if(Set[Name](nme.MUL, nme.AND) contains op) Values(0) else Values.empty
           } else {
             Values.empty
           }
+        } else if(op.toString == "apply") {
+          //TODO: if you wanted actual values, you need to save seq type and refactor values from Set to Seq
+          if(left.isSeq && left.actualSize == 1 && left.size == 1 && right.isValueForce && right.getValueForce == 0) Values(left.getValueForce) else left
+        } else if(op.toString == "map") {
+          right
+        } else if(op.toString == "contains") {
+          if(right.isValue) {
+            if(left.contains(right.getValue)) {
+              unit.warning(treePosHolder.pos, "This contains will always return true")
+            } else {
+              unit.warning(treePosHolder.pos, "This contains will never return true")
+            }
+          }
+          Values.empty
+        } else if(op.toString == "max") {
+          if(left.isValue && right.isValue) { 
+            if(left.getValue >= right.getValue) {
+              unit.warning(treePosHolder.pos, "This max will always return the first value")
+            } else {
+              unit.warning(treePosHolder.pos, "This max will always return the second value")
+            }
+            Values(math.max(left.getValue, right.getValue))
+          } else if(left.isValue && !right.isValue) {
+            if(left.getValue >= right.max) {
+              unit.warning(treePosHolder.pos, "This max will always return the first value")
+              Values(left.getValue)
+            } else if(left.getValue <= right.min) {
+              unit.warning(treePosHolder.pos, "This max will always return the second value")
+              right
+            } else {
+              Values.empty
+            }
+          } else if(!left.isValue && right.isValue) {
+            if(right.getValue >= left.max) {
+              unit.warning(treePosHolder.pos, "This max will always return the second value")
+              Values(right.getValue)
+            } else if(right.getValue <= left.min) {
+              unit.warning(treePosHolder.pos, "This max will always return the first value")
+              left
+            } else {
+              Values.empty
+            }
+          } else {
+            Values.empty
+          }          
+        } else if(op.toString == "min") {
+          if(left.isValue && right.isValue) {
+            if(left.getValue <= right.getValue) {
+              unit.warning(treePosHolder.pos, "This min will always return the first value")
+            } else {
+              unit.warning(treePosHolder.pos, "This min will always return the second value")
+            }
+            Values(math.min(left.getValue, right.getValue))
+          } else if(left.isValue && !right.isValue) {
+            if(left.getValue <= right.min) {
+              unit.warning(treePosHolder.pos, "This min will always return the first value")
+              Values(left.getValue)
+            } else if(left.getValue > right.max) {
+              unit.warning(treePosHolder.pos, "This min will always return the second value")
+              right
+            } else {
+              Values.empty
+            }
+          } else if(!left.isValue && right.isValue) {
+            if(right.getValue <= left.min) {
+              unit.warning(treePosHolder.pos, "This min will always return the second value")
+              Values(right.getValue)
+            } else if(right.getValue > left.max) {
+              unit.warning(treePosHolder.pos, "This min will always return the first value")
+              left
+            } else {
+              Values.empty
+            }
+          } else {
+            Values.empty
+          }          
+        } else if(op.toString == "take") {
+          if(left.isSeq && left.actualSize != -1 && right.isValue) {
+            if(right.getValueForce >= left.actualSize) {
+              unit.warning(treePosHolder.pos, "This take is always unnecessary.")
+              this 
+            } else {
+              if(right.getValueForce <= 0) unit.warning(treePosHolder.pos, "This collection will always be empty.")
+              Values.empty.addName(name).addActualSize(math.max(0, right.getValueForce))
+            }
+          } else {
+            Values.empty
+          }
+        } else if(op.toString == "drop") {
+          if(left.isSeq && left.actualSize != -1 && right.isValue) {
+            if(right.getValueForce <= 0) {
+              unit.warning(treePosHolder.pos, "This drop is always unnecessary.")
+              this
+            } else {
+              if(left.actualSize-right.getValueForce <= 0) unit.warning(treePosHolder.pos, "This collection will always be empty.")
+              Values.empty.addName(name).addActualSize(math.max(0, left.actualSize-right.getValueForce))
+            }
+          } else { 
+            Values.empty
+          }
+        } else if(left.isValue && right.isValue) {
+          if(left.getValue == right.getValue && op == nme.SUB && !left.name.isEmpty) unit.warning(treePosHolder.pos, "Same values on both sides of subtraction.")
+          Values(func(left.getValue, right.getValue))
         } else if(!left.isValue && right.isValue) {
-          if(right.getValue >= left.max) {
-            unit.warning(treePosHolder.pos, "This max will always return the second value")
-            Values(right.getValue)
-          } else if(right.getValue <= left.min) {
-            unit.warning(treePosHolder.pos, "This max will always return the first value")
-            left
-          } else {
-            Values.empty
-          }
-        } else {
-          Values.empty
-        }          
-      } else if(op.toString == "min") {
-        if(left.isValue && right.isValue) {
-          Values(math.min(left.getValue, right.getValue))
+          left.map(a => func(a, right.getValue), rangeSafe = isRangeSafe)
         } else if(left.isValue && !right.isValue) {
-          if(left.getValue <= right.min) {
-            unit.warning(treePosHolder.pos, "This min will always return the first value")
-            Values(left.getValue)
-          } else if(left.getValue > right.max) {
-            unit.warning(treePosHolder.pos, "This min will always return the second value")
-            right
+          right.map(a => func(left.getValue, a), rangeSafe = isRangeSafe) 
+        } else {
+          //ADD: join ranges, but be afraid of the explosion :)
+          if(left eq right) {
+            op match {
+              //case nme.ADD => left.map(a => a+a) //WRONG
+              //case nme.MUL => left.map(a => a*a)
+              case nme.DIV if(!left.contains(0)) => Values(1) //TODO: never gets executed?
+              case nme.SUB | nme.XOR => 
+                if(op == nme.SUB) unit.warning(treePosHolder.pos, "Same expression on both sides of subtraction.")
+                Values(0)
+              case nme.AND | nme.OR  => left
+              case _ => Values.empty
+            }
           } else {
             Values.empty
           }
-        } else if(!left.isValue && right.isValue) {
-          if(right.getValue <= left.min) {
-            unit.warning(treePosHolder.pos, "This min will always return the second value")
-            Values(right.getValue)
-          } else if(right.getValue > left.max) {
-            unit.warning(treePosHolder.pos, "This min will always return the first value")
-            left
-          } else {
-            Values.empty
-          }
-        } else {
-          Values.empty
-        }          
-      } else if(op.toString == "take") {
-        if(left.isSeq && left.actualSize != -1 && right.isValue) {
-          if(right.getValueForce >= left.actualSize) {
-            unit.warning(treePosHolder.pos, "This take is always unnecessary.")
-            this 
-          } else {
-            if(right.getValueForce <= 0) unit.warning(treePosHolder.pos, "This collection will always be empty.")
-            Values.empty.addName(name).addActualSize(math.max(0, right.getValueForce))
-          }
-        } else {
-          Values.empty
         }
-      } else if(op.toString == "drop") {
-        if(left.isSeq && left.actualSize != -1 && right.isValue) {
-          if(right.getValueForce <= 0) {
-            unit.warning(treePosHolder.pos, "This drop is always unnecessary.")
-            this
-          } else {
-            if(left.actualSize-right.getValueForce <= 0) unit.warning(treePosHolder.pos, "This collection will always be empty.")
-            Values.empty.addName(name).addActualSize(math.max(0, left.actualSize-right.getValueForce))
-          }
-        } else { 
-          Values.empty
-        }
-      } else if(left.isValue && right.isValue) {
-        if(left.getValue == right.getValue && op == nme.SUB && !left.name.isEmpty) unit.warning(treePosHolder.pos, "Same expression on both sides of subtraction.")
-        Values(func(left.getValue, right.getValue))
-      } else if(!left.isValue && right.isValue) {
-        left.map(a => func(a, right.getValue), rangeSafe = isRangeSafe)
-      } else if(left.isValue && !right.isValue) {
-        right.map(a => func(left.getValue, a), rangeSafe = isRangeSafe) 
-      } else {
-        //ADD: join ranges, but be afraid of the explosion :)
-        if(left eq right) {
-          op match {
-            //case nme.ADD => left.map(a => a+a) //WRONG
-            //case nme.MUL => left.map(a => a*a)
-            case nme.DIV if(!left.contains(0)) => Values(1) //TODO: never gets executed?
-            case nme.SUB | nme.XOR => 
-              if(op == nme.SUB) unit.warning(treePosHolder.pos, "Same expression on both sides of subtraction.")
-              Values(0)
-            case nme.AND | nme.OR  => left
-            case _ => Values.empty
-          }
-        } else {
-          Values.empty
-        }
+      )
+      
+      op match {
+        case nme.MOD if right.isValue => out.addConditions(Set(_ > -math.abs(right.getValue), _ < math.abs(right.getValue)))
+        case _ => out
       }
     }
     
@@ -573,7 +636,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         if (scala_Predef_intWrapper.toString endsWith "Wrapper") && (to_until.toString matches "to|until") =>
         
         val high2 = if(to_until.toString == "to") high else high-1
-        new Values(Set((low, high2)), Set(), "", isSeq = true, high2-low)
+        new Values(Set((low, high2)), Set(), Set(), "", isSeq = true, high2-low)
 
       case Apply(Select(Apply(scala_Predef_intWrapper, List(expr1)), to_until), List(expr2))
         if (scala_Predef_intWrapper.toString endsWith "Wrapper") => 
@@ -595,19 +658,19 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         if((to_until.toString matches "to|until") && computeExpr(expr1).isValue && computeExpr(expr2).isValue) {
           val (low, high) = (computeExpr(expr1).getValue, computeExpr(expr2).getValue + (if(to_until.toString == "to") 0 else -1))
           
-          new Values(Set((low, high)), Set(), "", isSeq = true, high-low)
+          new Values(Set((low, high)), Set(), Set(), name = "", isSeq = true, actualSize = high-low)
         } else {
           Values.empty
         }
 
       case t @ Apply(TypeApply(genApply @ Select(_,_), _), genVals) if methodImplements(genApply.symbol, SeqLikeGenApply) && (!t.tpe.widen.toString.contains("collection.mutable.")) =>
         val values = genVals.map(v => computeExpr(v))
-        if(values.forall(_.isValue)) new Values(Set(), values.map(_.getValue).toSet, "", isSeq = true, actualSize = values.size) else Values.empty.addActualSize(genVals.size)
+        if(values.forall(_.isValue)) new Values(Set(), values.map(_.getValue).toSet, Set(), "", isSeq = true, actualSize = values.size) else Values.empty.addActualSize(genVals.size)
 
       //Array isn't immutable, maybe later
       /*case Apply(Select(Select(scala, scala_Array), apply), genVals) if(scala_Array.toString == "Array") =>
         val values = genVals.map(v => computeExpr(v))
-        if(values.forall(_.isValue)) new Values(Set(), values.map(_.getValue).toSet, "", isSeq = true, actualSize = values.size) else Values.empty.addActualSize(genVals.size)*/
+        if(values.forall(_.isValue)) new Values(Set(), values.map(_.getValue).toSet, Set(), "", isSeq = true, actualSize = values.size) else Values.empty.addActualSize(genVals.size)*/
       
       //TODO: is this for array or what?
       case Select(Apply(arrayOps @ Select(_, intArrayOps), List(expr)), op) if(arrayOps.toString == "scala.this.Predef.intArrayOps") => 
@@ -618,8 +681,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
 
       case Apply(Select(scala_math_package, op), params) if scala_math_package.toString == "scala.math.`package`" =>
         op.toString match {
-          case "abs" | "signum" if params.size == 1 => computeExpr(params.head).applyUnary(op)
-          case "max" | "min"    if params.size == 2 => computeExpr(params(0))(op)(computeExpr(params(1)))
+          case "abs"|"signum" if params.size == 1 => computeExpr(params.head).applyUnary(op)
+          case "max"|"min"    if params.size == 2 => computeExpr(params(0))(op)(computeExpr(params(1)))
           case _ => Values.empty
         }
 
@@ -668,8 +731,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         //println(">        "+out)
         out
       
-      case If(cond, expr1, expr2) =>
-        //TODO: compute cond - if always/never holds, return that branch
+      case If(condExpr, expr1, expr2) =>
+        //TODO: if condExpr always/never holds, return that branch
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
         val backupStrs = stringVals.clone
         
@@ -680,8 +743,32 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         val e2 = computeExpr(expr2)
         vals = backupVals
         stringVals = backupStrs
+        
+        /*println(vals)
+        vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr)._1)).withDefaultValue(Values.empty)
+        println("e1"+vals)
+        val e1 = computeExpr(expr1)
+        println("e1"+e1)
+        stringVals = backupStrs
 
-        if(e1.isValue && e2.isValue) new Values(values = e1.values ++ e2.values) else Values.empty
+        vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr)._2)).withDefaultValue(Values.empty)
+        println("e2"+vals)
+        val e2 = computeExpr(expr2)
+        println("e2"+e1)*/
+        
+        vals = backupVals
+        stringVals = backupStrs
+
+        //if(e1.isValue && e2.isValue) new Values(values = e1.values ++ e2.values) else Values.empty
+        if(expr1.tpe <:< definitions.NothingClass.tpe) {
+          e2
+        } else if(expr2.tpe <:< definitions.NothingClass.tpe) {
+          e1
+        } else if(!e1.isSeq && !e2.isSeq && e1.nonEmpty && e2.nonEmpty) {
+          new Values(values = e1.values ++ e2.values, ranges = e1.ranges ++ e2.ranges)
+        } else {
+          Values.empty
+        }
 
       case a => 
         //val raw = showRaw( a ); if(!exprs.contains(raw) && raw.size < 700 && raw.size > "EmptyTree".size)println("computeExpr: "+treePosHolder.toString+"\n"+raw); exprs += raw
@@ -724,6 +811,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     }
     
     if(values.nonEmpty) {
+      values.notSeq
       vals += param -> values
       
       if(!isUsed(body, param) && func != "foreach") unit.warning(tree.pos, "Iterator value is not used in the body.")
@@ -796,7 +884,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
                   Values.empty
                 else 
                   Values(str.getMinLength, str.getMaxLength)
-              )
+              ).addCondition(_ >= 0)
           )
         case "toString" if params.size == 0 =>
           Left(toStringAttrs(string))
@@ -1028,13 +1116,17 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue || s.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.getTrimmedMaxLength
       )
     def *(n: Int): StringAttrs = 
-      new StringAttrs(
-        exactValue = if(this.exactValue.isDefined) Some(this.exactValue.get*n) else None,
-        minLength = this.getMinLength*n,
-        trimmedMinLength = this.getTrimmedMinLength*n, //ADD: can be made more exact
-        maxLength = if(this.getMaxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength*n,
-        trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength*n
-      )
+      if(n <= 0) {
+        unit.warning(treePosHolder.pos, "Multiplying a string with a value <= 0 will always result in an empty string.")
+        new StringAttrs(Some(""))
+      } else {
+        new StringAttrs(
+          exactValue = if(this.exactValue.isDefined) Some(this.exactValue.get*n) else None,
+          minLength = this.getMinLength*n,
+          trimmedMinLength = this.getTrimmedMinLength*n, //ADD: can be made more exact
+          maxLength = if(this.getMaxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength*n,
+          trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength*n)
+      }
     
     override def hashCode: Int = /*if(exactValue.isDefined) exactValue.hashCode else */exactValue.hashCode + name.hashCode + minLength + trimmedMinLength + maxLength + trimmedMaxLength
     override def equals(that: Any): Boolean = that match {
@@ -1092,7 +1184,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       } => //Fallthrough
       case Apply(label, List()) if (labels contains label.toString) && {
         // TODO: check if there is an infinite...
-        // vals.filter(a => vars contains a._1).map(a => println(a._1, a._2.applyCond(labels(label.toString))._2))
+        // vals.filter(a => vars contains a._1).map(a =>println(a._1, a._2.applyCond(labels(label.toString))._2))
         
         discardVars(labels(label.toString))//, (vars & getUsed(labels(label.toString))).toSeq:_*)
 
@@ -1182,7 +1274,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           stringVals = backupStrs
         }
       
-      case If(condExpr, t, f) => 
+      case If(condExpr, t, f) => //TODO: moved to computeExpr?
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
         val backupStrs = stringVals.clone
         
@@ -1212,26 +1304,31 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           unit.warning(pos.pos, "You will likely use a negative index for a collection here.")
         }
       
-      case DefDef(_, _, _, _, _, block) => 
+      case DefDef(_, _, _, params, _, block @ Block(b, last)) => 
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
         val backupStrs = stringVals.clone
+        
+        val paramNames = params.flatten.map(_.name.toString)
+        
+        vals = vals.filterNot(paramNames contains _)
         
         if(block.children.isEmpty)
           traverse(block)
         else
           block.children.foreach(traverse)
-          
-        block match {
-          //case Block(_, pos @ Literal(Constant(returnVal))) => 
-            //unit.warning(pos.pos, "This function returns a constant.")
-          //case Block(_, pos @ Ident(returnVal)) if vals(returnVal.toString).size == 1 && !vals(returnVal.toString).isSeq => 
-          case Block(_, returnVal) => 
-            if(computeExpr(returnVal).isValue) {
-              unit.warning(returnVal.pos, "This method always returns the same value: "+computeExpr(returnVal).getValue)
-            } else {
-            }
-          case _ =>
+        
+        val returnVal = last match {
+          case Return(ret) => 
+            unit.warning(last.pos, "Scala has implicit return, you don't need a return statement at the end of a method")
+            ret
+          case a => 
+            a
         }
+        
+        if(returnCount(block) == 0 && computeExpr(returnVal).isValue) {
+          unit.warning(last.pos, "This method always returns the same value: "+computeExpr(returnVal).getValue)
+        }
+
         vals = backupVals.withDefaultValue(Values.empty)
         stringVals = backupStrs
 

@@ -461,6 +461,12 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should("""{ var k = 3; val a = List(1,2,3); if(a.size == k) for(i <- a) 1/i }""")("This condition will always hold.")
     should("""{ var k = 4; val a = List(1,2,3); if(a.size == k) for(i <- a) 1/i }""")("This condition will never hold.")
     should("""{ var k = 1; val a = List(k,2,3); for(i <- a) 1/(i-k) }""")("You will likely divide by zero here.")
+    
+    shouldnt("""{ val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b-3) }""")("You will likely divide by zero here.")
+    should("""{ val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b-2) }""")("You will likely divide by zero here.")
+    should("""{ val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b-1) }""")("You will likely divide by zero here.")
+    should("""{ val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b-0) }""")("You will likely divide by zero here.")
+    shouldnt("""{ val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b+1) }""")("You will likely divide by zero here.")
   }
   
   @Test
@@ -518,6 +524,12 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
     //should(""""abcd"(22)""")
     //shouldnt(""""abcd"(2)""")
+    
+    msg = "Multiplying a string with a value <= 0 will always result in an empty string."
+    //should("""{ "dfd"*(-5) }""")
+    //should(""" val a = 3; "dfd"*(-a) """)
+    //shouldnt(""" val a = 3; "dfd"*(a) """)
+    
   }
   
   def abs_interpretation__Option() {
@@ -597,6 +609,12 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     //TODO: in the for loop it doesn't warn even if there is a problem, because range to string is not covered
     shouldnt("""{ var b = "0"; for(i <- 1 to 10) { b = i.toString; 1/(b.toInt-333) }; 1/b.toInt }""")("divide by zero")
     shouldnt("""{ var b = "0"; for(i <- -4 to 0) { b = i.toString; 1/(b.toInt-333) }; 1/b.toInt }""")("divide by zero")
+
+    should("""def a = { val a = 0; if (a == 0) 1.0 else 5 / a }""")("This condition will always hold.")
+    should("""def a = { val a = 0; def precision = if (a == 0) 1.0 else 5 / a }""")("This condition will always hold.")
+    should("""def a = { var a = 0; if (a == 0) 1.0 else 5 / a }""")("This condition will always hold.")
+    should("""def a = { var a = 0; def precision = if (a == 0) 1.0 else 5 / a }""")("This condition will always hold.")
+    should("""def a = { var a = 0; def precision = { val a = 5; if (a == 0) 1.0 else 5 / a } }""")("This condition will never hold.")
   }
   
   @Test
@@ -823,7 +841,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   
   @Test
   def probableBugs__sameExpression() {
-    implicit val msg = "Same expression on both sides"
+    implicit val msg = /*Same value/expression */"on both sides"
 
     should("""
       |var a = "b"
@@ -1337,25 +1355,22 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   def def__constant() {
     implicit val msg = "This method always returns the same value"
     
-    should("""{ def k:Int = { val a = 0; val b = a+2; a+1 } }""")
-    shouldnt("""{ def k(x:Int):Int = { val a = 0; val b = a+2; b+x } }""")
+    should("""def k: Int = { val a = 0; val b = a+2; a+1 }""")
+    should("""def l: Int = { val x = 5; if(util.Random.nextBoolean) 4; x }""")
+    shouldnt("""def l: Int = { val x = 5; if(util.Random.nextBoolean) return 4; x }""")
+    shouldnt("""def l: Int = { val x = 5; if(util.Random.nextBoolean) 4 else 5 }""")
+    shouldnt("""def k(x:Int):Int = { val a = 0; val b = a+2; b+x }""")
   }
   
   
   //stuff that doesn't work and I don't know why
   @Test 
   def broken() {
-  
-    ///doesn't warn if you delete 'def precision = '
-    //shouldnt("""def a { val a = 0; if (a == 0) 1.0 else 5 / a }""")("You will likely divide by zero here.") //passes
-    //shouldnt("""def a { val a = 0; def precision = if (a == 0) 1.0 else 5 / a }""")("You will likely divide by zero here.")
-    
-    ///works in the console, doesn't if you put { } around it
+
+    ///this one works in the console, but doesn't if you put { } around it
     //should("""val a = "abcd"; a.substring(2,2).tail""")("Taking the tail of an empty string.")
-    
-    ///room for optimization (or rewritting) of Values class
-    //this simple doesn't freeze anymore, but it can be done
-    //{ val a = (1 to 2000000).sum }
+    ///this one works in the console, but doesn't in tests
+    //should("""{ "dfd"*(-5) }""")
     
   }
 

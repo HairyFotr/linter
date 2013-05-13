@@ -475,7 +475,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           case Function(params, body) =>
             abstractInterpretation.traverseBlock(body)
-          
+                    
           case blockElem @ Block(init, last) =>
             abstractInterpretation.traverseBlock(blockElem)
 
