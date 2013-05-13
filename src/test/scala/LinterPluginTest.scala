@@ -689,14 +689,18 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       |var a = 4f
       |if(a != a) "foo"
     """)
+    should("""
+      |var a = Double.NaN
+      |if(a == Double.NaN) "foo"
+    """)
+    should("""
+      |var a = Double.NaN
+      |if(a == a) "foo"
+    """)
 
     shouldnt("""
       |var a = 4
       |if(a != a) "foo"
-    """)
-    shouldnt("""
-      |var a = Double.NaN
-      |if(a == a) "foo"
     """)
   }
   

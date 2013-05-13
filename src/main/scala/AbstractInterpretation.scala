@@ -432,12 +432,15 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           case nme.ASR => (_ >> _, false): F
           case nme.MOD if right.size == 1 && right.getValueForce != 0 => (_ % _, false): F
           case nme.DIV if right.size == 1 && right.getValueForce != 0 => (_ / _, false): F
-          case a if a.toString matches "apply|take|drop|map|max|min|contains" => ((a: Int, b: Int) => throw new Exception(), false): F //Foo, check below
+          case a if a.toString matches "apply|take|drop|max|min|contains|map|count" => ((a: Int, b: Int) => throw new Exception(), false): F //Foo, check below
           case _ => return Values.empty
       }
       
+      //List(ValDef(Modifiers(), newTermName("a"), TypeTree(), Apply(Select(Apply(Select(Ident(scala.StringContext), newTermName("apply")), List(Literal(Constant(" hello ")), Literal(Constant(" rld ")), Literal(Constant(" lll")))), newTermName("s")), List(Apply(Select(Apply(Select(Literal(Constant("w")), newTermName("$plus")), List(Literal(Constant(3)))), newTermName("$plus")), List(Literal(Constant("o")))), Literal(Constant(10))))))
       val out: Values = (
-        if(left.isEmpty || right.isEmpty) {
+        if(op.toString == "count") {
+          (if(left.actualSize == 0) Values(0) else if(left.actualSize > 0) Values.empty.addCondition(_ < left.actualSize) else Values.empty).addCondition(_ >= 0)
+        } else if(left.isEmpty || right.isEmpty) {
           //ADD: x & 2^n is Set(2^n,0) and stuff like that :)
           if(left.contains(0) || right.contains(0)) {
             if(Set[Name](nme.MUL, nme.AND) contains op) Values(0) else Values.empty
@@ -572,6 +575,19 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       
       op match {
         case nme.MOD if right.isValue => out.addConditions(Set(_ > -math.abs(right.getValue), _ < math.abs(right.getValue)))
+        case nme.DIV if left.isValue => out.addConditions(Set(_ >= -math.abs(left.getValue), _ <= math.abs(left.getValue)))
+        /*case (nme.AND | nme.OR) if left.isValue || right.isValue => 
+          //TODO: you need to learn two's complement, brah
+          val (min, max) = (
+            if(left.isValue && right.isValue) 
+              (math.min(left.getValue, right.getValue), math.max(left.getValue, right.getValue))
+            else if(left.isValue) 
+              (left.getValue, left.getValue)
+            else //if(right.isValue) 
+              (right.getValue, right.getValue)
+          )
+              
+          if(op == nme.AND) out.addConditions(_ <)*/
         case _ => out
       }
     }
@@ -625,6 +641,11 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         if (scala_augmentString.toString endsWith "augmentString") =>
         
         StringAttrs.stringFunc(string, func).right.getOrElse(Values.empty)
+
+      case strFun @ Apply(Select(Apply(scala_augmentString, List(string)), func), params)
+        if (scala_augmentString.toString endsWith "augmentString") =>
+        
+        StringAttrs.stringFunc(string, func, params).right.getOrElse(Values.empty)
 
       /// Division by zero
       case pos @ Apply(Select(_, op), List(expr)) if (op == nme.DIV || op == nme.MOD) && (computeExpr(expr).contains(0)) => 
@@ -904,17 +925,23 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           } else
             Left(new StringAttrs(minLength = math.max(str.minLength-1, 0), maxLength = if(str.maxLength != Int.MaxValue) math.max(str.maxLength-1, 0) else Int.MaxValue))
 
-        case "capitalize" if str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.capitalize)))
-        case "distinct"   if str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.distinct)))
-        case "reverse"    if str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.reverse)))
+        case "capitalize" if params.size == 0 => if(str.exactValue.isDefined) Left(new StringAttrs(str.exactValue.map(_.capitalize))) else Left(str)
+        case "distinct"   if params.size == 0 => if(str.exactValue.isDefined) Left(new StringAttrs(str.exactValue.map(_.distinct))) else Left(str.zeroMinLengths)
+        case "reverse"    if params.size == 0 => if(str.exactValue.isDefined) Left(new StringAttrs(str.exactValue.map(_.reverse))) else Left(str)
+        case "count"      if params.size == 1 => 
+          val out = Values.empty.addCondition(_ >= 0)
+          Right(if(str.getMaxLength != Int.MaxValue) out.addCondition(_ < str.getMaxLength) else out)
+        case "filter"     if params.size == 1 => 
+          println(Left(str.zeroMinLengths))
+          Left(str.removeExactValue.zeroMinLengths)
         
         //These come in (Char/String) versions
         case "stringPrefix" if params.size == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stringPrefix)))
         case "stripLineEnd" if params.size == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stripLineEnd)))
         case "stripMargin"  if params.size == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stripMargin)))
         
-        case "toUpperCase" => Left(new StringAttrs(str.exactValue.map(_.toUpperCase), None, str.minLength, str.trimmedMinLength))
-        case "toLowerCase" => Left(new StringAttrs(str.exactValue.map(_.toLowerCase), None, str.minLength, str.trimmedMinLength))
+        case "toUpperCase" => if(str.exactValue.isDefined) Left(new StringAttrs(str.exactValue.map(_.toUpperCase))) else Left(str)
+        case "toLowerCase" => if(str.exactValue.isDefined) Left(new StringAttrs(str.exactValue.map(_.toLowerCase))) else Left(str)
         case "trim" => 
           val newExactValue = str.exactValue.map(_.trim)
           val newMinLength = str.exactValue.map(_.trim.size).getOrElse(str.getTrimmedMinLength)
@@ -995,7 +1022,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
             case "startsWith" => unit.warning(params.head.pos, "This startsWith will always return "+string.startsWith(param)+".")
             case "endsWith"   => unit.warning(params.head.pos, "This endsWith will always return "+string.endsWith(param)+".")
             case "compare"    => unit.warning(params.head.pos, "This compare will always return "+string.compare(param)+".")
-            case "compareTo"  => unit.warning(params.head.pos, "This compare will always return "+string.compareTo(param)+".")
+            case "compareTo"  => unit.warning(params.head.pos, "This compareTo will always return "+string.compareTo(param)+".")
             case _ =>
           }
           Left(empty)
@@ -1045,7 +1072,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         case Literal(Constant(null)) => new StringAttrs(exactValue = Some("null"))
         case Literal(Constant(c)) => 
           if(stringVals.filter(s => s.name.isDefined && !(vars contains s.name.get)).exists(_.exactValue == Some(c.toString))) {
-            unit.warning(tree.pos, "You have defined that string as a val already, maybe use that?")
+            //unit.warning(tree.pos, "You have defined that string as a val already, maybe use that?")
           }
 
           new StringAttrs(exactValue = Some(c.toString))
@@ -1090,6 +1117,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       private val trimmedMaxLength: Int = Int.MaxValue) {
     
     def addName(name: String): StringAttrs = new StringAttrs(exactValue, Some(name), getMinLength, trimmedMinLength, getMaxLength, trimmedMaxLength)
+    def removeExactValue: StringAttrs = new StringAttrs(None, name, getMinLength, trimmedMinLength, getMaxLength, trimmedMaxLength)
+    def zeroMinLengths: StringAttrs = new StringAttrs(exactValue, name, 0, 0, getMaxLength, trimmedMaxLength)
     
     def alwaysIsEmpty: Boolean = getMaxLength == 0
     def alwaysNonEmpty: Boolean = getMinLength > 0
@@ -1208,14 +1237,14 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         vals = vals.map(a => (a._1, a._2.applyCond(condExpr)._1)).withDefaultValue(Values.empty)
       
       /// String checks
-      case s @ Literal(Constant(str: String)) if stringVals.filter(s => s.name.isDefined && !(vars contains s.name.get)).find(_.exactValue == Some(str)).isDefined =>
-        unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
-        visitedBlocks += s
+      //case s @ Literal(Constant(str: String)) if stringVals.filter(s => s.name.isDefined && !(vars contains s.name.get)).find(_.exactValue == Some(str)).isDefined =>
+        //unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
+        //visitedBlocks += s
 
       case ValDef(m: Modifiers, valName, _, s @ Literal(Constant(str: String))) if(!m.hasFlag(MUTABLE) && !m.hasFlag(FINAL)) =>
-        if(stringVals.filter(s => s.name.isDefined && !(vars contains s.name.get)).exists(_.exactValue == Some(str))) unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
+        //if(stringVals.filter(s => s.name.isDefined && !(vars contains s.name.get)).exists(_.exactValue == Some(str))) unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
         //stringVals += str
-        visitedBlocks += s
+        //visitedBlocks += s
         
         val str2 = StringAttrs(s).addName(valName.toString)
         //println("str2: "+str2)

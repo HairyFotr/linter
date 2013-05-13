@@ -29,7 +29,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
   val name = "linter"
   val description = "a static analysis compiler plugin"
-  val components = List[PluginComponent](PreTyperComponent, LinterComponent, AfterLinterComponent)
+  val components = List[PluginComponent](PreTyperComponent, LinterComponent)//, AfterLinterComponent)
   
   override val optionsHelp: Option[String] = Some("  -P:linter No options yet, just letting you know I'm here")
 
@@ -105,7 +105,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
 
   //used for simple var -> val cases
-  val varDecls,varAssigns = collection.mutable.HashSet[String]() //TermName actually...
+  //val varDecls,varAssigns = collection.mutable.HashSet[String]() //TermName actually...
 
   private object LinterComponent extends PluginComponent {
     import global._
@@ -159,6 +159,8 @@ class LinterPlugin(val global: Global) extends Plugin {
         selector.name == nme.WILDCARD && selector.renamePos == -1
       }
       
+      def isOptionOption(t: Tree): Boolean = t.tpe.widen.baseClasses.exists(tp => tp.tpe =:= definitions.OptionClass.tpe && tp.tpe.baseClasses.exists(_.tpe =:= definitions.OptionClass.tpe))
+      
       val abstractInterpretation = new AbstractInterpretation(global, unit)
 
       override def traverse(tree: Tree) { 
@@ -179,19 +181,19 @@ class LinterPlugin(val global: Global) extends Plugin {
           //TODO: Scala 2.11 will have unused variables and vars->vals behind the -Xlint flag
           case a @ Apply(Select(type1, varSetter), List(Select(type2, varName))) if (type1 equalsStructure type2) && (varSetter.toString == varName.toString+"_$eq") =>
             unit.warning(a.pos, "Assigning a variable to itself?")
-          case ValDef(m: Modifiers, varName, TypeTree(), value) if(m.hasFlag(MUTABLE)) =>
-            varDecls += varName.toString.trim
+          //case ValDef(m: Modifiers, varName, TypeTree(), value) if(m.hasFlag(MUTABLE)) =>
+            //varDecls += varName.toString.trim
             //println("vardecl |"+varName.toString.trim+"|")
-          case Apply(Select(a, assign), _) if varDecls.contains(assign.toString.dropRight(4)) => //drop "_$eq" - setter
-            val varName = assign.toString.dropRight(4)
-            varAssigns += varName.toString
+          //case Apply(Select(a, assign), _) if varDecls.contains(assign.toString.dropRight(4)) => //drop "_$eq" - setter
+            //val varName = assign.toString.dropRight(4)
+            //varAssigns += varName.toString
             //println("varassign |"+varName+"|")
           case Assign(l, r) =>
             if(l equalsStructure r) {
               unit.warning(l.pos, "Assigning a variable to itself?")
             } else l match {
               case Ident(varName) => 
-                varAssigns += varName.toString
+                //varAssigns += varName.toString
                 //println("varassign2 |"+varName+"|")
               case _ => 
                 //println(showRaw(l))
@@ -205,10 +207,10 @@ class LinterPlugin(val global: Global) extends Plugin {
             return
             
           /// Some numeric checks
-          case Apply(Select(lhs, nme.EQ), List(rhs))
+          /*case Apply(Select(lhs, nme.EQ), List(rhs))
             if isSubtype(lhs, DoubleClass.tpe) || isSubtype(lhs, FloatClass.tpe) || isSubtype(rhs, DoubleClass.tpe) || isSubtype(rhs, FloatClass.tpe) =>
             
-            //unit.warning(tree.pos, "Exact comparison of floating point values is potentially unsafe.")
+            unit.warning(tree.pos, "Exact comparison of floating point values is potentially unsafe.")*/
             
           /// log1p and expm -- see http://www.johndcook.com/blog/2010/06/07/math-library-functions-that-seem-unnecessary/
           //TODO: maybe make checks to protect against potentially wrong fixes, e.g. log1p(a + 1) or log1p(a - 1)
@@ -423,15 +425,24 @@ class LinterPlugin(val global: Global) extends Plugin {
           case If(cond1, _, If(cond2, _, _)) if cond1 equalsStructure cond2 =>
             unit.warning(cond2.pos, "This else-if has the same condition as the previous if.")
 
-          case Apply(Select(left, func), List(right)) if (func.toString matches "[$]amp[$]amp|[$]bar[$]bar") && (left equalsStructure right) =>        
-            unit.warning(tree.pos, "Same expression on both sides of condition.")
-          case Apply(Select(left, func), List(right)) if (func.toString matches "[$](greater|less|eq|bang)([$]eq)?") && (left equalsStructure right) =>
-            if(left.tpe <:< definitions.DoubleClass.tpe || left.tpe <:< definitions.FloatClass.tpe) {
-              /// Use variable.isNaN instead of (variable != variable)
-              unit.warning(tree.pos, "Same expression on both sides of comparison. (Use .isNan instead)")
-            } else {
-              unit.warning(tree.pos, "Same expression on both sides of comparison.")
-            }
+          case Apply(Select(left, func), List(right)) 
+            if (func.toString matches "[$]amp[$]amp|[$]bar[$]bar") && (left equalsStructure right) && tree.tpe.widen <:< definitions.BooleanClass.tpe =>
+            
+            unit.warning(tree.pos, "Same expression on both sides of boolean statement.")
+           
+          /// Use variable.isNaN instead of (variable != variable)
+          case Apply(Select(left, func), List(right))
+            if((left.tpe.widen <:< definitions.DoubleClass.tpe || left.tpe.widen <:< definitions.FloatClass.tpe)
+            && (func == nme.EQ || func == nme.NE)
+            && ((left equalsStructure right) || (right equalsStructure Literal(Constant(Double.NaN))) || (right equalsStructure Literal(Constant(Float.NaN))))) =>
+            
+            unit.warning(tree.pos, "Use .isNan instead of comparing to itself or NaN.")
+
+          /// Same expression on both sides of comparison.
+          case Apply(Select(left, func), List(right)) 
+            if (func.toString matches "[$](greater|less|eq|bang)([$]eq)?") && (left equalsStructure right) =>
+            
+            unit.warning(tree.pos, "Same expression on both sides of comparison.")
 
           /// Yoda conditions (http://www.codinghorror.com/blog/2012/07/new-programming-jargon.html): if(6 == a) ...
           case Apply(Select(Literal(Constant(const)), func), params) if (params.size) == 1 && (func.toString matches "[$](greater|less|eq)([$]eq)?") && (params.head match { case Literal(_) => false case _ => true })  =>
@@ -510,6 +521,17 @@ class LinterPlugin(val global: Global) extends Plugin {
               case _ =>
             }
 
+          /// an Option of an Option
+          //TODO: make stricter if you want, but Ident(_) could get annoying if someone out there is actually using this :)
+          case ValDef(_, _, _, value) if isOptionOption(value) =>
+            unit.warning(tree.pos, "Why would you need an Option of an Option?")
+
+          /// orElse(Some(...)).get is better written as getOrElse(...)
+          case Select(Apply(TypeApply(Select(opt, orElse), _), List(Apply(scala_Some_apply, List(value)))), get)
+            if orElse.toString == "orElse" && get.toString == "get" && scala_Some_apply.toString.startsWith("scala.Some.apply") =>
+            
+            unit.warning(scala_Some_apply.pos, "Use getOrElse(...) instead of orElse(Some(...)).get")
+
           /// find(...).isDefined is better written as exists(...)
           case Select(Apply(pos @ Select(collection, find), func), isDefined) 
             if find.toString == "find" && isDefined.toString == "isDefined" && (collection.toString.startsWith("scala.") || collection.toString.startsWith("immutable.")) =>
@@ -573,7 +595,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     }
   }
   
-  private object AfterLinterComponent extends PluginComponent {
+  /*private object AfterLinterComponent extends PluginComponent {
     import global._
 
     implicit val global = LinterPlugin.this.global
@@ -595,5 +617,5 @@ class LinterPlugin(val global: Global) extends Plugin {
         varDecls.clear
       }
     }
-  }
+  }*/
 }
