@@ -159,12 +159,16 @@ class LinterPlugin(val global: Global) extends Plugin {
         selector.name == nme.WILDCARD && selector.renamePos == -1
       }
       
-      def isOptionOption(t: Tree): Boolean = t.tpe.widen.baseClasses.exists(tp => tp.tpe =:= definitions.OptionClass.tpe && tp.tpe.baseClasses.exists(_.tpe =:= definitions.OptionClass.tpe))
+      def isOptionOption(t: Tree): Boolean = 
+        (t.tpe.widen.baseClasses.exists(tp => tp.tpe =:= definitions.OptionClass.tpe) 
+        && t.tpe.widen.typeArgs.exists(tp => tp.widen.baseClasses.exists(tp => tp.tpe =:= definitions.OptionClass.tpe)))
       
       val abstractInterpretation = new AbstractInterpretation(global, unit)
 
       override def traverse(tree: Tree) { 
+        //TODO: the matchers are broken up for one reason only - Scala 2.9 pattern matcher :)
         //abstractInterpretation.traverseBlock(tree)
+        ///Workarounds:
         tree match {
           /// Workaround: case class generated code triggers a lot of the checks...
           case ClassDef(mods, _, _, _) if mods.hasFlag(CASE) => return
@@ -176,36 +180,9 @@ class LinterPlugin(val global: Global) extends Plugin {
               case ValDef(modifiers, id1, _, _) :: Assign(id2, _) :: _ => true
               case _ => false
             }} => return
-
-          /// Tracks variable assignment (for unused, vars that could be vals, ...), and checks for self-assignments: a = a
-          //TODO: Scala 2.11 will have unused variables and vars->vals behind the -Xlint flag
-          case a @ Apply(Select(type1, varSetter), List(Select(type2, varName))) if (type1 equalsStructure type2) && (varSetter.toString == varName.toString+"_$eq") =>
-            unit.warning(a.pos, "Assigning a variable to itself?")
-          //case ValDef(m: Modifiers, varName, TypeTree(), value) if(m.hasFlag(MUTABLE)) =>
-            //varDecls += varName.toString.trim
-            //println("vardecl |"+varName.toString.trim+"|")
-          //case Apply(Select(a, assign), _) if varDecls.contains(assign.toString.dropRight(4)) => //drop "_$eq" - setter
-            //val varName = assign.toString.dropRight(4)
-            //varAssigns += varName.toString
-            //println("varassign |"+varName+"|")
-          case Assign(l, r) =>
-            if(l equalsStructure r) {
-              unit.warning(l.pos, "Assigning a variable to itself?")
-            } else l match {
-              case Ident(varName) => 
-                //varAssigns += varName.toString
-                //println("varassign2 |"+varName+"|")
-              case _ => 
-                //println(showRaw(l))
-            }
-
-          /// Checks if you read from a file without closing it: scala.io.Source.fromFile(file).mkString
-          //TODO: Only checks one-liners where you chain it - doesn't actually check if you close it
-          case Select(fromFile, _) if fromFile.toString startsWith "scala.io.Source.fromFile" =>
-            val warnMsg = "You should close the file stream after use."
-            unit.warning(fromFile.pos, warnMsg)
-            return
-            
+          case _ =>
+        }
+        tree match {
           /// Some numeric checks
           /*case Apply(Select(lhs, nme.EQ), List(rhs))
             if isSubtype(lhs, DoubleClass.tpe) || isSubtype(lhs, FloatClass.tpe) || isSubtype(rhs, DoubleClass.tpe) || isSubtype(rhs, FloatClass.tpe) =>
@@ -231,6 +208,14 @@ class LinterPlugin(val global: Global) extends Plugin {
             if (expr1 equalsStructure expr2) && math_sqrt.toString == "scala.math.`package`.sqrt" =>
             
             unit.warning(tree.pos, "Use abs instead of sqrt(x*x).")
+
+          /// Use variable.isNaN instead of (variable != variable)
+          case Apply(Select(left, func), List(right))
+            if((left.tpe.widen <:< definitions.DoubleClass.tpe || left.tpe.widen <:< definitions.FloatClass.tpe)
+            && (func == nme.EQ || func == nme.NE)
+            && ((left equalsStructure right) || (right equalsStructure Literal(Constant(Double.NaN))) || (right equalsStructure Literal(Constant(Float.NaN))))) =>
+            
+            unit.warning(tree.pos, "Use .isNan instead of comparing to itself or NaN.")
 
           /// Signum function checks
           case pos @ Apply(Select(expr1, op), List(expr2)) if (op == nme.DIV) && ((expr1, expr2) match {
@@ -276,6 +261,39 @@ class LinterPlugin(val global: Global) extends Plugin {
             if java_math_BigDecimal.toString == "java.math.BigDecimal" =>
             unit.warning(tree.pos, "Possible loss of precision - use a string constant")
           
+          case _ =>
+        }
+        
+        tree match {
+          /// Tracks variable assignment (for unused, vars that could be vals, ...), and checks for self-assignments: a = a
+          //TODO: Scala 2.11 will have unused variables and vars->vals behind the -Xlint flag
+          case a @ Apply(Select(type1, varSetter), List(Select(type2, varName))) if (type1 equalsStructure type2) && (varSetter.toString == varName.toString+"_$eq") =>
+            unit.warning(a.pos, "Assigning a variable to itself?")
+          //case ValDef(m: Modifiers, varName, TypeTree(), value) if(m.hasFlag(MUTABLE)) =>
+            //varDecls += varName.toString.trim
+            //println("vardecl |"+varName.toString.trim+"|")
+          //case Apply(Select(a, assign), _) if varDecls.contains(assign.toString.dropRight(4)) => //drop "_$eq" - setter
+            //val varName = assign.toString.dropRight(4)
+            //varAssigns += varName.toString
+            //println("varassign |"+varName+"|")
+          case Assign(l, r) =>
+            if(l equalsStructure r) {
+              unit.warning(l.pos, "Assigning a variable to itself?")
+            } else l match {
+              case Ident(varName) => 
+                //varAssigns += varName.toString
+                //println("varassign2 |"+varName+"|")
+              case _ => 
+                //println(showRaw(l))
+            }
+
+          /// Checks if you read from a file without closing it: scala.io.Source.fromFile(file).mkString
+          //TODO: Only checks one-liners where you chain it - doesn't actually check if you close it
+          case Select(fromFile, _) if fromFile.toString startsWith "scala.io.Source.fromFile" =>
+            val warnMsg = "You should close the file stream after use."
+            unit.warning(fromFile.pos, warnMsg)
+            return
+            
           /// Comparing with == on instances of different types: 5 == "5"
           //TODO: Scala 2.10 has a similar check "comparing values of types Int and String using `==' will always yield false"
           case Apply(eqeq @ Select(lhs, nme.EQ), List(rhs)) if methodImplements(eqeq.symbol, Object_==) && !isSubtype(lhs, rhs) && !isSubtype(rhs, lhs) && lhs.tpe.widen.toString != "Null" && rhs.tpe.widen.toString != "Null" =>
@@ -430,14 +448,6 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             unit.warning(tree.pos, "Same expression on both sides of boolean statement.")
            
-          /// Use variable.isNaN instead of (variable != variable)
-          case Apply(Select(left, func), List(right))
-            if((left.tpe.widen <:< definitions.DoubleClass.tpe || left.tpe.widen <:< definitions.FloatClass.tpe)
-            && (func == nme.EQ || func == nme.NE)
-            && ((left equalsStructure right) || (right equalsStructure Literal(Constant(Double.NaN))) || (right equalsStructure Literal(Constant(Float.NaN))))) =>
-            
-            unit.warning(tree.pos, "Use .isNan instead of comparing to itself or NaN.")
-
           /// Same expression on both sides of comparison.
           case Apply(Select(left, func), List(right)) 
             if (func.toString matches "[$](greater|less|eq|bang)([$]eq)?") && (left equalsStructure right) =>
@@ -521,6 +531,31 @@ class LinterPlugin(val global: Global) extends Plugin {
               case _ =>
             }
 
+          case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, param, _, _)), body))) if { //if (foreach_map.toString matches "foreach|map") && {
+            abstractInterpretation.forLoop(forloop)
+            false
+          } => //
+          case DefDef(_, _, _, _, _, block) => 
+            abstractInterpretation.traverseBlock(block)
+
+          //TODO: these two are probably superdeded by abs-interpreter
+          case pos @ Apply(Select(seq, apply), List(Literal(Constant(index: Int)))) 
+            if methodImplements(pos.symbol, SeqLikeApply) && index < 0 =>
+            unit.warning(pos.pos, "Using a negative index for a collection.")
+
+          case divByZero @ Apply(Select(rcvr, op), List(Literal(Constant(zero))))
+            // cannot check double/float, as typer will automatically translate it to Infinity
+            if (zero == 0) && (op == nme.DIV || op == nme.MOD) 
+              &&(rcvr.tpe <:< definitions.ByteClass.tpe
+              ||rcvr.tpe <:< definitions.ShortClass.tpe
+              ||rcvr.tpe <:< definitions.IntClass.tpe
+              ||rcvr.tpe <:< definitions.LongClass.tpe) =>
+            unit.warning(divByZero.pos, "Literal division by zero.")
+
+          case _ =>
+        }
+
+        tree match {
           /// an Option of an Option
           //TODO: make stricter if you want, but Ident(_) could get annoying if someone out there is actually using this :)
           case ValDef(_, _, _, value) if isOptionOption(value) =>
@@ -554,42 +589,20 @@ class LinterPlugin(val global: Global) extends Plugin {
                 unit.warning(tree.pos, "Use filter(x => cond) instead of this flatMap(x => if(cond) ... else ...)")
 
               //TODO: this check makes scalac 2.9 pattern matcher explode
-              /*case (Apply(option2Iterable1, List(none)),Apply(option2Iterable2, List(Apply(TypeApply(Select(some, apply), _), List(Ident(id))))))
+              case (Apply(option2Iterable1, List(none)),Apply(option2Iterable2, List(Apply(TypeApply(Select(some, apply), _), List(Ident(id))))))
                 if (none.toString == "scala.None")
                 && (some.toString == "scala.Some")
                 && (id.toString == param.toString) =>
                 
-                unit.warning(tree.pos, "Use filter(x => cond) instead of this flatMap(x => if(cond) ... else ...)")*/
+                unit.warning(tree.pos, "Use filter(x => cond) instead of this flatMap(x => if(cond) ... else ...)")
                 
               case a => 
                 //println((expr1, expr2))
                 //println((showRaw(expr1), showRaw(expr2)))
             }
-
-          case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, param, _, _)), body))) if { //if (foreach_map.toString matches "foreach|map") && {
-            abstractInterpretation.forLoop(forloop)
-            false
-          } => //
-
-          case DefDef(_, _, _, _, _, block) => 
-            abstractInterpretation.traverseBlock(block)
-
-          //TODO: these two are probably superdeded by abs-interpreter
-          case pos @ Apply(Select(seq, apply), List(Literal(Constant(index: Int)))) 
-            if methodImplements(pos.symbol, SeqLikeApply) && index < 0 =>
-            unit.warning(pos.pos, "Using a negative index for a collection.")
-
-          case divByZero @ Apply(Select(rcvr, op), List(Literal(Constant(zero))))
-            // cannot check double/float, as typer will automatically translate it to Infinity
-            if (zero == 0) && (op == nme.DIV || op == nme.MOD) 
-              &&(rcvr.tpe <:< definitions.ByteClass.tpe
-              ||rcvr.tpe <:< definitions.ShortClass.tpe
-              ||rcvr.tpe <:< definitions.IntClass.tpe
-              ||rcvr.tpe <:< definitions.LongClass.tpe) =>
-            unit.warning(divByZero.pos, "Literal division by zero.")
-
           case _ =>
         }
+
         super.traverse(tree)
       }
     }

@@ -541,11 +541,16 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt("""List(2).headOption.size == 1""")("will never hold")
     shouldnt("""List(2).headOption.size == 1""")("will always hold")
   
-    implicit val msg = "Did you mean to take the size of the collection inside the Option?"
+    implicit var msg = "Did you mean to take the size of the collection inside the Option?"
     should("""Option(List(2)).size""")
     should("""Option("fdsfd").size""")
     should("""List(List(2)).headOption.size""")
     shouldnt("""List(2).headOption.size""")
+    
+    msg = "Option of an Option"
+    should("""val a = Option(Option("fdsfs"))""")
+    shouldnt("""val a = Option("fdsfs")""")
+    shouldnt("""val a = Option(List(2))""")
   }
   
   def abs_interpretation__StringAndInt() {
@@ -1309,10 +1314,10 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   def style__flatMap_to_filter() {
     implicit val msg = /*filter*/"instead of this flatMap"
     
-    //should("""{ List(1,2,3).flatMap(x => if(x == 2) Some(x) else None) }""")
+    should("""{ List(1,2,3).flatMap(x => if(x == 2) Some(x) else None) }""")
     should("""{ List(1,2,3).flatMap(x => if(x == 2) Nil else List(x)) }""")
 
-    //shouldnt("""{ List(1,2,3).flatMap(x => if(x == 2) Some(x+1) else None) }""")
+    shouldnt("""{ List(1,2,3).flatMap(x => if(x == 2) Some(x+1) else None) }""")
     shouldnt("""{ List(1,2,3).flatMap(x => if(x == 2) Nil else List(x+1)) }""")
   }
 
