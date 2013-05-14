@@ -4,6 +4,7 @@ import scala.tools.nsc.{Global}
 import scala.tools.nsc.plugins.{Plugin, PluginComponent}
 import scala.tools.nsc.symtab.Flags.{IMPLICIT, OVERRIDE, MUTABLE, CASE, LAZY, FINAL}
 import com.foursquare.lint.global._
+import collection.mutable
 
 // Warning: Don't try too hard to understand this code, it's a mess and needs
 // to be rewritten in a type-safe and transparent way.
@@ -34,8 +35,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     (used > 0)
   }
   
-  def getUsed(tree: GTree): collection.mutable.HashSet[String] = {
-    val used = collection.mutable.HashSet[String]()
+  def getUsed(tree: GTree): mutable.HashSet[String] = {
+    val used = mutable.HashSet[String]()
 
     def findUsed(tree: GTree) {
       for(Ident(id) <- tree.children) used += id.toString
@@ -129,6 +130,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     def addValue(i: Int): Values = new Values(ranges, values + i, conditions, name, false, -1)
     def addSet(s: Set[Int]): Values = new Values(ranges, values ++ s, conditions, name, false, -1) //TODO: are these false, -1 ok?
     def addCondition(c: Int => Boolean): Values = new Values(ranges, values, conditions + c, name, isSeq, actualSize)
+    def addConditions(c: (Int => Boolean)*): Values = new Values(ranges, values, conditions ++ c, name, isSeq, actualSize)
     def addConditions(c: Set[Int => Boolean]): Values = new Values(ranges, values, conditions ++ c, name, isSeq, actualSize)
     def addName(s: String): Values = new Values(ranges, values, conditions, s, isSeq, actualSize)
     def addActualSize(s: Int): Values = new Values(ranges, values, conditions, name, isSeq, s)
@@ -562,7 +564,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
               //case nme.MUL => left.map(a => a*a)
               case nme.DIV if(!left.contains(0)) => Values(1) //TODO: never gets executed?
               case nme.SUB | nme.XOR => 
-                if(op == nme.SUB) unit.warning(treePosHolder.pos, "Same expression on both sides of subtraction.")
+                if(op == nme.SUB) unit.warning(treePosHolder.pos, "Same values on both sides of subtraction will return 0.")
+                if(op == nme.XOR) unit.warning(treePosHolder.pos, "Same values on both sides of ^ will return 0.")
                 Values(0)
               case nme.AND | nme.OR  => left
               case _ => Values.empty
@@ -574,8 +577,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       )
       
       op match {
-        case nme.MOD if right.isValue => out.addConditions(Set(_ > -math.abs(right.getValue), _ < math.abs(right.getValue)))
-        case nme.DIV if left.isValue => out.addConditions(Set(_ >= -math.abs(left.getValue), _ <= math.abs(left.getValue)))
+        case nme.MOD if right.isValue => out.addConditions(_ > -math.abs(right.getValue), _ < math.abs(right.getValue))
+        case nme.DIV if left.isValue => out.addConditions(_ >= -math.abs(left.getValue), _ <= math.abs(left.getValue))
         /*case (nme.AND | nme.OR) if left.isValue || right.isValue => 
           //TODO: you need to learn two's complement, brah
           val (min, max) = (
@@ -621,8 +624,11 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         val name = termName.toString
         val n = (if(name.contains(".this.")) name.substring(name.lastIndexOf(".")+1) else name).trim
         //println(n+": "+vals(n))
-        vals(n)
-        
+        if(vals contains n) vals(n) else if((defModels contains n) && defModels(n).isLeft) defModels(n).left.get else Values.empty
+      case Apply(Ident(termName), params) if defModels contains termName.toString =>
+        val n = termName.toString
+        if(vals contains n) vals(n) else if((defModels contains n) && defModels(n).isLeft) defModels(n).left.get else Values.empty
+      
       // String size
       /*case Apply(Select(Ident(id), length), List()) if stringVals.exists(_.name == Some(id.toString)) && length.toString == "length" =>
         val exactValue = stringVals.find(_.name == Some(id.toString)).map(_.exactValue)
@@ -741,29 +747,29 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       case Apply(Apply(TypeApply(Select(valName, map), List(_, _)), List(Function(List(ValDef(mods, paramName, _, EmptyTree)), expr))), _) if(map.toString == "map") => 
         //List(TypeApply(Select(Select(This(newTypeName("immutable")), scala.collection.immutable.List), newTermName("canBuildFrom")), List(TypeTree()))))
         
-        val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
-        val backupStrs = stringVals.clone
+        pushDefinitions()
+
         val res = computeExpr(valName)
         vals += paramName.toString -> res
         //println(">        "+vals)
         val out = computeExpr(expr)
-        vals = backupVals
-        stringVals = backupStrs
+
+        popDefinitions()
         //println(">        "+out)
         out
       
       case If(condExpr, expr1, expr2) =>
         //TODO: if condExpr always/never holds, return that branch
-        val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
-        val backupStrs = stringVals.clone
+        pushDefinitions()
         
         val e1 = computeExpr(expr1)
-        vals = backupVals
-        stringVals = backupStrs
+
+        popDefinitions()
+        pushDefinitions()
 
         val e2 = computeExpr(expr2)
-        vals = backupVals
-        stringVals = backupStrs
+        
+        popDefinitions()
         
         /*println(vals)
         vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr)._1)).withDefaultValue(Values.empty)
@@ -777,9 +783,6 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         val e2 = computeExpr(expr2)
         println("e2"+e1)*/
         
-        vals = backupVals
-        stringVals = backupStrs
-
         //if(e1.isValue && e2.isValue) new Values(values = e1.values ++ e2.values) else Values.empty
         if(expr1.tpe <:< definitions.NothingClass.tpe) {
           e2
@@ -800,20 +803,49 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     //println(out+"  "+showRaw(tree))
     out
   }
-  //val exprs = collection.mutable.HashSet[String]()
+  //val exprs = mutable.HashSet[String]()
       
-  // go immutable
-  var vals = collection.mutable.HashMap[String, Values]().withDefaultValue(Values.empty)
-  var stringVals = collection.mutable.HashSet[StringAttrs]()
   var treePosHolder: GTree = null //ugly hack to get position for a few warnings
+  // go immutable?
+  var vals = mutable.Map[String, Values]().withDefaultValue(Values.empty)
+  var vars = mutable.Set[String]()
+  var stringVals = mutable.Set[StringAttrs]()
+  var defModels = mutable.Map[String, Either[Values, StringAttrs]]().withDefaultValue(Left(Values.empty))
+  def discardVars(tree: GTree, force: String*) {
+    for(v <- vars; if isAssigned(tree, v) || (force contains v)) {
+      vals(v) = Values.empty
+      stringVals = stringVals.filter(v => v.name.isDefined && !(vars contains v.name.get))
+      //println("discard: "+(vals))
+    }
+  }
+  var labels = mutable.Map[String, GTree]()        
+  
+  //vals,vars,stringVals,defModels
+  val backupStack = mutable.Stack[(mutable.Map[String, Values], mutable.Set[String], mutable.Set[StringAttrs], mutable.Map[String, Either[Values, StringAttrs]])]()
+  def pushDefinitions() {
+    backupStack.push((
+      vals.map(a => a).withDefaultValue(Values.empty),
+      vars.map(a => a),
+      stringVals.map(a => a),
+      defModels.map(a => a).withDefaultValue(Left(Values.empty))))
+  }
+  def popDefinitions() {
+    //discards new and discarded vars also
+    val varsCurr = vars.map(a => a)
+    val (valsBack, varsBack, stringValsBack, defModelsBack) = backupStack.pop
+    vals = valsBack.map(a => a).withDefaultValue(Values.empty)
+    vars = varsBack.map(a => a)
+    discardVars(EmptyTree, ((varsCurr &~ varsBack).toSeq ++ (varsBack &~ varsCurr)):_*)
+    stringVals = stringValsBack.map(a => a)
+    defModels = defModelsBack.map(a => a).withDefaultValue(Left(Values.empty))
+  }
   
   def forLoop(tree: GTree) {
     treePosHolder = tree
     //TODO: actually anything that takes (A <: (a Number) => _), this is awful
     val funcs = "foreach|map|filter(Not)?|exists|find|flatMap|forall|groupBy|count|((drop|take)While)|(min|max)By|partition|span"
 
-    val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
-    val backupStrs = stringVals.clone
+    pushDefinitions()
     
     val (param, values, body, func) = tree match {
       case Apply(TypeApply(Select(collection, func), _), List(Function(List(ValDef(_, param, _, _)), body))) if (func.toString matches funcs) =>
@@ -839,11 +871,11 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
 
       traverseBlock(body)
     }
-    vals = backupVals.withDefaultValue(Values.empty)
-    stringVals = backupStrs
+
+    popDefinitions()
   }
   
-  val visitedBlocks = collection.mutable.HashSet[GTree]()
+  val visitedBlocks = mutable.HashSet[GTree]()
   
   // Just something quick I hacked together for an actual bug
   //implicit def String2StringAttrs(s: String) = new StringAttrs(exactValue = Some(s))
@@ -905,7 +937,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
                   Values.empty
                 else 
                   Values(str.getMinLength, str.getMaxLength)
-              ).addCondition(_ >= 0)
+              ).addCondition(_ >= 0).addCondition(_ < str.getMaxLength)
           )
         case "toString" if params.size == 0 =>
           Left(toStringAttrs(string))
@@ -932,9 +964,20 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           val out = Values.empty.addCondition(_ >= 0)
           Right(if(str.getMaxLength != Int.MaxValue) out.addCondition(_ < str.getMaxLength) else out)
         case "filter"     if params.size == 1 => 
-          println(Left(str.zeroMinLengths))
           Left(str.removeExactValue.zeroMinLengths)
         
+        case f @ ("indexOf"|"lastIndexOf") if params.size == 1 =>
+          if(str.exactValue.isDefined && stringParam.exactValue.isDefined) {
+            if(f == "indexOf")
+              Right(Values(str.exactValue.get.indexOf(stringParam.exactValue.get)))
+            else
+              Right(Values(str.exactValue.get.lastIndexOf(stringParam.exactValue.get)))
+          } else if(str.getMaxLength < Int.MaxValue) {
+            Right(Values.empty.addConditions(_ >= -1, _ < str.getMaxLength))
+          } else {
+            Right(Values.empty.addConditions(_ >= -1))
+          }
+
         //These come in (Char/String) versions
         case "stringPrefix" if params.size == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stringPrefix)))
         case "stripLineEnd" if params.size == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stripLineEnd)))
@@ -1027,7 +1070,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           }
           Left(empty)
           
-        //str.func(X, X)
+        //str.func(Int, Int)
         case f @ ("substring"|"codePointCount") if intParams.size == 2 && intParams.forall(_.isValue) =>
           lazy val string = str.exactValue.get //lazy to avoid None.get... didn't use monadic, because I was lazy
           val param = intParams.map(_.getValue)
@@ -1077,7 +1120,17 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
 
           new StringAttrs(exactValue = Some(c.toString))
           
-        case Ident(name) => stringVals.find(_.name.exists(_ == name.toString)).getOrElse(empty)
+        case Ident(name) =>
+          stringVals
+            .find(_.name.exists(_ == name.toString))
+            .getOrElse(empty)
+            
+        case Apply(Ident(name), params) if defModels contains name.toString =>
+          defModels
+            .find(m => m._1 == name.toString && m._2.isRight)
+            .map(_._2.right.get)
+            .getOrElse(empty)
+        
         case If(cond, expr1, expr2) =>
           val (e1, e2) = (traverse(expr1), traverse(expr2))
           
@@ -1167,26 +1220,12 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     override def toString: String = (exactValue, name, getMinLength, getTrimmedMinLength, getMaxLength, getTrimmedMaxLength).toString
   }
  
-  var vars = collection.mutable.HashSet[String]()
-  var labels = collection.mutable.HashMap[String, GTree]()        
-  def discardVars(tree: GTree, force: String*) {
-    for(v <- vars; if isAssigned(tree, v) || (force contains v)) {
-      vals(v) = Values.empty
-      stringVals = stringVals.filter(v => v.name.isDefined && !(vars contains v.name.get))
-      //println("discard: "+(vals))
-    }
-  }
-
   def traverseBlock(tree: GTree) {
-    val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
-    val backupVars = vars.map(a=> a)
-    val backupStrs = stringVals.clone
+    pushDefinitions()
     
     traverse(tree)
     
-    vals = backupVals.withDefaultValue(Values.empty)
-    vars = backupVars
-    stringVals = backupStrs
+    popDefinitions()
   }
   def traverse(tree: GTree) {
     if(visitedBlocks(tree)) return else visitedBlocks += tree
@@ -1285,27 +1324,28 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         expr match {
           case e => //Block(_, _) | If(_,_,_) =>
             //println(expr)
-            val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
-            val backupStrs = stringVals.clone
+            pushDefinitions()
+            
             traverse(expr)
-            vals = backupVals.withDefaultValue(Values.empty)
-            stringVals = backupStrs
+            
+            popDefinitions()
           //case _ =>
         }
       
       case Match(pat, cases) if pat.tpe.toString != "Any @unchecked" && cases.size >= 2 =>
         for(c <- cases) {
-          val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
-          val backupStrs = stringVals.clone
+          pushDefinitions()
+
           //TODO: c.pat can override some variables
           traverse(c.body)
-          vals = backupVals.withDefaultValue(Values.empty)
-          stringVals = backupStrs
+  
+          popDefinitions()          
         }
       
       case If(condExpr, t, f) => //TODO: moved to computeExpr?
         val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
         val backupStrs = stringVals.clone
+        pushDefinitions()
         
         //println(vals)
         vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr)._1)).withDefaultValue(Values.empty)
@@ -1313,12 +1353,13 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         //ADD: if always true, or always false pass the return value, e.g. val a = 1; val b = if(a == 1) 5 else 4
         t.foreach(traverse)
 
-        vals = backupVals.withDefaultValue(Values.empty)
+        popDefinitions()
+        pushDefinitions()
+
         vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr)._2)).withDefaultValue(Values.empty)
         f.foreach(traverse)
         
-        vals = backupVals.withDefaultValue(Values.empty)
-        stringVals = backupStrs
+        popDefinitions()
         //println(vals)
 
       //case pos @ Apply(Select(Ident(seq), apply), List(indexExpr)) 
@@ -1333,9 +1374,14 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           unit.warning(pos.pos, "You will likely use a negative index for a collection here.")
         }
       
-      case DefDef(_, _, _, params, _, block @ Block(b, last)) => 
-        val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
-        val backupStrs = stringVals.clone
+      case DefDef(_, name, _, params, _, block @ Block(b, last)) => 
+        //if you want to model one expr funcs - here's a start
+        /*val (block, last) = body match {
+          case block @ Block(b, last) => (block, last)
+          case expr => (EmptyTree, expr)
+        }*/
+        
+        pushDefinitions()
         
         val paramNames = params.flatten.map(_.name.toString)
         
@@ -1354,12 +1400,27 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
             a
         }
         
-        if(returnCount(block) == 0 && computeExpr(returnVal).isValue) {
-          unit.warning(last.pos, "This method always returns the same value: "+computeExpr(returnVal).getValue)
-        }
+        //defModels = backupDefModels
 
-        vals = backupVals.withDefaultValue(Values.empty)
-        stringVals = backupStrs
+        if(returnCount(block) == 0) { 
+          val retVal = computeExpr(returnVal)
+          if(retVal.isValue || (retVal.isSeq && retVal.size > 0)) {
+            unit.warning(last.pos, "This method always returns the same value: "+computeExpr(returnVal).getValue)
+          }
+          popDefinitions()
+          if(retVal.nonEmpty || retVal.conditions.nonEmpty || (retVal.isSeq && retVal.actualSize != -1)) {
+            //println("ModeledV: "+name.toString+" "+retVal)
+            defModels += name.toString -> Left(retVal)
+          } else {
+            val retVal = StringAttrs(returnVal)
+            if((retVal.getMinLength > 0 || retVal.getMaxLength < Int.MaxValue) && !(name.toString matches "[<$]init[$>]")) {
+              //println("ModeledS: "+name.toString+" "+retVal)
+              defModels += name.toString -> Right(retVal)
+            }
+          }
+        } else {
+          popDefinitions()
+        }
 
       /// Invalid regex
       case Apply(java_util_regex_Pattern_compile, List(regExpr)) if java_util_regex_Pattern_compile.toString == "java.util.regex.Pattern.compile" =>
@@ -1388,12 +1449,12 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
 
         unit.warning(t.pos, "Did you mean to take the size of the collection inside the Option?")
         
+      ///Checking the .size (there's a separate warning about using .size)
       //ADD: Generalize... move to applyCond completely, make it less hacky
       case t @ Apply(Select(Select(Apply(option2Iterable, List(opt)), size), op), List(expr))
         if (option2Iterable.toString contains "Option.option2Iterable") && size.toString == "size" && t.tpe.widen <:< definitions.BooleanClass.tpe =>
 
-        val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
-        val backupStrs = stringVals.clone
+        pushDefinitions()
 
         val valName = "__foobar__" //shoot me :P
         
@@ -1404,18 +1465,17 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         
         vals(valName).applyCond(cond)
         
-        vals = backupVals.withDefaultValue(Values.empty)
-        stringVals = backupStrs
+        popDefinitions()
 
       case b @ Block(stmts, ret) => 
         //println("block: "+b)
-        val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
-        val backupStrs = stringVals.clone
+        pushDefinitions()
+
         b.children.foreach(traverse)
         
         /// Try to use vars - TODO: is probably buggy
         /*val block = stmts :+ ret
-        val vars = collection.mutable.HashSet[String]()
+        val vars = mutable.HashSet[String]()
         block foreach {
           case ValDef(m: Modifiers, varName, _, value) if(m.hasFlag(MUTABLE)) =>
             vars += varName.toString
@@ -1431,8 +1491,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
             }
         }
         */
-        vals = backupVals.withDefaultValue(Values.empty)
-        stringVals = backupStrs
+        
+        popDefinitions()
 
       /// Pass on expressions
       case pos @ Apply(Select(_, op), List(expr)) =>

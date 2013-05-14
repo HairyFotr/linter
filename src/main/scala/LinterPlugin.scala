@@ -567,6 +567,17 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             unit.warning(scala_Some_apply.pos, "Use getOrElse(...) instead of orElse(Some(...)).get")
 
+          /// if(opt.isDefined) opt.get else something is better written as getOrElse
+          case If(Select(opt1, isDefined), Select(opt2, get), orElse)
+            if isDefined.toString == "isDefined" && get.toString == "get" && (opt1 equalsStructure opt2) && !(orElse.tpe.widen <:< definitions.NothingClass.tpe) =>
+            
+            if(orElse equalsStructure Literal(Constant(null))) {
+              unit.warning(opt2.pos, "Use opt.orNull or opt.getOrElse(null) instead of if(opt.isDefined) opt.get else null")
+            } else {
+              unit.warning(opt2.pos, "Use opt.getOrElse(...) instead of if(opt.isDefined) opt.get else ...")
+            }
+
+          
           /// find(...).isDefined is better written as exists(...)
           case Select(Apply(pos @ Select(collection, find), func), isDefined) 
             if find.toString == "find" && isDefined.toString == "isDefined" && (collection.toString.startsWith("scala.") || collection.toString.startsWith("immutable.")) =>
