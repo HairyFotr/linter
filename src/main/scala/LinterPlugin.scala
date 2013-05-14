@@ -18,7 +18,7 @@ package com.foursquare.lint
 
 import scala.tools.nsc.{Global, Phase}
 import scala.tools.nsc.plugins.{Plugin, PluginComponent}
-import scala.tools.nsc.symtab.Flags.{IMPLICIT, OVERRIDE, MUTABLE, CASE}
+import scala.tools.nsc.symtab.Flags.{IMPLICIT, OVERRIDE, MUTABLE, CASE, SEALED, TRAIT}
 
 package object global {
   type GTree = Global#Tree
@@ -35,28 +35,66 @@ class LinterPlugin(val global: Global) extends Plugin {
 
   private object PreTyperComponent extends PluginComponent {
     import global._
+    import collection.mutable
 
     val global = LinterPlugin.this.global
 
     override val runsAfter = List("parser")
 
     val phaseName = "linter-parsed"
-
+    
+    val sealedTraits = mutable.Map[Name, Tree]()
+    val usedTraits = mutable.Set[Name]()
     override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
       override def apply(unit: global.CompilationUnit) {
         new PreTyperTraverser(unit).traverse(unit.body)
+        //println((sealedTraits, usedTraits))
+        for(unusedTrait <- sealedTraits.filterNot(st => usedTraits.exists(_.toString == st._1.toString))) {
+          unit.warning(unusedTrait._2.pos, "This sealed trait is never extended.")//TODO: It might still be used in some type-signature somewhere... see scalaz
+        }
+        sealedTraits.clear()
+        usedTraits.clear()
       }
     }
 
     class PreTyperTraverser(unit: CompilationUnit) extends Traverser {
+      var inTrait = false
       override def traverse(tree: Tree) {
+        //if(showRaw(tree).contains("Hello"))println(showRaw(tree))
         tree match {
+          /// Unused sealed traits
+          case t @ ClassDef(mods, name, _, Template(extendsList, _, body)) if !mods.hasFlag(SEALED) && mods.hasFlag(TRAIT) =>
+            inTrait = true
+            for(stmt <- body) traverse(stmt)
+            inTrait = false
+            return
+
+          case t @ ClassDef(mods, name, _, Template(extendsList, _, body)) if mods.hasFlag(SEALED) && mods.hasFlag(TRAIT) && !inTrait =>
+            sealedTraits += name -> t
+            for(Ident(traitName) <- extendsList if traitName.toString != name.toString) usedTraits += traitName
+            for(stmt <- body) traverse(stmt)
+            return
+            
+          case ClassDef(mods, _, _, Template(extendsList, _, body)) => //if mods.hasFlag(CASE) => 
+            for(Ident(traitName) <- extendsList) usedTraits += traitName
+            for(stmt <- body) traverse(stmt)
+            return
+            
+          case ModuleDef(mods, name, Template(extendsList, _, body)) =>
+            for(Ident(traitName) <- extendsList) usedTraits += traitName
+            for(stmt <- body) traverse(stmt)
+            return
+
+          //case _ if(showRaw(tree).contains("Hello")) => println(showRaw(tree))
+            
+ 
           case DefDef(mods: Modifiers, name, _, valDefs, typeTree, block) =>
             /// Unused method parameters
             //TODO: This nags, when a class overrides a method, but doesn't mark it as such - check out late flags: http://harrah.github.io/browse/samples/compiler/scala/tools/nsc/symtab/Flags.scala.html
             if(name.toString != "<init>" && !block.isEmpty && !mods.hasFlag(OVERRIDE)) {
               //Get the parameters, except the implicit ones
               val params = valDefs.flatMap(_.filterNot(_.mods.hasFlag(IMPLICIT))).map(_.name.toString).toBuffer
+              valDefs
 
               //TODO: Put into utils
               def isBlockEmpty(block: Tree): Boolean = block match {
@@ -89,7 +127,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 && (funcParams.forall(_.isInstanceOf[Ident]))
                 && (funcParams.map(_.toString).toList == params.map(_.toString).toList)
               ) {
-                unit.warning(call.pos, "Possible infinite recursive call. (Except if params are mutable, or the names are shadowed)")
+                //unit.warning(call.pos, "Possible infinite recursive call. (Except if params are mutable, or the names are shadowed)")
               }
             }
             

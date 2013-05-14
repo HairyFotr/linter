@@ -1352,6 +1352,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
   
   @Test
+  @Ignore
   def def__recursion() {
     implicit val msg = "infinite recursive call"
     
@@ -1371,6 +1372,18 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt("""def k(x:Int):Int = { val a = 0; val b = a+2; b+x }""")
   }
   
+  @Test 
+  def trait__unused_sealed() {
+    implicit val msg = "This sealed trait is never"
+    
+    should("""sealed trait Hello""")
+    should("""class a { sealed trait Hello; object a { val b = "fdsfds"; class s(); } }""")
+    should("""class a { sealed trait Hello; sealed trait Hello2 extends Hello; object a { val b = "fdsfds"; class s(); } }""")
+    should("""class a { sealed trait Hello; sealed trait Hello2 extends Hello; object a { val b = "fdsfds"; class s() extends Hello; } }""")
+    shouldnt("""class a { sealed trait Hello; sealed trait Hello2 extends Hello; object a { val b = "fdsfds"; class s() extends Hello2; } }""")
+  }
+
+
   
   //stuff that doesn't work and I don't know why
   @Test 
