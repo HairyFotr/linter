@@ -551,6 +551,11 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should("""val a = Option(Option("fdsfs"))""")
     shouldnt("""val a = Option("fdsfs")""")
     shouldnt("""val a = Option(List(2))""")
+
+    msg = "Use .isdefined instead of comparing to None"
+    should("""val a = Option(5); if(a == None) "foo"""")
+    should("""val a = Option(5); if(a != None) "bar"""")
+    should("""val a = Option(5); if(a.isDefined) "foo"""")
   }
   
   def abs_interpretation__StringAndInt() {

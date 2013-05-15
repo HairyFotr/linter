@@ -94,7 +94,6 @@ class LinterPlugin(val global: Global) extends Plugin {
             if(name.toString != "<init>" && !block.isEmpty && !mods.hasFlag(OVERRIDE)) {
               //Get the parameters, except the implicit ones
               val params = valDefs.flatMap(_.filterNot(_.mods.hasFlag(IMPLICIT))).map(_.name.toString).toBuffer
-              valDefs
 
               //TODO: Put into utils
               def isBlockEmpty(block: Tree): Boolean = block match {
@@ -598,6 +597,10 @@ class LinterPlugin(val global: Global) extends Plugin {
           //TODO: make stricter if you want, but Ident(_) could get annoying if someone out there is actually using this :)
           case ValDef(_, _, _, value) if isOptionOption(value) =>
             unit.warning(tree.pos, "Why would you need an Option of an Option?")
+
+          /// Comparing to None
+          case Apply(Select(opt, op), List(scala_None)) if((op == nme.EQ || op == nme.NE) && scala_None.toString == "scala.None") =>
+            unit.warning(tree.pos, "Use .isdefined instead of comparing to None")
 
           /// orElse(Some(...)).get is better written as getOrElse(...)
           case Select(Apply(TypeApply(Select(opt, orElse), _), List(Apply(scala_Some_apply, List(value)))), get)

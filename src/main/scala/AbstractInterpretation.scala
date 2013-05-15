@@ -111,11 +111,11 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     def conditionsContain(i: Int): Boolean = conditions.forall(c => c(i))
     
     // experimental alternative to empty
-    def makeUnknown = new Values(conditions = conditions)
+    def makeUnknown: Values = new Values(conditions = conditions)
    
     def rangesContain(i: Int): Boolean = (ranges exists { case (low, high) => i >= low && i <= high })
     
-    def notSeq = new Values(ranges, values, conditions, name, false)
+    def notSeq: Values = new Values(ranges, values, conditions, name, false)
     
     def contains(i: Int): Boolean = (values contains i) || rangesContain(i)
     def apply(i: Int): Boolean = contains(i)
@@ -915,6 +915,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
       lazy val intParam = if(params.size == 1 && params.head.tpe.widen <:< definitions.IntClass.tpe) computeExpr(params.head) else Values.empty
       lazy val intParams = if(params.forall(_.tpe.widen <:< definitions.IntClass.tpe)) params.map(computeExpr).toList else List() //option?
       lazy val stringParam = if(params.size == 1 && params.head.tpe.widen <:< definitions.StringClass.tpe) StringAttrs(params.head) else empty
+      lazy val stringParams = if(params.forall(_.tpe.widen <:< definitions.StringClass.tpe)) params.map(StringAttrs.apply) else List()
 
       //println((string, func, params, str, intParam))
       //println(str.exactValue)
@@ -1103,6 +1104,25 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
               Left(empty)
           }        
         
+        //str.func(String, String)
+        case f @ ("replaceAll") if stringParams.size == 2 && stringParams.forall(_.exactValue.isDefined) =>
+          val (p0,p1) = (stringParams(0).exactValue.get, stringParams(1).exactValue.get)
+          
+          if(str.exactValue.isDefined) {
+            try { 
+              Left(new StringAttrs(Some(str.exactValue.get.replaceAll(p0, p1))))
+            } catch {
+              case e: java.util.regex.PatternSyntaxException =>
+                Left(empty)
+            }
+          } else if((p0 matches """\[[^\]]+\]""") && p1.size == 1) { //keeps the same length
+            Left(str)
+          } else if(p1 == "") { //length is 0..size
+            Left(str.zeroMinLengths)
+          } else {
+            Left(empty)
+          }
+
         case _ =>
           //if(str.exactValue.isDefined)println((str, func, params))
           Left(empty)
@@ -1134,11 +1154,17 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         case If(cond, expr1, expr2) =>
           val (e1, e2) = (traverse(expr1), traverse(expr2))
           
-          new StringAttrs(
-            minLength = math.min(e1.getMinLength, e2.getMinLength), 
-            trimmedMinLength = math.min(e1.getTrimmedMinLength, e2.getTrimmedMinLength),
-            maxLength = math.max(e1.getMaxLength, e2.getMaxLength), 
-            trimmedMaxLength = math.max(e1.getTrimmedMaxLength, e2.getTrimmedMaxLength))
+          if(expr1.tpe <:< definitions.NothingClass.tpe) {
+            e2
+          } else if(expr2.tpe <:< definitions.NothingClass.tpe) {
+            e1
+          } else {
+            new StringAttrs(
+              minLength = math.min(e1.getMinLength, e2.getMinLength), 
+              trimmedMinLength = math.min(e1.getTrimmedMinLength, e2.getTrimmedMinLength),
+              maxLength = math.max(e1.getMaxLength, e2.getMaxLength), 
+              trimmedMaxLength = math.max(e1.getTrimmedMaxLength, e2.getTrimmedMaxLength))
+          }
 
         case Apply(augmentString, List(expr)) if(augmentString.toString == "scala.this.Predef.augmentString") =>
           StringAttrs(expr)
