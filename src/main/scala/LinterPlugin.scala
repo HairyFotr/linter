@@ -552,12 +552,9 @@ class LinterPlugin(val global: Global) extends Plugin {
               case (Assign(id1, id2), Assign(id2_, id1_)) if(id1 equalsStructure id1_) && (id2 equalsStructure id2_) =>
                 unit.warning(id1_.pos, "Did you mean to swap these two variables?")
 
-              //TODO: move to def analysis - this is only for those blocks
-              //case (_, l @ Return(_)) if l eq last =>
-              //  unit.warning(l.pos, "Scala has implicit return, so you don't need 'return'")
-              //  true              
-              case (v @ ValDef(_, id1, _, _), l @ Ident(id2)) if id1.toString == id2.toString && (l eq last) =>
-                unit.warning(v.pos, "You don't need that temp variable.")
+              /// "...; val x = value; x }" at the end of a method - usually I do this for debug outputs
+              //case (v @ ValDef(_, id1, _, _), l @ Ident(id2)) if id1.toString == id2.toString && (l eq last) =>
+              //  unit.warning(v.pos, "You don't need that temp variable.")
 
               case (If(cond1, _, _), If(cond2, _, _)) if cond1 equalsStructure cond2 =>
                 unit.warning(cond1.pos, "Two subsequent ifs have the same condition")

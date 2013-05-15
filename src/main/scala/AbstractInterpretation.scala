@@ -1131,7 +1131,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
 
     
     def apply(tree: Tree): StringAttrs = {
-      def traverse(tree: Tree): StringAttrs = tree match {
+      def traverseString(tree: Tree): StringAttrs = tree match {
         case Literal(Constant(null)) => new StringAttrs(exactValue = Some("null"))
         case Literal(Constant(c)) => 
           if(stringVals.filter(s => s.name.isDefined && !(vars contains s.name.get)).exists(_.exactValue == Some(c.toString))) {
@@ -1152,7 +1152,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
             .getOrElse(empty)
         
         case If(cond, expr1, expr2) =>
-          val (e1, e2) = (traverse(expr1), traverse(expr2))
+          val (e1, e2) = (traverseString(expr1), traverseString(expr2))
           
           if(expr1.tpe <:< definitions.NothingClass.tpe) {
             e2
@@ -1182,7 +1182,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           empty
       }
       
-      val a = traverse(tree)
+      val a = traverseString(tree)
       //println("tree: "+ a)
       a
     }
@@ -1411,7 +1411,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         
         val paramNames = params.flatten.map(_.name.toString)
         
-        vals = vals.filterNot(paramNames contains _)
+        vals = vals.filterNot(paramNames contains _._1)
         
         if(block.children.isEmpty)
           traverse(block)

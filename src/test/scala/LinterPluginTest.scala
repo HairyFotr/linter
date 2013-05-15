@@ -1107,6 +1107,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
 
   @Test
+  @Ignore
   def style__tempVariable() {
     implicit val msg = "You don't need that temp variable"
    
