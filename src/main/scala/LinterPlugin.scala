@@ -66,14 +66,14 @@ class LinterPlugin(val global: Global) extends Plugin {
         //if(showRaw(tree).contains("Hello"))println(showRaw(tree))
         tree match {
           /// Unused sealed traits
-          case t @ ClassDef(mods, name, _, Template(extendsList, _, body)) if !mods.isSealed && mods.isTrait =>
+          case ClassDef(mods, name, _, Template(extendsList, _, body)) if !mods.isSealed && mods.isTrait =>
             inTrait = true
             for(stmt <- body) traverse(stmt)
             inTrait = false
             return
 
-          case t @ ClassDef(mods, name, _, Template(extendsList, _, body)) if mods.isSealed && mods.isTrait && !inTrait =>
-            sealedTraits += name -> t
+          case ClassDef(mods, name, _, Template(extendsList, _, body)) if mods.isSealed && mods.isTrait && !inTrait =>
+            sealedTraits += name -> tree
             for(Ident(traitName) <- extendsList if traitName.toString != name.toString) usedTraits += traitName
             for(stmt <- body) traverse(stmt)
             return
@@ -613,7 +613,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           /// Comparing to None
           case Apply(Select(opt, op), List(scala_None)) if((op == nme.EQ || op == nme.NE) && scala_None.toString == "scala.None") =>
-            unit.warning(tree.pos, "Use .isdefined instead of comparing to None")
+            unit.warning(tree.pos, "Use .isDefined instead of comparing to None")
 
           /// orElse(Some(...)).get is better written as getOrElse(...)
           case Select(Apply(TypeApply(Select(opt, orElse), _), List(Apply(scala_Some_apply, List(value)))), get)

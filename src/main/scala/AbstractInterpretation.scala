@@ -13,64 +13,39 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   import global._
 
   //TODO: move these to utils
-  def isUsed(tree: GTree, name: String): Boolean = {
+  def isUsed(t: GTree, name: String): Boolean = {
+    val tree = t.asInstanceOf[Tree]
     var used = 0
 
-    /*
     //scala 2.10+
-    for(Ident(id) <- t; if id.toString == name) used += 1
+    for(Ident(id) <- tree; if id.toString == name) used += 1
     //TODO: Only for select types, also, maybe this doesn't belong in all uses of isUsed (e.g. Assignment right after declaration)
-    for(Select(Ident(id), func) <- t; if (func.toString matches "size|length|head|last") && (id.toString == name)) used -= 1
-    */
-    def findUsed(tree: GTree) {
-      for(Ident(id) <- tree.children; if id.toString == name) used += 1
-      //TODO: Only for select types, also, maybe this doesn't belong in all uses of isUsed (e.g. Assignment right after declaration)
-      for(Select(Ident(id), func) <- tree.children; if (func.toString matches "size|length|head|last") && (id.toString == name)) used -= 1
-      
-      for(subTree <- tree.children; if (subTree != tree)) findUsed(subTree)
-    }
-    
-    findUsed(tree)
+    for(Select(Ident(id), func) <- tree; if (func.toString matches "size|length|head|last") && (id.toString == name)) used -= 1
     
     (used > 0)
   }
   
-  def getUsed(tree: GTree): mutable.HashSet[String] = {
-    val used = mutable.HashSet[String]()
-
-    def findUsed(tree: GTree) {
-      for(Ident(id) <- tree.children) used += id.toString
-
-      for(subTree <- tree.children; if (subTree != tree)) findUsed(subTree)
-    }
-    
-    findUsed(tree)
-    
+  def getUsed(tree: Tree): mutable.Set[String] = {
+    val used = mutable.Set[String]()
+    for(Ident(id) <- tree) used += id.toString
     used
   }
 
-  def isAssigned(tree: GTree, name: String): Boolean = {
-    def findUsed(tree: GTree): Boolean = {
-      for(Assign(Ident(id), _) <- tree.children; if id.toString == name) return true
-      var out = false
-      for(subTree <- tree.children; if (subTree != tree)) out |= findUsed(subTree)
-      out
-    }
+  def isAssigned(tree: Tree, name: String): Boolean = {
+    for(Assign(Ident(id), _) <- tree; if id.toString == name) 
+      return true
     
-    findUsed(tree)
+    false
   }
     
-  def returnCount(tree: GTree): Int = {
+  def returnCount(tree: Tree): Int = {
     var used = 0
-
-    def findUsed(tree: GTree) {
-      for(Return(id) <- tree.children) used += 1
-
-      for(subTree <- tree.children; if (subTree != tree)) findUsed(subTree)
-    }
-    
-    findUsed(tree)
-    
+    for(Return(id) <- tree) used += 1
+    used
+  }
+  def throwsCount(tree: Tree): Int = {
+    var used = 0
+    for(Throw(id) <- tree) used += 1
     used
   }
 
@@ -812,14 +787,14 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   var vars = mutable.Set[String]()
   var stringVals = mutable.Set[StringAttrs]()
   var defModels = mutable.Map[String, Either[Values, StringAttrs]]().withDefaultValue(Left(Values.empty))
-  def discardVars(tree: GTree, force: String*) {
+  def discardVars(tree: Tree, force: String*) {
     for(v <- vars; if isAssigned(tree, v) || (force contains v)) {
       vals(v) = Values.empty
       stringVals = stringVals.filter(v => v.name.isDefined && !(vars contains v.name.get))
       //println("discard: "+(vals))
     }
   }
-  var labels = mutable.Map[String, GTree]()        
+  var labels = mutable.Map[String, Tree]()        
   
   //vals,vars,stringVals,defModels
   val backupStack = mutable.Stack[(mutable.Map[String, Values], mutable.Set[String], mutable.Set[StringAttrs], mutable.Map[String, Either[Values, StringAttrs]])]()
@@ -1251,11 +1226,11 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
   def traverseBlock(tree: GTree) {
     pushDefinitions()
     
-    traverse(tree)
+    traverse(tree.asInstanceOf[Tree])
     
     popDefinitions()
   }
-  def traverse(tree: GTree) {
+  def traverse(tree: Tree) {
     if(visitedBlocks(tree)) return else visitedBlocks += tree
     treePosHolder = tree
     tree match {
@@ -1431,7 +1406,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         
         //defModels = backupDefModels
 
-        if(returnCount(block) == 0) { 
+        if(returnCount(block) == 0 && throwsCount(block) == 0) {//ADD: can be made better - if sentences are easy to model
           val retVal = computeExpr(returnVal)
           if(retVal.isValue || (retVal.isSeq && retVal.size > 0)) {
             unit.warning(last.pos, "This method always returns the same value: "+computeExpr(returnVal).getValue)
