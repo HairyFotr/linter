@@ -91,8 +91,6 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
 
   object Values {
     lazy val empty = new Values()
-    //def apply(low: Int, high: Int, name: String, isSeq: Boolean, actualSize: Int): Values = new Values(name = name, ranges = Set((low, high)), isSeq = isSeq, actualSize = actualSize)
-    //def apply(s: Set[Int], name: String, isSeq: Boolean, actualSize: Int): Values = new Values(name = name, values = s, isSeq = isSeq, actualSize = actualSize)
     def apply(i: Int, name: String = ""): Values = new Values(name = name, values = Set(i))
     def apply(low: Int, high: Int): Values = new Values(ranges = Set((low, high)))
   }
@@ -152,7 +150,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     }
     
     // discard values, that are inside ranges
-    def optimizeValues: Values = new Values(values = values.filter(v => !rangesContain(v)), ranges = ranges, conditions = conditions, name = name, isSeq = isSeq, actualSize = actualSize)
+    def optimizeValues: Values = new Values(ranges, values.filter(v => !rangesContain(v)), conditions, name, isSeq, actualSize)
     //def optimizeRanges = new Values(values = values, ranges = ranges.)
     
     def isEmpty: Boolean = this.size == 0
@@ -193,7 +191,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           Values.empty
       }
     
-    def applyCond(condExpr: Tree): (Values, Values) = {//TODO: return (true, false) ValueSets in one go - applyInverseCond sucks //TODO: true and false cound be possible returns for error msgs
+    def applyCond(condExpr: Tree): (Values, Values) = {
+      //TODO: alwaysTrue and false cound be possible returns for error msgs
       //TODO: check out if you're using 'this' for things that aren't... this method shouldn't be here anyways
       //println("expr: "+showRaw(condExpr))
       var alwaysHold, neverHold = false
@@ -438,7 +437,6 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           case _ => return Values.empty
       }
       
-      //List(ValDef(Modifiers(), newTermName("a"), TypeTree(), Apply(Select(Apply(Select(Ident(scala.StringContext), newTermName("apply")), List(Literal(Constant(" hello ")), Literal(Constant(" rld ")), Literal(Constant(" lll")))), newTermName("s")), List(Apply(Select(Apply(Select(Literal(Constant("w")), newTermName("$plus")), List(Literal(Constant(3)))), newTermName("$plus")), List(Literal(Constant("o")))), Literal(Constant(10))))))
       val out: Values = (
         if(op.toString == "count") {
           (if(left.actualSize == 0) Values(0) else if(left.actualSize > 0) Values.empty.addCondition(_ < left.actualSize) else Values.empty).addCondition(_ >= 0)
@@ -598,7 +596,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     //approximate
     def size: Int = values.size + ranges.foldLeft(0)((acc, range) => acc + (range._2 - range._1) + 1)
     
-    override def toString: String = "Values("+(if(name.size > 0) name+")(" else "")+(values.map(_.toString) ++ ranges.map(a => a._1+"-"+a._2)).mkString(",")+", "+isSeq+", "+actualSize+")"
+    override def toString: String = 
+      "Values("+(if(name.size > 0) name+")(" else "")+(values.map(_.toString) ++ ranges.map(a => a._1+"-"+a._2)).mkString(",")+", "+isSeq+", "+actualSize+")"
   }
   
   val SeqLikeObject: Symbol = definitions.getModule(newTermName("scala.collection.GenSeq"))
@@ -690,14 +689,14 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           Values.empty
         }
 
-      case t @ Apply(TypeApply(genApply @ Select(_,_), _), genVals) if methodImplements(genApply.symbol, SeqLikeGenApply) && (!t.tpe.widen.toString.contains("collection.mutable.")) =>
+      case t @ Apply(TypeApply(genApply @ Select(_,_), _), genVals)
+        if methodImplements(genApply.symbol, SeqLikeGenApply) && (!t.tpe.widen.toString.contains("collection.mutable.")) =>
+        
         val values = genVals.map(v => computeExpr(v))
-        if(values.forall(_.isValue)) new Values(Set(), values.map(_.getValue).toSet, Set(), "", isSeq = true, actualSize = values.size) else Values.empty.addActualSize(genVals.size)
+        if(values.forall(_.isValue)) new Values(values = values.map(_.getValue).toSet, isSeq = true, actualSize = values.size) else Values.empty.addActualSize(genVals.size)
 
       //Array isn't immutable, maybe later
-      /*case Apply(Select(Select(scala, scala_Array), apply), genVals) if(scala_Array.toString == "Array") =>
-        val values = genVals.map(v => computeExpr(v))
-        if(values.forall(_.isValue)) new Values(Set(), values.map(_.getValue).toSet, Set(), "", isSeq = true, actualSize = values.size) else Values.empty.addActualSize(genVals.size)*/
+      //case Apply(Select(Select(scala, scala_Array), apply), genVals) if(scala_Array.toString == "Array") =>
       
       //TODO: is this for array or what?
       case Select(Apply(arrayOps @ Select(_, intArrayOps), List(expr)), op) if(arrayOps.toString == "scala.this.Predef.intArrayOps") => 
@@ -732,7 +731,9 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           Values.empty
         }
 
-      case Apply(TypeApply(Select(valName, op), _), List(scala_math_Numeric_IntIsIntegral)) if scala_math_Numeric_IntIsIntegral.toString == "math.this.Numeric.IntIsIntegral" && op.toString == "sum" =>
+      case Apply(TypeApply(Select(valName, op), _), List(scala_math_Numeric_IntIsIntegral)) 
+        if scala_math_Numeric_IntIsIntegral.toString == "math.this.Numeric.IntIsIntegral" && op.toString == "sum" =>
+        
         computeExpr(valName).applyUnary(op)
 
       //List(Literal(Constant(1)), Literal(Constant(2)), Literal(Constant(3)), Literal(Constant(4)), Literal(Constant(0)), Literal(Constant(0))))
@@ -1046,7 +1047,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
                 Left(new StringAttrs(Some(string.takeRight(param))))
               else 
                 Left(new StringAttrs(minLength = math.min(param, str.minLength), maxLength = math.max(param, 0)))
-            case a => Left(empty)
+            case a => 
+              Left(empty)
           } catch {
             case e: IndexOutOfBoundsException =>
               unit.warning(params.head.pos, "This index will likely cause an IndexOutOfBoundsException.")
@@ -1236,7 +1238,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
           trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength*n)
       }
     
-    override def hashCode: Int = /*if(exactValue.isDefined) exactValue.hashCode else */exactValue.hashCode + name.hashCode + minLength + trimmedMinLength + maxLength + trimmedMaxLength
+    override def hashCode: Int = exactValue.hashCode + name.hashCode + minLength + trimmedMinLength + maxLength + trimmedMaxLength
     override def equals(that: Any): Boolean = that match {
       case s: StringAttrs => (this.exactValue.isDefined && s.exactValue.isDefined && this.exactValue.get == s.exactValue.get)
       case s: String => exactValue.exists(_ == s)
@@ -1307,7 +1309,8 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         //visitedBlocks += s
 
       case ValDef(m: Modifiers, valName, _, s @ Literal(Constant(str: String))) if(!m.hasFlag(MUTABLE) && !m.hasFlag(FINAL)) =>
-        //if(stringVals.filter(s => s.name.isDefined && !(vars contains s.name.get)).exists(_.exactValue == Some(str))) unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
+        //if(stringVals.filter(s => s.name.isDefined && !(vars contains s.name.get)).exists(_.exactValue == Some(str)))
+          //unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
         //stringVals += str
         //visitedBlocks += s
         
