@@ -497,14 +497,22 @@ class LinterPlugin(val global: Global) extends Plugin {
             unit.warning(a.pos, "If statement branches have the same structure.")
 
           case If(cond1, _, e) if {
-            lazy val conds = mutable.ListBuffer(cond1)
+            def getSubConds(tree: Tree): List[Tree] = tree match {
+              //TODO: recursively get all of conds too
+              case cond @ Apply(Select(left, op), List(right)) if op == nme.ZOR => 
+                List(cond) ++ getSubConds(left) ++ getSubConds(right)
+              case cond => 
+                List(cond)
+            }
+            lazy val conds = mutable.ListBuffer(getSubConds(cond1):_*)
             def elseIf(tree: Tree) {
               tree match {
                 case If(cond, _, e) => 
-                  if(conds.exists(_ equalsStructure cond))
+                  val subConds = getSubConds(cond)
+                  if(conds.exists(c => subConds.exists(_ equalsStructure c)))
                     unit.warning(cond.pos, "This else-if has the same condition as a previous if.")
-                  else
-                    conds += cond
+                  else 
+                    conds ++= subConds
 
                   elseIf(e)
                 case _ =>
