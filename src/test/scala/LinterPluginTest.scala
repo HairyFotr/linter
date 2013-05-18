@@ -479,6 +479,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should(""" val a = "a "; if(a.isEmpty) "foo" """)
     should(""" val r = "a    b".distinct.tail; if(r.nonEmpty) "foo" """)
     should(""" var b = " "; val a = (b + (if(b == " ") "a" else "b"+b)).trim.toLowerCase; if(a.nonEmpty) "foo" """)
+    should(""" val a = util.Random.nextLong + util.Random.nextString(6); if(a.nonEmpty) "fdd" """)
     shouldnt(""" var b = " "; val a = (b + (if(b == " ") " " else " "+b)).trim.toLowerCase; if(a.nonEmpty) "foo" """)
 
     msg = "string will always be empty"

@@ -861,7 +861,6 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     
     def toStringAttrs(param: Tree): StringAttrs = {
       val intParam = computeExpr(param)
-      
       if(intParam.isValue) new StringAttrs(Some(intParam.getValue.toString))
       else if(param.tpe.widen <:< definitions.IntClass.tpe) new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 11, trimmedMaxLength = 11)
       else if(param.tpe.widen <:< definitions.LongClass.tpe) new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 20, trimmedMaxLength = 20)
@@ -1146,6 +1145,9 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         case Apply(augmentString, List(expr)) if(augmentString.toString == "scala.this.Predef.augmentString") =>
           StringAttrs(expr)
           
+        case Apply(Select(expr1, op), List(expr2)) if (op == nme.ADD) && (expr1.tpe.widen <:< definitions.StringClass.tpe ^ expr2.tpe.widen <:< definitions.StringClass.tpe) =>
+          toStringAttrs(expr1) + toStringAttrs(expr2)
+
         /// Pass on functions on strings
         //TODO: maybe check if some return string and can be computed
         case Apply(Select(str, func), params) => 
@@ -1153,7 +1155,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
 
         case Select(Apply(scala_augmentString, List(string)), func) if (scala_augmentString.toString endsWith "augmentString") =>
           stringFunc(string, func).left.getOrElse(empty)
-            
+
         case a => 
           //println(showRaw(a))
           empty
@@ -1306,7 +1308,7 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
         //ADD: isSeq and actualSize
 
         if(expr.tpe.widen <:< definitions.StringClass.tpe) {
-          val str = StringAttrs(expr).addName(valName.toString)
+          val str = StringAttrs.toStringAttrs(expr).addName(valName.toString)
           //println("str1: "+str)
           if(str.exactValue.isDefined || str.getMinLength > 0) {
             stringVals += str
