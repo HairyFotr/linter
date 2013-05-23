@@ -17,7 +17,6 @@ class AbstractInterpretation(val global: Global, val unit: GUnit) {
     val tree = t.asInstanceOf[Tree]
     var used = 0
 
-    //scala 2.10+
     for(Ident(id) <- tree; if id.toString == name) used += 1
     //TODO: Only for select types, also, maybe this doesn't belong in all uses of isUsed (e.g. Assignment right after declaration)
     for(Select(Ident(id), func) <- tree; if (func.toString matches "size|length|head|last") && (id.toString == name)) used -= 1
