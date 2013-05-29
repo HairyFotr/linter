@@ -52,11 +52,13 @@ class LinterPlugin(val global: Global) extends Plugin {
     }
     override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
       override def apply(unit: global.CompilationUnit) {
-        resetTraits()
-        new PreTyperTraverser(unit).traverse(unit.body)
-        //println((sealedTraits, usedTraits))
-        for(unusedTrait <- sealedTraits.filterNot(st => usedTraits.exists(_.toString == st._1.toString))) {
-          unit.warning(unusedTrait._2.pos, "This sealed trait is never extended.")//TODO: It might still be used in some type-signature somewhere... see scalaz
+        if(!unit.isJava) {
+          resetTraits()
+          new PreTyperTraverser(unit).traverse(unit.body)
+          //println((sealedTraits, usedTraits))
+          for(unusedTrait <- sealedTraits.filterNot(st => usedTraits.exists(_.toString == st._1.toString))) {
+            unit.warning(unusedTrait._2.pos, "This sealed trait is never extended.")//TODO: It might still be used in some type-signature somewhere... see scalaz
+          }
         }
       }
     }
@@ -156,7 +158,9 @@ class LinterPlugin(val global: Global) extends Plugin {
 
     override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
       override def apply(unit: global.CompilationUnit) {
-        new LinterTraverser(unit).traverse(unit.body)
+        if(!unit.isJava) {
+          new LinterTraverser(unit).traverse(unit.body)
+        }
       }
     }
 
