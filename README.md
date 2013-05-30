@@ -1,8 +1,10 @@
-# Linter Compiler Plugin
+# Linter Compiler Plugin [![Build Status](https://travis-ci.org/HairyFotr/linter.png)](https://travis-ci.org/HairyFotr/linter)
 
 Linter is a Scala compiler plugin that adds compile-time checks to help protect against various possible bugs and style problems.
 
-It's currently very much a work in progress - some parts will probably need to be rewritten.
+It's currently a work in progress - some parts will need to be rewritten.
+
+But it is useful (and usable), and all forms of feedback are very welcome.
 
 To see it in action, run `sbt console` in this project's folder, or try it out on your code.
 
@@ -18,7 +20,7 @@ Add it as a compiler plugin to your project by editing your build.sbt file:
 You can download the latest snapshot here:
 [Scala 2.10.1](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar?raw=true), 
 [Scala 2.9.3](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.9.3/0.1-SNAPSHOT/linter_2.9.3-0.1-SNAPSHOT.jar?raw=true),
-[Scala 2.11.0-M2](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar?raw=true) (experimental), 
+[Scala 2.11.0-M3](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar?raw=true) (experimental), 
 
     scalac -Xplugin:<path-to-linter-jar>.jar ...
 
