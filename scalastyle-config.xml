@@ -70,6 +70,7 @@
   </parameters>
  </check>
  <check level="warning" class="org.scalastyle.scalariform.MethodNamesChecker" enabled="true">
+  <customMessage>Method name does not match the rule</customMessage>
   <parameters>
    <parameter name="regex"><![CDATA[^([a-z][A-Za-z0-9]*|[-+*/])$]]></parameter>
   </parameters>
@@ -80,9 +81,18 @@
   </parameters>
  </check>
  <check level="warning" class="org.scalastyle.scalariform.PublicMethodsHaveTypeChecker" enabled="true"></check>
- <check level="warning" class="org.scalastyle.scalariform.TokenChecker" enabled="false">
+ 
+ <!-- Custom rules -->
+ <check level="warning" class="org.scalastyle.scalariform.TokenChecker" enabled="true">
+  <customMessage>Disallowed method: println</customMessage>
   <parameters>
    <parameter name="regex"><![CDATA[println]]></parameter>
+  </parameters>
+ </check>
+ <check level="warning" class="org.scalastyle.file.RegexChecker" enabled="true">
+  <customMessage>Disallowed method: unit.warning</customMessage>
+  <parameters>
+   <parameter name="regex"><![CDATA[unit[.]warning[(]]]></parameter>
   </parameters>
  </check>
 </scalastyle>
