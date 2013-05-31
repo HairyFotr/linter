@@ -922,6 +922,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   
   
   @Test
+  @Ignore
   def string__constantLength() {
     implicit val msg = "of a constant string"
 
@@ -943,6 +944,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
 
   @Test
+  @Ignore
   def string__processingConstant() {
     implicit val msg = "Processing a constant string"
     
@@ -1247,7 +1249,6 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     
     should("""BigDecimal(0.55555555555555555555555555555)""")
     should("""new java.math.BigDecimal(0.1)""")
-    should("""BigDecimal.valueOf(0.55555555555555555555555555555)""")
     should("""BigDecimal.valueOf(0.55555555555555555555555555555)""")
     should("""BigDecimal(1.333333333333333333333333333333333333333333333e223)""")
     should("""
