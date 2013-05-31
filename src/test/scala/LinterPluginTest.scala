@@ -625,6 +625,8 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should("""def a = { var a = 0; if (a == 0) 1.0 else 5 / a }""")("This condition will always hold.")
     should("""def a = { var a = 0; def precision = if (a == 0) 1.0 else 5 / a }""")("This condition will always hold.")
     should("""def a = { var a = 0; def precision = { val a = 5; if (a == 0) 1.0 else 5 / a } }""")("This condition will never hold.")
+    
+    shouldnt(""" def test(a: Int = 0) = if(a > 0) "x" else "y" """)("This condition will never hold.")
   }
   
   @Test

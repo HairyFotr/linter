@@ -850,7 +850,7 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
     popDefinitions()
   }
   
-  val visitedBlocks = mutable.HashSet[GTree]()
+  val visitedBlocks = mutable.HashSet[Tree]()
   
   // Just something quick I hacked together for an actual bug
   //implicit def String2StringAttrs(s: String) = new StringAttrs(exactValue = Some(s))
@@ -858,6 +858,7 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
     //TODO: when merging, save known chunks - .contains then partially works
     def empty: StringAttrs = new StringAttrs()
     
+    // scalastyle:off magic.number
     def toStringAttrs(param: Tree): StringAttrs = {
       val intParam = computeExpr(param)
       if(intParam.isValue) new StringAttrs(Some(intParam.getValue.toString))
@@ -882,6 +883,7 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
         }
       }
     }
+    // scalastyle:on magic.number
     
     /// Tries to execute string functions and return either a String or Int representation
     def stringFunc(string: Tree, func: Name, params: List[Tree] = List[Tree]()): Either[StringAttrs, Values] = {
@@ -1284,7 +1286,7 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
         //warn(s, "You have defined that string as a val already, maybe use that?")
         //visitedBlocks += s
 
-      case ValDef(m: Modifiers, valName, _, s @ Literal(Constant(str: String))) if(!m.hasFlag(MUTABLE) && !m.hasFlag(FINAL)) =>
+      case ValDef(m: Modifiers, valName, _, s @ Literal(Constant(str: String))) if(!m.isMutable && !m.isFinal && !m.hasDefault) =>
         //if(stringVals.filter(s => s.name.isDefined && !(vars contains s.name.get)).exists(_.exactValue == Some(str)))
           //warn(s, "You have defined that string as a val already, maybe use that?")
         //stringVals += str
@@ -1297,12 +1299,12 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
         }
         //println("stringVals2: "+stringVals)
 
-      case ValDef(m: Modifiers, valName, _, Literal(Constant(a: Int))) if(!m.hasFlag(MUTABLE)) =>
+      case ValDef(m: Modifiers, valName, _, Literal(Constant(a: Int))) if(!m.isMutable && !m.hasDefault) =>
         val valNameStr = valName.toString.trim
         vals += valNameStr -> Values(a, valNameStr)
         //println(vals(valName.toString))
 
-      case v@ValDef(m: Modifiers, valName, _, expr) => //if !m.hasFlag(MUTABLE) /*&& !m.hasFlag(LAZY)) && !computeExpr(expr).isEmpty*/ => //&& computeExpr(expr).isValue =>
+      case v@ValDef(m: Modifiers, valName, _, expr) if(!m.hasDefault) => //if !m.hasFlag(MUTABLE) /*&& !m.hasFlag(LAZY)) && !computeExpr(expr).isEmpty*/ => //&& computeExpr(expr).isValue =>
         //ADD: aliasing... val a = i, where i is an iterator, then 1/i-a is divbyzero
         //ADD: isSeq and actualSize
 
@@ -1388,9 +1390,10 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
         
         pushDefinitions()
         
-        val paramNames = params.flatten.map(_.name.toString)
-        
+        //TODO: handle params
+        val paramNames = params.flatten.map(_.name.toString)        
         vals = vals.filterNot(paramNames contains _._1)
+        visitedBlocks ++= params.flatten
         
         if(block.children.isEmpty)
           traverse(block)

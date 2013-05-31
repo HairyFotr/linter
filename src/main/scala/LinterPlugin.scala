@@ -30,7 +30,9 @@ package object global {
     if(line matches ".*// *nolint *") {
       // skip
     } else {
+      // scalastyle:off regex
       unit.warning(pos, msg)
+      // scalastyle:on regex
     }
   }
   def warn(tree: GTree, msg: String)(implicit unit: GUnit) {
