@@ -643,6 +643,39 @@ class LinterPlugin(val global: Global) extends Plugin {
           case ValDef(_, _, _, value) if isOptionOption(value) =>
             warn(tree, "Why would you need an Option of an Option?")
 
+          /// Putting null into Option
+          case DefDef(_, name, _, _, tpe, body) if (tpe.toString matches "Option\\[.*\\]") &&
+            (body match {
+              case n @ Literal(Constant(null)) => warn(n, "You probably meant None, not null."); true;
+              case Block(_, n @ Literal(Constant(null))) => warn(n, "You probably meant None, not null."); true;
+              case _ => false
+            }) => //
+          case ValDef(_, name, tpe, body) if (tpe.toString matches "Option\\[.*\\]") &&
+            (body match {
+              case n @ Literal(Constant(null)) => warn(n, "You probably meant None, not null."); true;
+              case Block(_, n @ Literal(Constant(null))) => warn(n, "You probably meant None, not null."); true;
+              case _ => false
+            }) => //
+          case Assign(left, right) if (left.tpe.toString matches "Option\\[.*\\]") &&
+            (right match {
+              case n @ Literal(Constant(null)) => warn(n, "You probably meant None, not null."); true;
+              case Block(_, n @ Literal(Constant(null))) => warn(n, "You probably meant None, not null."); true;
+              case _ => false
+            }) => //
+          
+          /// null checking instead of Option wrapping
+          case If(Apply(Select(left, op), List(Literal(Constant(null)))), t, f) 
+            if (op == nme.EQ && t.toString == "scala.None" && (f match {
+              case Apply(TypeApply(scala_Some_apply, _), List(some)) if left equalsStructure some => true
+              case _ => false
+            }))
+            || (op == nme.NE && f.toString == "scala.None" && (t match {
+              case Apply(TypeApply(scala_Some_apply, _), List(some)) if left equalsStructure some => true
+              case _ => false
+            })) =>
+
+            warn(tree, "Use Option(...), which automatically wraps null to None")
+          
           /// Comparing to None
           case Apply(Select(opt, op), List(scala_None)) if((op == nme.EQ || op == nme.NE) && scala_None.toString == "scala.None") =>
             warn(tree, "Use .isDefined instead of comparing to None")
