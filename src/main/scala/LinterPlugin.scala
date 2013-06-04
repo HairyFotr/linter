@@ -417,8 +417,9 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(pos, "Taking the size of a constant string")
 
           /// Pattern Matching checks
-          case Match(pat, cases) if pat.tpe.toString != "Any @unchecked" && cases.size >= 2 =>
+          case Match(pat, cases) if (pat match { case Typed(_, _) => false; case _ => true }) && pat.tpe.toString != "Any @unchecked" && cases.size >= 2 =>
             // Workaround: "Any @unchecked" seems to happen on the matching structures of actors - and all cases return true
+            // Workaround: Typed (or Annotated) seems to happen in for loop pattern matching, which doesn't work right for at least for checkUsage
 
             /// Pattern Matching on a constant value
             //TODO: move to abs-interpreter
@@ -480,10 +481,21 @@ class LinterPlugin(val global: Global) extends Plugin {
                 warn(streak.tree.body, streak.streak+" neighbouring cases are identical, and could be merged.")
               }
             }
+            
+            /// Checking for unused variables in pattern matching
+            def checkUsage(c: CaseDef) {
+              //TODO: use for self-testing from time to time - ~100 warnings currently :/
+              /*val binds = for(b @ Bind(name, _) <- c.pat; if !name.toString.startsWith("_")) yield (b, name.toString)
+              for(unused <- binds.filter { case (b, name) => !abstractInterpretation.isUsed(c, name)}) {
+                println(showRaw(pat))
+                warn(unused._1, "Unused value in pattern matching, use _ instead. (or prefix with _ to get rid of me)")
+              }*/
+            }
 
             for(c <- cases) {
               checkCase(c)
               checkStreak(c)
+              checkUsage(c)
             }
 
             printStreakWarning()
@@ -666,11 +678,11 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// null checking instead of Option wrapping
           case If(Apply(Select(left, op), List(Literal(Constant(null)))), t, f) 
             if (op == nme.EQ && t.toString == "scala.None" && (f match {
-              case Apply(TypeApply(scala_Some_apply, _), List(some)) if left equalsStructure some => true
+              case Apply(TypeApply(scala_Some_apply, _), List(some)) if (left equalsStructure some) && scala_Some_apply.toString.startsWith("scala.Some.apply") => true
               case _ => false
             }))
             || (op == nme.NE && f.toString == "scala.None" && (t match {
-              case Apply(TypeApply(scala_Some_apply, _), List(some)) if left equalsStructure some => true
+              case Apply(TypeApply(scala_Some_apply, _), List(some)) if (left equalsStructure some) && scala_Some_apply.toString.startsWith("scala.Some.apply") => true
               case _ => false
             })) =>
 

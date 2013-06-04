@@ -686,7 +686,7 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
           case _ => Values.empty
         }
 
-      case Apply(Select(scala_util_Random, nextInt), params) if nextInt.toString == "nextInt" => //if scala_util_Random.toString == "scala.util" => or rather the type
+      case Apply(Select(scala_util_Random, nextInt), params) if nextInt.toString == "nextInt" && scala_util_Random.tpe <:< definitions.getClass(newTermName("scala.util.Random")).tpe =>
         if(params.size == 1) {
           val param = computeExpr(params.head)
           if(param.nonEmpty) {
@@ -1270,7 +1270,7 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
         false
       } => //Fallthrough
 
-      case forloop @ Apply(TypeApply(Select(collection, foreach_map), _), List(Function(List(ValDef(_, _, _, _)), _))) =>
+      case forloop @ Apply(TypeApply(Select(collection, _), _), List(Function(List(ValDef(_, _, _, _)), _))) =>
         forLoop(forloop)
       
       /// Assertions checks
