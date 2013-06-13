@@ -19,6 +19,7 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
 
     for(Ident(id) <- tree; if id.toString == name) used += 1
     //TODO: Only for select types, also, maybe this doesn't belong in all uses of isUsed (e.g. Assignment right after declaration)
+    // isSideEffectFreeFor(...)
     for(Select(Ident(id), func) <- tree; if (func.toString matches "size|length|head|last") && (id.toString == name)) used -= 1
     
     (used > 0)

@@ -1,4 +1,4 @@
-scalaVersion := "2.10.1"
+scalaVersion := "2.10.2"
 
 libraryDependencies <++= (scalaVersion) { (scalaVersion) =>
   Seq(
@@ -19,7 +19,7 @@ name := "linter"
 
 organization := "com.foursquare.lint"
 
-crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.9.2", "2.9.3", "2.10.1", "2.11.0-M3") }
+crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.9.2", "2.9.3", "2.10.2", "2.11.0-M3") }
 
 publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
 

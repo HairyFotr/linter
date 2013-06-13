@@ -86,7 +86,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       override def traverse(tree: Tree) {
         //if(showRaw(tree).contains("Hello"))println(showRaw(tree))
         tree match {
-          /// Unused sealed traits
+          /// Unused sealed traits (Idea by edofic)
           case ClassDef(mods, name, _, Template(extendsList, _, body)) if !mods.isSealed && mods.isTrait =>
             inTrait = true
             for(stmt <- body) traverse(stmt)
@@ -187,11 +187,6 @@ class LinterPlugin(val global: Global) extends Plugin {
       implicit val unitt = unit
       import definitions.{AnyClass, ObjectClass, Object_==, OptionClass, SeqClass}
       
-      val stringLiteralCount = collection.mutable.HashMap[String, Int]().withDefaultValue(0)
-      //some common ones, and some play framework hacks
-      val stringLiteralExceptions = """(\s*|GET|POST|[\/.{}(), ?x%+_-]{0,3})"""
-      val stringLiteralFileExceptions = Set("routes_routing.scala", "routes_reverseRouting.scala")
-
       val JavaConversionsModule: Symbol = definitions.getModule(newTermName("scala.collection.JavaConversions"))
       val SeqLikeClass: Symbol = definitions.getClass(newTermName("scala.collection.SeqLike"))
       val SeqLikeContains: Symbol = SeqLikeClass.info.member(newTermName("contains"))
@@ -224,6 +219,22 @@ class LinterPlugin(val global: Global) extends Plugin {
       def isLiteral(t:Tree): Boolean = t match {
         case Literal(_) => true
         case _ => false
+      }
+      
+      //returns the string subtree of a string.length/size subtree
+      def getStringFromLength(t: Tree): Option[Tree] = t match {
+        case Apply(Select(str, length), List())
+          if str.tpe <:< definitions.StringClass.tpe && length.toString == "length" =>
+          
+          Some(str)
+          
+        case Select(Apply(scala_Predef_augmentString, List(str)), size)
+          if str.tpe <:< definitions.StringClass.tpe && size.toString == "size" && scala_Predef_augmentString.toString == "scala.this.Predef.augmentString" =>
+          
+          Some(str)
+          
+        case _ =>
+          None
       }
 
       val abstractInterpretation = new AbstractInterpretation(global, unit)
@@ -265,6 +276,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Apply(Select(Literal(Constant(-1)), nme.ADD), List(Apply(exp, _))) if exp.toString == "scala.math.`package`.exp" =>
             warn(tree, "Use math.expm1(x) instead of -1 + math.exp(x) for added accuracy (if x is near 1).")
 
+          // Use abs instead of doing it manually
           case Apply(sqrt, List(Apply(pow, List(expr, Literal(Constant(2)))))) if sqrt.toString == "scala.math.`package`.sqrt" && pow.toString == "scala.math.`package`.pow" =>
             warn(tree, "Use abs instead of sqrt(pow(_, 2)).")
 
@@ -299,7 +311,6 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             val warnMsg = "Possible loss of precision - use a string constant"
             
-            //TODO: Scala BigDecimal constructor isn't as bad as the Java one... still fails with 0.555555555555555555555555555
             try {
               val p = c.pos
               //TODO: There must be a less hacky way...
@@ -382,11 +393,11 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           /// Nag about using null
           //TODO: Too much noise - limit in some way
-          case Literal(Constant(null)) =>
+          //case Literal(Constant(null)) =>
             //warn(tree, "Using null is considered dangerous.")
 
           /// String checks
-          case Literal(Constant(str: String)) =>
+          /*case Literal(Constant(str: String)) =>
             /// Repeated string literals
             //TODO: String interpolation gets broken down into parts and causes false positives
             //TODO: a quick benchmark showed string literals are actually more optimized than almost anything else, even final vals
@@ -395,27 +406,42 @@ class LinterPlugin(val global: Global) extends Plugin {
             stringLiteralCount(str) += 1
             if(stringLiteralCount(str) == threshold && !(stringLiteralFileExceptions.contains(unit.source.toString)) && !(str.matches(stringLiteralExceptions))) {
               //TODO: Too much noise :)
-              //warn(tree, unit.source.path.toString)
-              //warn(tree, """String literal """"+str+"""" appears multiple times.""")
-            }
-            
-            //TODO: Doesn't this already reach the abs-interpreter anyway?
-            /*if(abstractInterpretation.stringVals.exists(_.exactValue == Some(str))) {
-              warn(tree, "You have defined that string as a val already, maybe use that?")
-              abstractInterpretation.visitedBlocks += tree
+              warn(tree, """String literal """"+str+"""" appears multiple times.""")
             }*/
-
+            
+          /// str.substring("sdfsdf".length) -> str.stripPrefix("sdfsdf")
+          //TODO: not an exact replacement, also performance questions
+          // maybe .drop("sdfsdf".length)
+          /*case Apply(Select(str, substring), List(strLen))
+            if str.tpe <:< definitions.StringClass.tpe            
+            && substring.toString == "substring"
+            && getStringFromLength(strLen).isDefined =>
+            
+            warn(tree, "Use x.stripPrefix(y), instead of x.substring(y.length)")
+          */  
+          /// str.substring(0, str.length - "sdfsdf".length) -> str.stripPrefix("sdfsdf")
+          //TODO: not an exact replacement, also performance questions
+          // maybe .dropRight("sdfsdf".length)
+          /*
+          case Apply(Select(str1, substring), List(Literal(Constant(0)), Apply(Select(str1Len, nme.SUB), List(str2Len))))
+            if str1.tpe <:< definitions.StringClass.tpe
+            && substring.toString == "substring"
+            && getStringFromLength(str1Len).isDefined && getStringFromLength(str2Len).isDefined
+            && (str1 equalsStructure getStringFromLength(str1Len).get) =>
+          
+            warn(tree, "Use x.stripSuffix(y), instead of x.substring(x.length-y.length)")
+          */
           /// Processing a constant string: "hello".size
-          case Apply(Select(pos @ Literal(Constant(s: String)), func), params) =>
+          /*case Apply(Select(pos @ Literal(Constant(s: String)), func), params) =>
             func.toString match {
               case "$plus"|"equals"|"$eq$eq"|"toCharArray"|"matches"|"getBytes" => //ignore
-              case "length" => //warn(pos, "Taking the length of a constant string")
-              case _        => //warn(pos, "Processing a constant string")
+              case "length" => warn(pos, "Taking the length of a constant string")
+              case _        => warn(pos, "Processing a constant string")
             }
           case Select(Apply(Select(predef, augmentString), List(pos @ Literal(Constant(s: String)))), size)
             if predef.toString == "scala.this.Predef" && augmentString.toString == "augmentString" && size.toString == "size" => 
             warn(pos, "Taking the size of a constant string")
-
+          */
           /// Pattern Matching checks
           case Match(pat, cases) if (pat match { case Typed(_, _) => false; case _ => true }) && pat.tpe.toString != "Any @unchecked" && cases.size >= 2 =>
             // Workaround: "Any @unchecked" seems to happen on the matching structures of actors - and all cases return true
@@ -532,7 +558,8 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             warn(a, "If statement branches have the same structure.")
 
-          case If(cond1, _, e) if {
+          /// Find repeated conditions that are essentially dead (only considers things separated by OR)
+          case If(condition, _, e) if {
             def getSubConds(tree: Tree): List[Tree] = tree match {
               //TODO: recursively get all of conds too
               case cond @ Apply(Select(left, op), List(right)) if op == nme.ZOR => 
@@ -540,7 +567,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               case cond => 
                 List(cond)
             }
-            lazy val conds = mutable.ListBuffer(getSubConds(cond1):_*)
+            lazy val conds = mutable.ListBuffer(getSubConds(condition):_*)
             def elseIf(tree: Tree) {
               tree match {
                 case If(cond, _, e) => 
@@ -561,19 +588,18 @@ class LinterPlugin(val global: Global) extends Plugin {
           //Ignore: ignores while(true)... I mean, one can't accidentally use while(true), can they? :)
           /*case LabelDef(whileName, List(), If(cond @ Literal(Constant(a: Boolean)), _, _)) =>
             //TODO: doesn't actually ignore, but that test is trivial anyway, commenting both
-          
           case If(cond @ Literal(Constant(bool: Boolean)), _, _) => 
             //TODO: there are people still doing breakable { while(true) {... don't warn on while(true)?
             warn(cond, "This condition will always be "+bool+".")*/
             
           //TODO: Move to abstract interpreter once it handles booleans
-          case Apply(Select(Literal(Constant(false)), op), _) if op == nme.ZAND =>
+          case Apply(Select(Literal(Constant(false)), nme.ZAND), _) =>
             warn(tree, "This part of boolean expression will always be false.")
-          case Apply(Select(_, op), List(lite @ Literal(Constant(false)))) if op == nme.ZAND =>
+          case Apply(Select(_, nme.ZAND), List(lite @ Literal(Constant(false)))) =>
             warn(lite, "This part of boolean expression will always be false.")
-          case Apply(Select(Literal(Constant(true)), op), _) if op == nme.ZOR =>
+          case Apply(Select(Literal(Constant(true)), nme.ZOR), _) =>
             warn(tree, "This part of boolean expression will always be true.")
-          case Apply(Select(_, op), List(lite @ Literal(Constant(true)))) if op == nme.ZOR =>
+          case Apply(Select(_, nme.ZOR), List(lite @ Literal(Constant(true)))) =>
             warn(lite, "This part of boolean expression will always be true.")
             
           /// if(cond1) { if(cond2) ... } is the same as if(cond1 && cond2) ...
@@ -582,6 +608,8 @@ class LinterPlugin(val global: Global) extends Plugin {
           
           
           /// Abstract interpretation, and multiple-statement checks
+          //TODO: make abs-interpreter good enough to handle the whole units and even some cross-unit stuff
+          // probably multipass
           case ClassDef(mods, name, tparams, impl) =>
             abstractInterpretation.traverseBlock(impl)
 
@@ -596,6 +624,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             val block = init :+ last
             //TODO: var v; ...non v related stuff...; v = 4 <-- this is the same thing, really
+            // implement as set of case class Check(...)
             
             /// Checks on two subsequent statements
             (block zip block.tail) foreach { 
@@ -655,7 +684,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case ValDef(_, _, _, value) if isOptionOption(value) =>
             warn(tree, "Why would you need an Option of an Option?")
 
-          /// Putting null into Option
+          /// Putting null into Option (idea by Smotko)
           case DefDef(_, name, _, _, tpe, body) if (tpe.toString matches "Option\\[.*\\]") &&
             (body match {
               case n @ Literal(Constant(null)) => warn(n, "You probably meant None, not null."); true;
