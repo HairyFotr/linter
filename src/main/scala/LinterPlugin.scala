@@ -276,7 +276,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Apply(Select(Literal(Constant(-1)), nme.ADD), List(Apply(exp, _))) if exp.toString == "scala.math.`package`.exp" =>
             warn(tree, "Use math.expm1(x) instead of -1 + math.exp(x) for added accuracy (if x is near 1).")
 
-          // Use abs instead of doing it manually
+          /// Use abs instead of doing it manually
           case Apply(sqrt, List(Apply(pow, List(expr, Literal(Constant(2)))))) if sqrt.toString == "scala.math.`package`.sqrt" && pow.toString == "scala.math.`package`.pow" =>
             warn(tree, "Use abs instead of sqrt(pow(_, 2)).")
 
@@ -766,7 +766,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 
                 warn(tree, "Use filter(x => condition) instead of this flatMap(x => if(condition) ... else ...)")
                 
-              case a => 
+              case _ => 
                 //println((showRaw(expr1), showRaw(expr2)))
             }
           case _ =>

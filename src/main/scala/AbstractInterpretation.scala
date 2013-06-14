@@ -840,8 +840,7 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
     }
     
     if(values.nonEmpty) {
-      values.notSeq
-      vals += param -> values
+      vals += param -> values.notSeq
       
       if(!isUsed(body, param) && func != "foreach") warn(tree, "Iterator value is not used in the body.")
 
@@ -1220,7 +1219,7 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
     override def hashCode: Int = exactValue.hashCode + name.hashCode + minLength + trimmedMinLength + maxLength + trimmedMaxLength
     override def equals(that: Any): Boolean = that match {
       case s: StringAttrs => (this.exactValue.isDefined && s.exactValue.isDefined && this.exactValue.get == s.exactValue.get)
-      case s: String => exactValue.exists(_ == s)
+      case s: String => this.exactValue.exists(_ == s)
       case _ => false
     }
     
