@@ -52,7 +52,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
         val compiler = super.newCompiler(settings, reporter)
         val linterPlugin = new LinterPlugin(compiler)
         for (phase <- linterPlugin.components)
-          compiler.asInstanceOf[ {def phasesSet: mutable.HashSet[tools.nsc.SubComponent]}].phasesSet += phase
+          compiler.asInstanceOf[{def phasesSet: mutable.HashSet[tools.nsc.SubComponent]}].phasesSet += phase
         compiler
       }
     }

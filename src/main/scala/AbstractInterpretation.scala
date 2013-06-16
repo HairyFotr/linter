@@ -1146,7 +1146,8 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
         case Apply(augmentString, List(expr)) if(augmentString.toString == "scala.this.Predef.augmentString") =>
           StringAttrs(expr)
           
-        case Apply(Select(expr1, op), List(expr2)) if (op == nme.ADD) && (expr1.tpe.widen <:< definitions.StringClass.tpe ^ expr2.tpe.widen <:< definitions.StringClass.tpe) =>
+        // Implicit toString
+        case Apply(Select(expr1, nme.ADD), List(expr2)) if (expr1.tpe.widen <:< definitions.StringClass.tpe ^ expr2.tpe.widen <:< definitions.StringClass.tpe) =>
           toStringAttrs(expr1) + toStringAttrs(expr2)
 
         /// Pass on functions on strings
