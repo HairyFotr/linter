@@ -222,7 +222,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       }
       
       // Just a way to make the Tree/Name-String comparisons more readable
-      class RichToStr[T](n: T) {
+      abstract class RichToStr[T](n: T) {
         def is(str: String): Boolean = n.toString == str
         def isAny(str: String*): Boolean = str.exists(n.toString == _)
         def startsWith(str: String): Boolean = n.toString startsWith str
@@ -230,8 +230,9 @@ class LinterPlugin(val global: Global) extends Plugin {
         def endsWith(str: String): Boolean = n.toString endsWith str
         def endsWithAny(str: String*): Boolean = str.exists(n.toString endsWith _)
       }
-      implicit class RichTree(n: Tree) extends RichToStr(n)
-      implicit class RichName(n: Name) extends RichToStr(n)
+      implicit def RichTree(n: Tree) = new RichToStr(n) {}
+      implicit def RichName(n: Name) = new RichToStr(n) {}
+      //implicit class RichName(n: Name) extends RichToStr(n)
       
       // Returns the string subtree of a string.length/size subtree
       def getStringFromLength(t: Tree): Option[Tree] = t match {
@@ -304,7 +305,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// Use xxx.isNaN instead of (xxx != xxx)
           case Apply(Select(left, func), List(right))
             if (left.tpe.widen <:< definitions.DoubleClass.tpe || left.tpe.widen <:< definitions.FloatClass.tpe)
-            && (func isAny (nme.EQ, nme.NE))
+            && (func == nme.EQ || func == nme.NE)
             && ((left equalsStructure right) || (right equalsStructure Literal(Constant(Double.NaN))) || (right equalsStructure Literal(Constant(Float.NaN)))) =>
             
             warn(tree, "Use .isNan instead of comparing to itself or NaN.")
@@ -546,7 +547,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           /// If checks
           case Apply(Select(left, func), List(right)) 
-            if (func isAny (nme.ZAND, nme.ZOR)) && (left equalsStructure right) && tree.tpe.widen <:< definitions.BooleanClass.tpe =>
+            if (func == nme.ZAND || func == nme.ZOR) && (left equalsStructure right) && tree.tpe.widen <:< definitions.BooleanClass.tpe =>
             
             warn(tree, "Same expression on both sides of boolean statement.")
            
@@ -685,7 +686,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           // cannot check double/float, as typer will automatically translate it to Infinity
           case divByZero @ Apply(Select(rcvr, op), List(Literal(Constant(0))))
-            if (op isAny (nme.DIV, nme.MOD))
+            if (op == nme.DIV || op == nme.MOD)
             && (rcvr.tpe <:< definitions.ByteClass.tpe
              || rcvr.tpe <:< definitions.ShortClass.tpe
              || rcvr.tpe <:< definitions.IntClass.tpe
@@ -735,7 +736,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, "Use Option(...), which automatically wraps null to None")
           
           /// Comparing to None
-          case Apply(Select(opt, op), List(scala_None)) if (op isAny (nme.EQ, nme.NE)) && (scala_None is "scala.None") =>
+          case Apply(Select(opt, op), List(scala_None)) if (op == nme.EQ || op == nme.NE) && (scala_None is "scala.None") =>
             warn(tree, "Use .isDefined instead of comparing to None")
 
           /// orElse(Some(...)).get is better written as getOrElse(...)
