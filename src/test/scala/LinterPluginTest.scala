@@ -1053,8 +1053,25 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
 
   @Test
+  def possibleBugs__anynothing() {
+    implicit val msg = "Inferred type"//Any/Nothing. This might not be what you intended."
+    
+    should("""{ var a = if(3 == 3) 5 else ""; println(a) }""")
+    shouldnt("""{ var a:Any = if(3 == 3) 5 else ""; println(a) }""")
+    
+    should("""{ var a = List(if(3 == 3) 5 else ""); println(a) }""")
+    shouldnt("""{ var a:List[Any] = List(if(3 == 3) 5 else ""); println(a) }""")
+
+    should("""{ var a = if(3 == 3) throw new Exception() else throw new Error(); println(a) }""")
+    shouldnt("""{ var a:Nothing = if(3 == 3) throw new Exception() else throw new Error(); println(a) }""")
+    
+    should("""{ var a = List(if(3 == 3) throw new Exception() else throw new Error()); println(a) }""")
+    shouldnt("""{ var a:List[Nothing] = List(if(3 == 3) throw new Exception() else throw new Error()); println(a) }""")
+  }
+  
+  @Test
   def possibleBugs__assignment() {
-    implicit val msg = "Assignment right after declaration"
+    implicit val msg = "unused value before"//"Assignment right after declaration"
     
     should("""
       var a = 6
@@ -1080,7 +1097,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def possibleBugs__assignment2() {
-    implicit val msg = "Two subsequent assigns"
+    implicit val msg = "unused value before"//"Two subsequent assigns"
     
     should("""
       var a = 6

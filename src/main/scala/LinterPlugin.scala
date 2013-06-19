@@ -50,13 +50,15 @@ class LinterPlugin(val global: Global) extends Plugin {
   
   override val optionsHelp: Option[String] = Some("  -P:linter No options yet, just letting you know I'm here")
 
+  val inferred = mutable.HashSet[Position]() // Used for a scala 2.9 hack (can't find out which types are inferred)
+
   private object PreTyperComponent extends PluginComponent {
     import global._
-
+    
     val global = LinterPlugin.this.global
-
+    
     override val runsAfter = List("parser")
-
+    
     val phaseName = "linter-parsed"
     
     private val sealedTraits = mutable.Map[Name, Tree]()
@@ -80,9 +82,10 @@ class LinterPlugin(val global: Global) extends Plugin {
         }
       }
     }
-
+    
     class PreTyperTraverser(unit: CompilationUnit) extends Traverser {
       implicit val unitt = unit
+
       override def traverse(tree: Tree) {
         //if(showRaw(tree).contains("Hello"))println(showRaw(tree))
         tree match {
@@ -110,6 +113,13 @@ class LinterPlugin(val global: Global) extends Plugin {
             return
 
           
+          /// Warn on Nothing/Any or M[Nothing/Any] (idea by OlegYch)
+          case ValDef(mods, _, tpe, _) 
+            if !mods.isParameter 
+            && tpe.toString == "<type ?>" =>
+            
+            inferred += tpe.pos
+
           case DefDef(mods: Modifiers, name, _, valDefs, typeTree, block) =>
             /// Unused method parameters
             //TODO: This nags, when a class overrides a method, but doesn't mark it as such - check out if this gets set later: 
@@ -230,9 +240,9 @@ class LinterPlugin(val global: Global) extends Plugin {
         def endsWith(str: String): Boolean = n.toString endsWith str
         def endsWithAny(str: String*): Boolean = str.exists(n.toString endsWith _)
       }
-      implicit def RichTree(n: Tree) = new RichToStr(n) {}
-      implicit def RichName(n: Name) = new RichToStr(n) {}
-      //implicit class RichName(n: Name) extends RichToStr(n)
+      // (scala 2.9 implicit class)
+      implicit def richTree(n: Tree) = new RichToStr(n) {}
+      implicit def richName(n: Name) = new RichToStr(n) {}
       
       // Returns the string subtree of a string.length/size subtree
       def getStringFromLength(t: Tree): Option[Tree] = t match {
@@ -251,7 +261,7 @@ class LinterPlugin(val global: Global) extends Plugin {
         case _ =>
           None
       }
-
+      
       val abstractInterpretation = new AbstractInterpretation(global, unit)
 
       override def traverse(tree: Tree) { 
@@ -641,34 +651,71 @@ class LinterPlugin(val global: Global) extends Plugin {
             abstractInterpretation.traverseBlock(blockElem)
 
             val block = init :+ last
-            //TODO: var v; ...non v related stuff...; v = 4 <-- this is the same thing, really
-            // implement as set of case class Check(...)
+
+            /// Check for unused variable values
+            sealed trait AssignStatus
+            case class Unknown() extends AssignStatus
+            case class Unused() extends AssignStatus
+            case class Used() extends AssignStatus
             
+            val assigns = mutable.HashMap[Name, AssignStatus]().withDefaultValue(Unknown())
+            def checkAssigns(tree: Tree, onlySetUsed: Boolean = false) {
+              tree match {
+                // TODO: It could check if it gets set in all branches - Ignores currently
+                case If(cond, t, f) =>
+                  tree.children foreach { t => checkAssigns(t, onlySetUsed = true) }
+                case Match(pat, cases) =>
+                  tree.children foreach { t => checkAssigns(t, onlySetUsed = true) }
+                
+                case ValDef(mods, id, _, right) if mods.isMutable =>
+                  //TODO: shadowing warning doesn't work, even if I make sure each tree is visited once, and even if I don't traverse inner Blocks
+                  //if(assigns contains id) warn(tree, "Variable "+id.toString+" is being shadowed here.")
+                  checkAssigns(right, onlySetUsed)
+                  //Two exceptions: null and None are sometimes legit init values without use:
+                  if(right isAny ("null", "scala.None"))
+                    assigns(id) = Used()
+                  else if(!onlySetUsed)
+                    assigns(id) = Unused()
+                    
+                case Assign(Ident(id), right) =>
+                  checkAssigns(right, onlySetUsed)
+                  if(!onlySetUsed) assigns(id) match {
+                    case Unused() =>
+                      warn(tree, "Variable "+id.toString+" has an unused value before this reassign.")
+                    case Used() =>
+                      assigns(id) = Unused()
+                    case Unknown() =>
+                  }
+                  
+                case Ident(id) =>
+                  assigns(id) = Used()
+                  
+                case tree =>
+                  //for(Ident(id) <- tree; if assigns(id) == Unused()) assigns(id) == Used()
+                  tree.children foreach { t => checkAssigns(t, onlySetUsed) }
+              }
+            }
+            
+            block foreach { t => checkAssigns(t, onlySetUsed = false) }
+            /// Warnings when exiting a block - don't seem to work right
+            //val unused = (assigns filter { _._2 == Unused() } map { _._1.toString.trim } mkString ", ")
+            //if(!unused.isEmpty) warn(block.last, "Variable(s) "+unused+" have an unused value before here.")
+
             /// Checks on two subsequent statements
             (block zip block.tail) foreach { 
-              case (ValDef(modifiers, id1, _, _), Assign(id2, assign)) 
-                if id1.toString == id2.toString && !abstractInterpretation.isUsed(assign, id2.toString)=>
-                
-                warn(id2, "Assignment right after declaration is most likely a bug (unless you side-effect like a boss)")
-
-              //case (Assign(id1, _), Assign(id2, _)) if id1.toString == id2.toString => // stricter
-              case (Assign(id1, _), Assign(id2, assign)) 
-                if id1.toString == id2.toString && !abstractInterpretation.isUsed(assign, id2.toString) =>
-                
-                warn(id2, "Two subsequent assigns are most likely a bug (unless you side-effect like a boss)")
-
               case (Assign(id1, id2), Assign(id2_, id1_)) if(id1 equalsStructure id1_) && (id2 equalsStructure id2_) =>
                 warn(id1_, "Did you mean to swap these two variables?")
 
               /// "...; val x = value; x }" at the end of a method - usually I do this for debug outputs
+              // this could be generalized in the new unused value code above 
               //case (v @ ValDef(_, id1, _, _), l @ Ident(id2)) if id1.toString == id2.toString && (l eq last) =>
               //  warn(v, "You don't need that temp variable.")
 
               case (If(cond1, _, _), If(cond2, _, _)) if cond1 equalsStructure cond2 =>
-                warn(cond1, "Two subsequent ifs have the same condition")
+                warn(cond2, "Two subsequent ifs have the same condition")
 
               case (s1, s2) if s1 equalsStructure s2 =>
-                warn(s1, "You're doing the exact same thing twice.")
+                warn(s2, "You're doing the exact same thing twice.")
 
               case _ =>
             }
@@ -696,11 +743,27 @@ class LinterPlugin(val global: Global) extends Plugin {
           case _ =>
         }
 
+        def isAnyType(tpe: Type): Boolean = {
+           (tpe =:= definitions.AnyClass.tpe ||
+           tpe.typeArgs.exists(t => t =:= definitions.AnyClass.tpe))
+        }
+        def isNothingType(tpe: Type): Boolean = {
+          (tpe =:= definitions.NothingClass.tpe ||
+           tpe.typeArgs.exists(t => t =:= definitions.NothingClass.tpe))
+        }
+
         tree match {
           /// an Option of an Option
           //TODO: make stricter if you want, but Ident(_) could get annoying if someone out there is actually using this :)
           case ValDef(_, _, _, value) if isOptionOption(value) =>
             warn(tree, "Why would you need an Option of an Option?")
+
+          case ValDef(mods, _, tpe, _) 
+            if !mods.isParameter 
+            && (isAnyType(tpe.tpe) || isNothingType(tpe.tpe))
+            && (inferred contains tpe.pos) =>
+            
+            warn(tree, "Inferred type "+tpe.tpe+". This might not be what you intended.")
 
           /// Putting null into Option (idea by Smotko)
           case DefDef(_, name, _, _, tpe, body) if (tpe.toString matches "Option\\[.*\\]") &&
