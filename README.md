@@ -18,7 +18,7 @@ Add it as a compiler plugin to your project by editing your build.sbt file:
 
 ### Manually
 You can download the latest snapshot here:
-[Scala 2.10.1](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar?raw=true), 
+[Scala 2.10.2](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar?raw=true), 
 [Scala 2.9.3](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.9.3/0.1-SNAPSHOT/linter_2.9.3-0.1-SNAPSHOT.jar?raw=true),
 [Scala 2.11.0-M3](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar?raw=true) (experimental), 
 
@@ -170,11 +170,12 @@ Feel free to implement these, or add your own ideas. Pull requests welcome!
 * Boolean function parameters should be named (`func("arg1", force = true)`)
 * Detect vars, that could easily be vals (done in scala 2.11 -Xlint)
 
-Rule lists from other static analysis tools:
+Rule lists from other static analysis tools for inspiration:
 * ScalaStyle - https://github.com/scalastyle/scalastyle/wiki
 * CheckStyle(Java) - http://checkstyle.sourceforge.net/availablechecks.html
 * PMD(Java) - http://pmd.sourceforge.net/pmd-5.0.3/rules/index.html
 * PVS-Studio(C++) - http://www.viva64.com/en/d/
+* Coverity(C++) - http://www.slideshare.net/Coverity/static-analysis-primer-22874326 (6,7)
  
 ### Some resources
 * A quick overview of writing compiler plugins: http://www.scala-lang.org/node/140
