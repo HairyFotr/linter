@@ -97,6 +97,7 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
     //def forall(func: Int => Boolean) = (values forall func) && (ranges forall { case (low, high) => (low to high) forall func })
     def existsLower(i: Int): Boolean = (values exists { _ < i }) || (ranges exists { case (low, high) => low < i })
     def existsGreater(i: Int): Boolean = (values exists { _ > i }) || (ranges exists { case (low, high) => high > i })
+    def forallLower(i: Int): Boolean = (values forall { _ < i }) && (ranges forall { case (low, high) => (low <= high) && (high < i) })
     def forallEquals(i: Int): Boolean = (values forall { _ == i }) && (ranges forall { case (low, high) => (low == high) && (i == low) })
     
     def addRange(low: Int, high: Int): Values = new Values(ranges + (if(low > high) (high, low) else (low, high)), values, conditions, name, false, -1)
@@ -918,10 +919,10 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
           )
         case "toString" if params.size == 0 =>
           Left(toStringAttrs(string))
-        case "$plus" if params.size == 1 =>
+        case ("$plus"|"concat") if params.size == 1 =>
           Left(str + toStringAttrs(params.head))
-        case "$times" if intParam.isValue =>
-          Left(str * intParam.getValue)
+        case "$times" =>
+          Left(str * intParam)
 
         case f @ ("init"|"tail") => 
           if(str.exactValue.isDefined) {
@@ -1204,9 +1205,33 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
         maxLength = if(this.getMaxLength == Int.MaxValue || s.getMaxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength + s.getMaxLength,
         trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue || s.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.getTrimmedMaxLength
       )
+    def *(n: Values): StringAttrs = {
+      if(n.isValue) {
+        this * n.getValue
+      } else if(n.nonEmpty) {
+        if(n forallLower 2) {
+          if(n.max == 1) {
+            new StringAttrs(
+              minLength = 0,
+              trimmedMinLength = 0,
+              maxLength = this.getMaxLength,
+              trimmedMaxLength = this.getTrimmedMaxLength)
+          } else {
+            warn(treePosHolder, "Multiplying a string with a value <= 0 will result in an empty string.")
+            new StringAttrs(exactValue = Some(""))
+          }
+        } else {
+          new StringAttrs(
+            minLength = if(n.min > 0) this.getMinLength*n.min else 0,
+            trimmedMinLength = if(n.min > 0) this.getTrimmedMinLength*n.min else 0)
+        }
+      } else {
+        StringAttrs.empty
+      }
+    }
     def *(n: Int): StringAttrs = 
       if(n <= 0) {
-        warn(treePosHolder, "Multiplying a string with a value <= 0 will always result in an empty string.")
+        warn(treePosHolder, "Multiplying a string with a value <= 0 will result in an empty string.")
         new StringAttrs(Some(""))
       } else {
         new StringAttrs(
@@ -1449,14 +1474,6 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
         treePosHolder = regExpr
                 
         StringAttrs(regExpr).exactValue.foreach(checkRegex)
-
-      /// Option checks
-      /// Checks for Option[Traversable[A]].size, which is probably a bug (use .isDefined instead)
-      case t @ Select(Apply(option2Iterable, List(opt)), size)
-        if (option2Iterable.toString contains "Option.option2Iterable") && size.toString == "size" 
-        && opt.tpe.widen.typeArgs.exists(tp => tp.widen <:< definitions.StringClass.tpe || tp.widen.baseClasses.exists(_.tpe =:= definitions.TraversableClass.tpe)) =>
-
-        warn(t, "Did you mean to take the size of the collection inside the Option?")
         
       ///Checking the .size (there's a separate warning about using .size)
       //ADD: Generalize... move to applyCond completely, make it less hacky
