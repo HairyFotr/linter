@@ -547,6 +547,9 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt("""List(2).headOption.size""")
     msg = "Did you mean to take the size of the string inside the Option?"
     should("""Option("fdsfd").size""")
+    msg = "Using Option.size is not recommended, use Option.isDefined instead"
+    should("""val a = Option(4).size""")
+    should("""List(2).headOption.size""")
     
     msg = "Option of an Option"
     should("""val a = Option(Option("fdsfs"))""")

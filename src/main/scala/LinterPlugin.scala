@@ -851,26 +851,14 @@ class LinterPlugin(val global: Global) extends Plugin {
                 //println((showRaw(expr1), showRaw(expr2)))
             }
             
-            //TODO: Warn on all usage of opt.size? I can't think of a good reason to use it.
-            /// Checks for Option[Traversable[A]].size, which is probably a bug (use .isDefined instead)
-            case t @ Select(Apply(option2Iterable, List(opt)), size)
-              if (option2Iterable.toString contains "Option.option2Iterable") && (size is "size")
-              && opt.tpe.widen.typeArgs.exists(tp => tp.widen <:< definitions.StringClass.tpe || tp.widen.baseClasses.exists(_.tpe =:= definitions.TraversableClass.tpe)) =>
-
-              warn(t, "Did you mean to take the size of the collection inside the Option?")
+            /// Checks for Option.size, which is probably a bug (use .isDefined instead)
+            case t @ Select(Apply(option2Iterable, List(opt)), size) if (option2Iterable.toString contains "Option.option2Iterable") && (size is "size") =>
               
-            /// Checks for Option[String].size, which is probably a bug
-            case t @ Select(Apply(option2Iterable, List(opt)), size)
-              if (option2Iterable.toString contains "Option.option2Iterable") && (size is "size")
-              && opt.tpe.widen.typeArgs.exists(tp => tp.widen <:< definitions.StringClass.tpe || tp.widen.baseClasses.exists(_.tpe =:= definitions.TraversableClass.tpe)) =>
-
-              warn(t, "Did you mean to take the size of the string inside the Option?")
-
-            ///Checking the .size (there's a separate warning about using .size)
-            //ADD: Generalize... move to applyCond completely, make it less hacky
-            case t @ Apply(Select(Select(Apply(option2Iterable, List(opt)), size), op), List(expr))
-              if (option2Iterable.toString contains "Option.option2Iterable") && size.toString == "size" && t.tpe.widen <:< definitions.BooleanClass.tpe =>
-
+              if(opt.tpe.widen.typeArgs.exists(tp => tp.widen <:< definitions.StringClass.tpe || tp.widen.baseClasses.exists(_.tpe =:= definitions.TraversableClass.tpe)))
+                warn(t, "Did you mean to take the size of the string inside the Option?")
+              else
+                warn(t, "Using Option.size is not recommended, use Option.isDefined instead")
+              
           case _ =>
         }
 
