@@ -96,7 +96,8 @@ class LinterPlugin(val global: Global) extends Plugin {
             inTrait = false
             return
 
-          case ClassDef(mods, name, _, Template(extendsList, _, body)) if mods.isSealed && mods.isTrait && !inTrait =>
+          // typeparams (3rd param) are sometimes used for type-checking hacks
+          case ClassDef(mods, name, List(), Template(extendsList, _, body)) if mods.isSealed && mods.isTrait && !inTrait =>
             sealedTraits += name -> tree
             for(Ident(traitName) <- extendsList if traitName.toString != name.toString) usedTraits += traitName
             for(stmt <- body) traverse(stmt)

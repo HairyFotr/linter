@@ -1424,10 +1424,14 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     implicit val msg = "This sealed trait is never"
     
     should("""sealed trait Hello""")
+    should("""sealed trait Hello { def a = println("hello") }""")
     should("""class a { sealed trait Hello; object a { val b = "fdsfds"; class s(); } }""")
     should("""class a { sealed trait Hello; sealed trait Hello2 extends Hello; object a { val b = "fdsfds"; class s(); } }""")
     should("""class a { sealed trait Hello; sealed trait Hello2 extends Hello; object a { val b = "fdsfds"; class s() extends Hello; } }""")
     shouldnt("""class a { sealed trait Hello; sealed trait Hello2 extends Hello; object a { val b = "fdsfds"; class s() extends Hello2; } }""")
+
+    shouldnt("""sealed trait Hello { def a = println("hello") }; val b = new Hello {}""")
+    shouldnt("""sealed trait Hello[A, B <: List]""")
   }
 
   @Test 
