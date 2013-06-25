@@ -258,6 +258,10 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     
     should("""val a = 5; a match { case a if a == 5 => "f" case a if a == 5 => "d" }""")
     shouldnt("""val a = 5; a match { case a if a == 6 => "f" case a if a == 5 => "d" }""")
+    
+    should("""val x = 5; (x,8) match { case (a,8) if a == 5 => "f" case (b,8) if b == 5 => "d" }""")
+    shouldnt("""val x = 5; (x,8) match { case (a,8) if a == 5 => "f" case (b,8) if b == 6 => "d" }""")
+    shouldnt("""val x = 5; (x,8) match { case (a,8) if a == 5 => "f" case (b,7) if b == 6 => "d" }""")
   }
   
   @Test

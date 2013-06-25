@@ -241,8 +241,8 @@ class LinterPlugin(val global: Global) extends Plugin {
         def endsWithAny(str: String*): Boolean = str.exists(n.toString endsWith _)
       }
       // (scala 2.9 implicit class)
-      implicit def richTree(n: Tree) = new RichToStr(n) {}
-      implicit def richName(n: Name) = new RichToStr(n) {}
+      implicit def richTree(n: Tree): RichToStr[Tree] = new RichToStr(n) {}
+      implicit def richName(n: Name): RichToStr[Name] = new RichToStr(n) {}
       
       // Returns the string subtree of a string.length/size subtree
       def getStringFromLength(t: Tree): Option[Tree] = t match {
@@ -549,10 +549,45 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             /// Detect unreachable cases 
             //TODO: move to abs. interpreter to detect impossible guards
-            //TODO: val x = 5; x match { case a if a == 5 => "f" case b if b == 5 => "d" } <-- maybe use some kind of hashing or renaming?
             val pastCases = mutable.ListBuffer[CaseDef]()
             def checkUnreachable(c: CaseDef) {
-              if(pastCases exists { p => (p.pat equalsStructure c.pat) && (p.guard equalsStructure c.guard) })
+              //adapted from scala/reflect/internal/Trees.scala to cover wildcards in CaseDef
+              def correspondsWildcardStructure(thiz: CaseDef, that: CaseDef): Boolean = {
+                val wildcards = mutable.HashSet[(Name, Name)]()//enumerate wildcard aliases
+                
+                def correspondsStructure(thiz: Tree, that: Tree): Boolean = {
+                  (thiz eq that) || ((thiz.productArity == that.productArity) && {
+                    def equals0(this0: Any, that0: Any): Boolean = (this0, that0) match {
+                      case (x: Name, y: Name) if wildcards.contains((x, y)) => 
+                        true
+                      case (x: Tree, y: Tree) => 
+                        (x eq y) || correspondsStructure(x, y)
+                      case (xs: List[_], ys: List[_]) => 
+                        (xs corresponds ys)(equals0)
+                      case _ => 
+                        this0 == that0
+                    }
+                    def compareOriginals(): Boolean = (thiz, that) match {
+                      case (x: TypeTree, y: TypeTree) if x.original != null && y.original != null =>
+                        correspondsStructure(x.original, y.original)
+                      case _ =>
+                        true
+                    }
+                    
+                    ((thiz, that) match {
+                      case (Bind(x, Ident(nme.WILDCARD)), Bind(y, Ident(nme.WILDCARD))) =>
+                        wildcards += ((x, y))
+                        true
+                      case _ =>
+                        thiz.productIterator zip that.productIterator forall { case (x, y) => equals0(x, y) }
+                    }) && compareOriginals()
+                  })
+                }
+                
+                (correspondsStructure(thiz.pat, that.pat) && correspondsStructure(thiz.guard, that.guard))
+              }
+
+              if(pastCases exists { p => correspondsWildcardStructure(p, c) })
                 warn(c.pos, "Identical case detected above - this will never match.")
               else
                 pastCases += c
@@ -564,7 +599,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               checkUsage(c)
               checkUnreachable(c)
             }
-
+            
             printStreakWarning()
             printCaseWarning()
 
