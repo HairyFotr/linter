@@ -862,14 +862,25 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
     // scalastyle:off magic.number
     def toStringAttrs(param: Tree): StringAttrs = {
       val intParam = computeExpr(param)
-      if(intParam.isValue) new StringAttrs(Some(intParam.getValue.toString))
-      else if(param.tpe.widen <:< definitions.IntClass.tpe) new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 11, trimmedMaxLength = 11)
-      else if(param.tpe.widen <:< definitions.LongClass.tpe) new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 20, trimmedMaxLength = 20)
+      if(intParam.isValue) new StringAttrs(exactValue = Some(intParam.getValue.toString))
+      if(intParam.size > 1) {
+        val maxLen = math.max(intParam.max.toString.length, intParam.min.toString.length)
+        new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = maxLen, trimmedMaxLength = maxLen)
+      } else if(param match { case Literal(Constant(a)) => true case _  => false }) param match { //groan.
+        case Literal(Constant(null)) => new StringAttrs(exactValue = Some("null"))
+        case Literal(Constant(a))    => new StringAttrs(Some(a.toString))
+      } else if(param.tpe.widen <:< definitions.CharClass.tpe)  new StringAttrs(minLength = 1, trimmedMinLength = 0, maxLength = 1, trimmedMaxLength = 0)
+      else if(param.tpe.widen <:< definitions.ByteClass.tpe)    new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 4, trimmedMaxLength = 4)
+      else if(param.tpe.widen <:< definitions.ShortClass.tpe)   new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 6, trimmedMaxLength = 6)
+      else if(param.tpe.widen <:< definitions.IntClass.tpe)     new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 11, trimmedMaxLength = 11)
+      else if(param.tpe.widen <:< definitions.LongClass.tpe)    new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 20, trimmedMaxLength = 20)
       //http://stackoverflow.com/questions/1701055/what-is-the-maximum-length-in-chars-needed-to-represent-any-double-value :)
-      else if(param.tpe.widen <:< definitions.DoubleClass.tpe) new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 1079, trimmedMaxLength = 1079)
-      else if(param.tpe.widen <:< definitions.FloatClass.tpe) new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 154, trimmedMaxLength = 154)
+      else if(param.tpe.widen <:< definitions.DoubleClass.tpe)  new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 1079, trimmedMaxLength = 1079)
+      else if(param.tpe.widen <:< definitions.FloatClass.tpe)   new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 154, trimmedMaxLength = 154)
+      else if(param.tpe.widen <:< definitions.BooleanClass.tpe) new StringAttrs(minLength = 4, trimmedMinLength = 4, maxLength = 5, trimmedMaxLength = 5)
       else {
         //TODO: not sure if this is the right way, but <:< definitions.TraversableClass.tpe does not work directly
+        // also, it's possible to have a Traversable, which has a shorter toString, but not that likely IMO
         if((param.tpe.baseClasses.exists(_.tpe =:= definitions.TraversableClass.tpe)) && !(param.tpe.widen <:< definitions.StringClass.tpe)) {
           // collections: minimal is Nil or Type()
           //TODO: Surely I can do moar... intParam.isSeq, etc
@@ -1428,7 +1439,11 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
         
         val returnVal = last match {
           case Return(ret) => 
-            warn(last, "Scala has implicit return, you don't need a return statement at the end of a method")
+            def otherReturns: Boolean = { 
+              for(Return(ret) <- b) return true
+              false
+            }
+            if(otherReturns) warn(last, "Scala has implicit return, you don't need a return statement at the end of a method")
             ret
           case a => 
             a
