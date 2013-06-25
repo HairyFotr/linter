@@ -253,6 +253,14 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
   
   @Test
+  def case__unreachable() {
+    implicit val msg = "Identical case detected above - this will never match."
+    
+    should("""val a = 5; a match { case a if a == 5 => "f" case a if a == 5 => "d" }""")
+    shouldnt("""val a = 5; a match { case a if a == 6 => "f" case a if a == 5 => "d" }""")
+  }
+  
+  @Test
   def case__constantValue() {
     implicit val msg = "Pattern matching on a constant value"
     

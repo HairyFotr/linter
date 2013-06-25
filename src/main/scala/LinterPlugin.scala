@@ -516,6 +516,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
 
             /// Checking for duplicate case bodies
+            // only if isLiteral(c.pat), because other types can't easily be merged
             case class Streak(streak: Int, tree: CaseDef)
             var streak = Streak(0, cases.head)
             def checkStreak(c: CaseDef) {
@@ -546,10 +547,22 @@ class LinterPlugin(val global: Global) extends Plugin {
               }*/
             }
 
+            /// Detect unreachable cases 
+            //TODO: move to abs. interpreter to detect impossible guards
+            //TODO: val x = 5; x match { case a if a == 5 => "f" case b if b == 5 => "d" } <-- maybe use some kind of hashing or renaming?
+            val pastCases = mutable.ListBuffer[CaseDef]()
+            def checkUnreachable(c: CaseDef) {
+              if(pastCases exists { p => (p.pat equalsStructure c.pat) && (p.guard equalsStructure c.guard) })
+                warn(c.pos, "Identical case detected above - this will never match.")
+              else
+                pastCases += c
+            }
+
             for(c <- cases) {
               checkCase(c)
               checkStreak(c)
               checkUsage(c)
+              checkUnreachable(c)
             }
 
             printStreakWarning()
@@ -659,7 +672,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             case class Used() extends AssignStatus
             
             val assigns = mutable.HashMap[Name, AssignStatus]().withDefaultValue(Unknown())
-            def checkAssigns(tree: Tree, onlySetUsed: Boolean = false) {
+            def checkAssigns(tree: Tree, onlySetUsed: Boolean) {
               tree match {
                 // TODO: It could check if it gets set in all branches - Ignores currently
                 case If(cond, t, f) =>
