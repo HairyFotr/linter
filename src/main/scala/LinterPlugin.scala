@@ -293,9 +293,9 @@ class LinterPlugin(val global: Global) extends Plugin {
           //TODO: maybe make checks to protect against potentially wrong fixes, e.g. log1p(a + 1) or log1p(a - 1)
           // also, check 1-exp(x) and other negated versions
           case Apply(log, List(Apply(Select(Literal(Constant(1)), nme.ADD), _))) if log is "scala.math.`package`.log" => 
-            warn(tree, "Use math.log1p(x) instead of math.log(1 + x) for added accuracy (if x is near 0")
+            warn(tree, "Use math.log1p(x) instead of math.log(1 + x) for added accuracy (if x is near 0)")
           case Apply(log, List(Apply(Select(_, nme.ADD), List(Literal(Constant(1)))))) if log is "scala.math.`package`.log" => 
-            warn(tree, "Use math.log1p(x) instead of math.log(x + 1) for added accuracy (if x is near 0")
+            warn(tree, "Use math.log1p(x) instead of math.log(x + 1) for added accuracy (if x is near 0)")
             
           case Apply(Select(Apply(exp, _), nme.SUB), List(Literal(Constant(1)))) if exp is "scala.math.`package`.exp" => 
             warn(tree, "Use math.expm1(x) instead of math.exp(x) - 1 for added accuracy (if x is near 1).")
@@ -521,7 +521,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             case class Streak(streak: Int, tree: CaseDef)
             var streak = Streak(0, cases.head)
             def checkStreak(c: CaseDef) {
-              if((c.body equalsStructure streak.tree.body) && isLiteral(c.pat) && !(c.body.children == List())) {
+              if((c.body equalsStructure streak.tree.body) && isLiteral(c.pat) && !(c.body == EmptyTree)) {
                 streak = Streak(streak.streak + 1, c)
               } else {
                 printStreakWarning()
@@ -635,30 +635,34 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             warn(a, "If statement branches have the same structure.")
 
-          /// Find repeated conditions that are essentially dead (only considers things separated by OR)
+          /// Find repeated (sub)conditions that will never hold
+          // caches conditions separated by OR, and checks all subconditions separated by either AND or OR
           case If(condition, _, e) if {
-            def getSubConds(cond: Tree): List[Tree] =
+            def getSubConds(cond: Tree)(op: Name): List[Tree] =
               List(cond) ++ (cond match {
-                case Apply(Select(left, nme.ZOR), List(right)) =>
-                  getSubConds(left) ++ getSubConds(right)
+                case Apply(Select(left, opp), List(right)) if op == opp =>
+                  getSubConds(left)(op) ++ getSubConds(right)(op)
                 case _ =>
                   Nil
               })
-            lazy val conds = mutable.ListBuffer(getSubConds(condition):_*)
+            lazy val conds = mutable.ListBuffer(getSubConds(condition)(nme.ZOR):_*)
             def elseIf(tree: Tree) {
               tree match {
                 case If(cond, _, e) => 
-                  val subConds = getSubConds(cond)
-                  if(conds.exists(c => subConds.exists(_ equalsStructure c)))
-                    warn(cond, "This else-if has the same condition as a previous if.")
-                  else 
-                    conds ++= subConds
+                  val subCondsOr = getSubConds(cond)(nme.ZOR)
+                  val subCondsAnd = getSubConds(cond)(nme.ZAND)
+
+                  for(newCond <- (subCondsOr ++ subCondsAnd); 
+                      oldCond <- conds; if newCond equalsStructure oldCond)
+                    warn(newCond, "This condition has appeared earlier in the if-else chain, and will never hold here.")
+
+                  conds ++= subCondsOr
 
                   elseIf(e)
                 case _ =>
               }
             }
-            elseIf(e)            
+            elseIf(e)
             false
           } => //Fallthrough
 
@@ -848,8 +852,8 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, "Use Option(...), which automatically wraps null to None")
           
           /// Comparing to None
-          case Apply(Select(opt, op), List(scala_None)) if (op == nme.EQ || op == nme.NE) && (scala_None is "scala.None") =>
-            warn(tree, "Use .isDefined instead of comparing to None")
+          /*case Apply(Select(opt, op), List(scala_None)) if (op == nme.EQ || op == nme.NE) && (scala_None is "scala.None") =>
+            warn(tree, "Use .isDefined instead of comparing to None")*/
 
           /// orElse(Some(...)).get is better written as getOrElse(...)
           case Select(Apply(TypeApply(Select(opt, orElse), _), List(Apply(scala_Some_apply, List(value)))), get)
@@ -858,14 +862,30 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(scala_Some_apply, "Use getOrElse(...) instead of orElse(Some(...)).get")
 
           /// if(opt.isDefined) opt.get else something is better written as getOrElse(something)
-          //TODO: consider covering .isEmpty too
-          case If(Select(opt1, isDefined), Select(opt2, get), orElse)
-            if (isDefined is "isDefined") && (get is "get") && (opt1 equalsStructure opt2) && !(orElse.tpe.widen <:< definitions.NothingClass.tpe) =>
+          //TODO: improve the warning text, and curb the code duplication
+          case If(Select(opt1, isDefined), getCase @ Select(opt2, get), elseCase) //duplication
+            if (isDefined is "isDefined") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< definitions.NothingClass.tpe) =>
             
-            if(orElse equalsStructure Literal(Constant(null))) {
+            if(elseCase equalsStructure Literal(Constant(null))) {
               warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(opt.isDefined) opt.get else null")
-            } else {
+            } else if(getCase.tpe.widen <:< elseCase.tpe.widen) {
               warn(opt2, "Use opt.getOrElse(...) instead of if(opt.isDefined) opt.get else ...")
+            }
+          case If(Select(Select(opt1, isDefined), nme.UNARY_!), elseCase, getCase @ Select(opt2, get)) //duplication
+            if (isDefined is "isDefined") && (get is "get") && (opt1 equalsStructure opt2) && !(getCase.tpe.widen <:< definitions.NothingClass.tpe) =>
+            
+            if(elseCase equalsStructure Literal(Constant(null))) {
+              warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(!opt.isDefined) null else opt.get")
+            } else if(getCase.tpe.widen <:< elseCase.tpe.widen) {
+              warn(opt2, "Use opt.getOrElse(...) instead of if(!opt.isDefined) ... else opt.get")
+            }
+          case If(Apply(Select(opt1, nme.NE), List(scala_None)), getCase @ Select(opt2, get), elseCase) //duplication
+            if (scala_None is "scala.None") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< definitions.NothingClass.tpe) =>
+            
+            if(elseCase equalsStructure Literal(Constant(null))) {
+              warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(opt != None) opt.get else null")
+            } else if(getCase.tpe.widen <:< elseCase.tpe.widen) {
+              warn(opt2, "Use opt.getOrElse(...) instead of if(opt != None) opt.get else ...")
             }
           
           /// find(...).isDefined is better written as exists(...)
@@ -903,8 +923,10 @@ class LinterPlugin(val global: Global) extends Plugin {
             /// Checks for Option.size, which is probably a bug (use .isDefined instead)
             case t @ Select(Apply(option2Iterable, List(opt)), size) if (option2Iterable.toString contains "Option.option2Iterable") && (size is "size") =>
               
-              if(opt.tpe.widen.typeArgs.exists(tp => tp.widen <:< definitions.StringClass.tpe || tp.widen.baseClasses.exists(_.tpe =:= definitions.TraversableClass.tpe)))
+              if(opt.tpe.widen.typeArgs.exists(tp => tp.widen <:< definitions.StringClass.tpe))
                 warn(t, "Did you mean to take the size of the string inside the Option?")
+              else if(opt.tpe.widen.typeArgs.exists(tp => tp.widen.baseClasses.exists(_.tpe =:= definitions.TraversableClass.tpe)))
+                warn(t, "Did you mean to take the size of the collection inside the Option?")
               else
                 warn(t, "Using Option.size is not recommended, use Option.isDefined instead")
               

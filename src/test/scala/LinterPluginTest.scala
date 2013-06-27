@@ -835,7 +835,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def probableBugs__sameElseIfCondition() {
-    implicit val msg = "else-if has the same condition"
+    implicit val msg = "This condition has appeared earlier in the if-else chain, and will never hold here."
 
     should("""
       var a = "b"+util.Random.nextInt
