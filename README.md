@@ -1,6 +1,6 @@
 # Linter Compiler Plugin [![Build Status](https://travis-ci.org/HairyFotr/linter.png)](https://travis-ci.org/HairyFotr/linter)
 
-Linter is a Scala compiler plugin that adds compiletime checks to help protect against various possible bugs and style problems
+Linter is a Scala compiler plugin that adds compile-time checks to help protect against various possible bugs and style problems.
 
 It's currently a work in progress - some parts will need to be rewritten.
 
