@@ -160,7 +160,7 @@ You can also check the [test code](https://github.com/HairyFotr/linter/blob/mast
     <console>:29: warning: List[Int].contains(String) will probably return false.
                   List(1, 2, 3).contains("4")
                                 ^
-### Unsafe `==`
+#### Unsafe `==`
     scala> Nil == None
     <console>:29: warning: Comparing with == on instances of different types (object Nil, object None) will probably return false.
                   Nil == None
