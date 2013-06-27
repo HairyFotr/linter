@@ -142,7 +142,7 @@ You can also check the [test code](https://github.com/HairyFotr/linter/blob/mast
                   List(1,2,3,4).find(x => x % 2 == 0).isDefined
                                 ^
 
-#### Use filter(...) instead of flatmap(...)
+#### Use filter(...) instead of flatMap(...)
     scala> List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)
     <console>:8: warning: Use filter(x => condition) instead of flatMap(x => if(condition) ... else ...)
                   List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)
