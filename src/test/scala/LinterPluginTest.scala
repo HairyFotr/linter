@@ -344,8 +344,8 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   def def__redundantParameters() {
     implicit val msg = "not used in method"
     
-    should("""def func(a:Int, b:Int) = a""")
-    should("""def func(a:Int)(implicit b:Int) = b""")
+    should("""def func(a:Int, b:Int) = { val c = a+1; c } """)
+    should("""def func(a:Int)(implicit b:Int) = { val c = b+1; b }""")
     
     shouldnt("""def func(a:Int)(implicit b:Int) = a""")
     shouldnt("""def func(a:Int) = a""")
@@ -647,7 +647,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   
   @Test
   def regex__syntaxErrors() {
-    implicit val msg = "Regex pattern syntax warning"
+    implicit val msg = "Regex pattern syntax error"
     
     should("""
       "*+".r
@@ -1090,23 +1090,21 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     implicit val msg = "unused value before"//"Assignment right after declaration"
     
     should("""
-      var a = 6
+      var a = 6L
       a = 3
     """)
-    //TODO:
-    /*should("""
-      var a = 6
+    should("""
+      var a = 6L
       println("foo")
       a = 3
-    """)*/
+    """)
 
-    // Most of the real-world cases are like this - use var to compute new value
     shouldnt("""
       var a = "A6"
       a = a.toLowerCase
     """)
     shouldnt("""
-      var a = 6
+      var a = 6L
       a += 3
     """)
   }
@@ -1116,13 +1114,12 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     implicit val msg = "unused value before"//"Two subsequent assigns"
     
     should("""
-      var a = 6
+      var a = 6L
       println(a)
       a = 4
       a = 3
     """)
 
-    // Most of the real-world cases are like this - use var to compute new value
     // If fails, look at isUsed first
     shouldnt("""
       var a = "A6"

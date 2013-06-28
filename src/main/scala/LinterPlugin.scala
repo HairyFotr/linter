@@ -121,25 +121,20 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             inferred += tpe.pos
 
-          case DefDef(mods: Modifiers, name, _, valDefs, typeTree, block) =>
+          case DefDef(mods: Modifiers, name, _, valDefs, typeTree, body) =>
             /// Unused method parameters
             //TODO: This nags, when a class overrides a method, but doesn't mark it as such - check out if this gets set later: 
             // http://harrah.github.io/browse/samples/compiler/scala/tools/nsc/symtab/Flags.scala.html
-            if(name.toString != "<init>" && !block.isEmpty && !mods.isOverride) {
+            if(name.toString != "<init>" && !body.isEmpty && !mods.isOverride) {
               //Get the parameters, except the implicit ones
               val params = valDefs.flatMap(_.filterNot(_.mods.isImplicit)).map(_.name.toString).toBuffer
 
               //TODO: Put into utils
-              def isBlockEmpty(block: Tree): Boolean = block match {
-                case Literal(Constant(a: Unit)) => true
-                case Ident(qmarks) if qmarks.toString == "$qmark$qmark$qmark" => true
-                case Select(scala_Predef, qmarks) if qmarks.toString == "$qmark$qmark$qmark" => true
-                case Throw(_) => true
-                //case a if a.isEmpty || a.children.isEmpty => true
-                case _ => false
-              }
+              // Is the body simple enough to ignore?
+              def isBodySimple(body: Tree): Boolean = !body.isInstanceOf[Block]
               
-              if(!(name.toString == "main" && params.size == 1 && params.head == "args") && !isBlockEmpty(block)) { // filter main method
+              
+              if(!(name.toString == "main" && params.size == 1 && params.head == "args") && !isBodySimple(body)) { // filter main method
                 val used = for(Ident(name) <- tree if params contains name.toString) yield name.toString
                 val unused = params -- used
                 
@@ -155,7 +150,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               /// Recursive call with exactly the same params
               //TODO: Currenlty doesn't cover shadowing or mutable changes of params, or the method shadowing/overriding
               /*for (
-                call @ Apply(Ident(funcCall), funcParams) <- block; 
+                call @ Apply(Ident(funcCall), funcParams) <- body; 
                 if (funcCall.toString == name.toString)
                 && (funcParams.forall(_.isInstanceOf[Ident]))
                 && (funcParams.map(_.toString).toList == params.map(_.toString).toList)
@@ -196,7 +191,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
     class LinterTraverser(unit: CompilationUnit) extends Traverser {
       implicit val unitt = unit
-      import definitions.{AnyClass, ObjectClass, Object_==, OptionClass, SeqClass}
+      import definitions.{AnyClass, NothingClass, ObjectClass, Object_==, OptionClass, SeqClass}
       
       val JavaConversionsModule: Symbol = definitions.getModule(newTermName("scala.collection.JavaConversions"))
       val SeqLikeClass: Symbol = definitions.getClass(newTermName("scala.collection.SeqLike"))
@@ -224,14 +219,20 @@ class LinterPlugin(val global: Global) extends Plugin {
       }
       
       def isOptionOption(t: Tree): Boolean = 
-        (t.tpe.widen.baseClasses.exists(tp => tp.tpe =:= definitions.OptionClass.tpe) 
-        && t.tpe.widen.typeArgs.exists(tp => tp.widen.baseClasses.exists(tp => tp.tpe =:= definitions.OptionClass.tpe)))
+        (t.tpe.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe) 
+        && t.tpe.widen.typeArgs.exists(_.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe)))
       
       def isLiteral(t:Tree): Boolean = t match {
         case Literal(_) => true
         case _ => false
       }
       
+      def getUsed(tree: Tree): Set[String] = (for(Ident(id) <- tree) yield id.toString).toSet
+      def getAssigned(tree: Tree): Set[String] = {
+        (for(Assign(Ident(id), _) <- tree) yield id.toString).toSet
+        //TODO: non-local stuff (for(Apply(Select(id, setter), List(_)) <- tree; if setter.toString endsWith "_$eq") yield setter.dropRight(4)).toSet
+      }
+
       // Just a way to make the Tree/Name-String comparisons more readable
       abstract class RichToStr[T](n: T) {
         def is(str: String): Boolean = n.toString == str
@@ -550,6 +551,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             /// Detect unreachable cases 
             //TODO: move to abs. interpreter to detect impossible guards
+            //TODO: if there is a case (x,y) without a guard, it will make a latter case (x,y) with a guard unreachable
             val pastCases = mutable.ListBuffer[CaseDef]()
             def checkUnreachable(c: CaseDef) {
               //adapted from scala/reflect/internal/Trees.scala to cover wildcards in CaseDef
@@ -730,11 +732,12 @@ class LinterPlugin(val global: Global) extends Plugin {
                   else if(!onlySetUsed)
                     assigns(id) = Unused()
                     
-                case Assign(Ident(id), right) =>
+                case Assign(ident @ Ident(id), right) =>
                   checkAssigns(right, onlySetUsed)
                   if(!onlySetUsed) assigns(id) match {
                     case Unused() =>
-                      warn(tree, "Variable "+id.toString+" has an unused value before this reassign.")
+                      if(!(ident.tpe <:< definitions.BooleanClass.tpe || ident.tpe <:< definitions.IntClass.tpe)) //Ignore Boolean and Int
+                        warn(tree, "Variable "+id.toString+" has an unused value before this reassign.")
                     case Used() =>
                       assigns(id) = Unused()
                     case Unknown() =>
@@ -755,7 +758,8 @@ class LinterPlugin(val global: Global) extends Plugin {
             //if(!unused.isEmpty) warn(block.last, "Variable(s) "+unused+" have an unused value before here.")
 
             /// Checks on two subsequent statements
-            (block zip block.tail) foreach { 
+            val blockPairs = (block zip block.tail)
+            blockPairs foreach {
               case (Assign(id1, id2), Assign(id2_, id1_)) if(id1 equalsStructure id1_) && (id2 equalsStructure id2_) =>
                 warn(id1_, "Did you mean to swap these two variables?")
 
@@ -764,10 +768,18 @@ class LinterPlugin(val global: Global) extends Plugin {
               //case (v @ ValDef(_, id1, _, _), l @ Ident(id2)) if id1.toString == id2.toString && (l eq last) =>
               //  warn(v, "You don't need that temp variable.")
 
-              case (If(cond1, _, _), If(cond2, _, _)) if cond1 equalsStructure cond2 =>
+              case (i1 @ If(cond1, _, _), i2 @ If(cond2, _, _)) if (cond1 equalsStructure cond2) && (i1 match {
+                case If(Ident(_), _, _) => //Ignore single booleans - usually if(debug)
+                  false 
+                case If(Select(Ident(_), nme.UNARY_!), _, _) => //Ignore single booleans - usually if(!debug)
+                  false
+                case If(cond, t, f) => //Ignore if assigning variables which appear in condition
+                  (getUsed(cond) & (getAssigned(t) ++ getAssigned(f))).size == 0
+                }) =>
+                  
                 warn(cond2, "Two subsequent ifs have the same condition")
 
-              case (s1, s2) if s1 equalsStructure s2 =>
+              case (s1, s2) if (s1 equalsStructure s2) && !(s1 is "scala.this.Predef.println()") =>
                 warn(s2, "You're doing the exact same thing twice.")
 
               case _ =>
@@ -796,14 +808,8 @@ class LinterPlugin(val global: Global) extends Plugin {
           case _ =>
         }
 
-        def isAnyType(tpe: Type): Boolean = {
-           (tpe =:= definitions.AnyClass.tpe ||
-           tpe.typeArgs.exists(t => t =:= definitions.AnyClass.tpe))
-        }
-        def isNothingType(tpe: Type): Boolean = {
-          (tpe =:= definitions.NothingClass.tpe ||
-           tpe.typeArgs.exists(t => t =:= definitions.NothingClass.tpe))
-        }
+        def containsAnyType(tpe: Type): Boolean = (tpe =:= AnyClass.tpe || tpe.typeArgs.exists(_ =:= AnyClass.tpe))
+        def containsNothingType(tpe: Type): Boolean = (tpe =:= NothingClass.tpe || tpe.typeArgs.exists(_ =:= NothingClass.tpe))
 
         tree match {
           /// an Option of an Option
@@ -811,12 +817,21 @@ class LinterPlugin(val global: Global) extends Plugin {
           case ValDef(_, _, _, value) if isOptionOption(value) =>
             warn(tree, "Why would you need an Option of an Option?")
 
-          case ValDef(mods, _, tpe, _) 
+          case ValDef(mods, name, tpe, body) 
             if !mods.isParameter 
-            && (isAnyType(tpe.tpe) || isNothingType(tpe.tpe))
-            && (inferred contains tpe.pos) =>
+            && !(name.toString.trim matches "res[0-9]+") //workaround for REPL
+            && ((tpe.toString contains "Any") || (tpe.toString contains "Nothing")) // Gets rid of Stuff[_]
+            && (containsAnyType(tpe.tpe) || containsNothingType(tpe.tpe))
+            && (inferred contains tpe.pos) 
+            && !(body.isInstanceOf[New])=>
             
-            warn(tree, "Inferred type "+tpe.tpe+". This might not be what you intended.")
+            val exceptions = body match {
+              case Apply(Select(New(_), nme.CONSTRUCTOR), _) => true
+              case _ => false
+            }
+            
+            if(!exceptions)
+              warn(tree, "Inferred type "+tpe.tpe+". This might not be what you intended.")
 
           /// Putting null into Option (idea by Smotko)
           case DefDef(_, name, _, _, tpe, body) if (tpe.toString matches "Option\\[.*\\]") &&

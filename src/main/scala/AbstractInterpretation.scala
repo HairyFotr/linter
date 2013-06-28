@@ -54,7 +54,7 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
       val regex = reg.r
     } catch {
       case e: java.util.regex.PatternSyntaxException =>
-        warn(treePosHolder, "Regex pattern syntax warning: "+e.getDescription)
+        warn(treePosHolder, "Regex pattern syntax error: "+e.getDescription)
       case e: Exception =>
     }
   }
@@ -824,7 +824,7 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
 
     pushDefinitions()
     
-    val (param, values, body, func) = tree match {
+    val (param, values, body, func, collection) = tree match {
       case Apply(TypeApply(Select(collection, func), _), List(Function(List(ValDef(_, param, _, _)), body))) if (func.toString matches funcs) =>
         //println(showRaw(collection))
         val values = computeExpr(collection).addName(param.toString)
@@ -834,7 +834,7 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
             //return
         //}
         
-        (param.toString, values, body, func.toString)
+        (param.toString, values, body, func.toString, collection)
       case _ => 
         //println("not a loop("+tree.pos+"): "+showRaw(tree))
         return
@@ -843,7 +843,11 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
     if(values.nonEmpty) {
       vals += param -> values.notSeq
       
-      if(!isUsed(body, param) && func != "foreach") warn(tree, "Iterator value is not used in the body.")
+      val exceptions =
+        (func == "foreach" ||
+        collection.tpe.toString.startsWith("scala.collection.immutable.Range"))
+      
+      if(!isUsed(body, param) && !exceptions) warn(tree, "Iterator value is not used in the body.")
 
       traverseBlock(body)
     }
@@ -880,7 +884,7 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
       else if(param.tpe.widen <:< definitions.BooleanClass.tpe) new StringAttrs(minLength = 4, trimmedMinLength = 4, maxLength = 5, trimmedMaxLength = 5)
       else {
         //TODO: not sure if this is the right way, but <:< definitions.TraversableClass.tpe does not work directly
-        // also, it's possible to have a Traversable, which has a shorter toString, but not that likely IMO
+        // also, it's possible to have a Traversable, which has a shorter toString - check if you're in scala. or Predef
         if((param.tpe.baseClasses.exists(_.tpe =:= definitions.TraversableClass.tpe)) && !(param.tpe.widen <:< definitions.StringClass.tpe)) {
           // collections: minimal is Nil or Type()
           //TODO: Surely I can do moar... intParam.isSeq, etc
