@@ -99,13 +99,13 @@
  
 
  <!-- Custom rules -->
- <check level="warning" class="org.scalastyle.scalariform.TokenChecker" enabled="true">
+ <check level="error" class="org.scalastyle.scalariform.TokenChecker" enabled="true">
   <customMessage>Disallowed method: println</customMessage>
   <parameters>
    <parameter name="regex"><![CDATA[println]]></parameter>
   </parameters>
  </check>
- <check level="warning" class="org.scalastyle.file.RegexChecker" enabled="true">
+ <check level="error" class="org.scalastyle.file.RegexChecker" enabled="true">
   <customMessage>Disallowed method: unit.warning</customMessage>
   <parameters>
    <parameter name="regex"><![CDATA[unit[.]warning[(]]]></parameter>
