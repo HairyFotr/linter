@@ -1001,6 +1001,22 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
               Left(empty)
           }
         //str.func(Int)
+        case f @ ("toDouble"|"toFloat") if str.exactValue.isDefined =>
+          try {
+            str.exactValue.get.toDouble
+          } catch {
+            case e: Exception =>
+              warn(treePosHolder, "This String "+f+" conversion will likely fail.")
+          }
+          Left(empty)
+        case f @ ("toLong") if str.exactValue.isDefined =>
+          try {
+            str.exactValue.get.toLong
+          } catch {
+            case e: Exception =>
+              warn(treePosHolder, "This String "+f+" conversion will likely fail.")
+          }
+          Left(empty)
         case f @ ("charAt"|"codePointAt"|"codePointBefore"|"substring"
                  |"apply"|"drop"|"take"|"dropRight"|"takeRight") if intParam.isValue =>
           val param = intParam.getValue

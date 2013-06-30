@@ -294,14 +294,14 @@ class LinterPlugin(val global: Global) extends Plugin {
           //TODO: maybe make checks to protect against potentially wrong fixes, e.g. log1p(a + 1) or log1p(a - 1)
           // also, check 1-exp(x) and other negated versions
           case Apply(log, List(Apply(Select(Literal(Constant(1)), nme.ADD), _))) if log is "scala.math.`package`.log" => 
-            warn(tree, "Use math.log1p(x) instead of math.log(1 + x) for added accuracy (if x is near 0)")
+            warn(tree, "Use math.log1p(x) instead of math.log(1 + x) for added accuracy when x is near 0")
           case Apply(log, List(Apply(Select(_, nme.ADD), List(Literal(Constant(1)))))) if log is "scala.math.`package`.log" => 
-            warn(tree, "Use math.log1p(x) instead of math.log(x + 1) for added accuracy (if x is near 0)")
+            warn(tree, "Use math.log1p(x) instead of math.log(x + 1) for added accuracy when x is near 0")
             
           case Apply(Select(Apply(exp, _), nme.SUB), List(Literal(Constant(1)))) if exp is "scala.math.`package`.exp" => 
-            warn(tree, "Use math.expm1(x) instead of math.exp(x) - 1 for added accuracy (if x is near 1).")
+            warn(tree, "Use math.expm1(x) instead of math.exp(x) - 1 for added accuracy when x is near 0.")
           case Apply(Select(Literal(Constant(-1)), nme.ADD), List(Apply(exp, _))) if exp is "scala.math.`package`.exp" =>
-            warn(tree, "Use math.expm1(x) instead of -1 + math.exp(x) for added accuracy (if x is near 1).")
+            warn(tree, "Use math.expm1(x) instead of -1 + math.exp(x) for added accuracy when x is near 0.")
 
           /// Use abs instead of doing it manually
           case Apply(sqrt, List(Apply(pow, List(expr, Literal(Constant(2))))))
@@ -320,7 +320,10 @@ class LinterPlugin(val global: Global) extends Plugin {
             && (func == nme.EQ || func == nme.NE)
             && ((left equalsStructure right) || (right equalsStructure Literal(Constant(Double.NaN))) || (right equalsStructure Literal(Constant(Float.NaN)))) =>
             
-            warn(tree, "Use .isNan instead of comparing to itself or NaN.")
+            if(left equalsStructure right) 
+              warn(tree, "Use .isNan instead of comparing to itself.")
+            else
+              warn(tree, "Use .isNan instead of comparing to NaN.")
 
           /// Signum function checks
           case pos @ Apply(Select(expr1, nme.DIV), List(expr2)) if ((expr1, expr2) match {
