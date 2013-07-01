@@ -9,6 +9,9 @@ But it is usable (and useful), and all forms of feedback are very welcome.
 To see it in action, try it out on your code or run `sbt console` in its folder.
 
 ## Usage
+
+__Note:__ If you have instructions for another build tool or IDE, or better instructions for current ones, please make a pull request.
+
 ### From sbt
 Add it as a compiler plugin to your project by editing your build.sbt file:
 
@@ -34,7 +37,6 @@ You can download the latest jars here:
           <arg>-Xplugin:<path-to-linter-jar>.jar</arg>
         </args>
       </configuration>
-    (if you use maven, please make a pull request with a more proper maven way)
 
 ## Currently supported warnings
 
@@ -166,12 +168,11 @@ You can also check the [test code](https://github.com/HairyFotr/linter/blob/mast
                   Nil == None
                       ^
 
-
 ## Future Work
 
 * Add more checks
 * Add more tests, report false positives
-* Pick and choose which warnings you want
+* Pick and choose which warnings you want (configuration)
 * Choose whether they should be warnings or errors
 * Improve testing (larger samples, generated tests, ...)
 
