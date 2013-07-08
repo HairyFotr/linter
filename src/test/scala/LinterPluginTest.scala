@@ -341,17 +341,26 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
 
   @Test
-  def def__redundantParameters() {
+  def def__unusedParameters() {
     implicit val msg = "not used in method"
     
     should("""def func(a:Int, b:Int) = { val c = a+1; c } """)
     should("""def func(a:Int)(implicit b:Int) = { val c = b+1; b }""")
-    
+
     shouldnt("""def func(a:Int)(implicit b:Int) = a""")
     shouldnt("""def func(a:Int) = a""")
     shouldnt("""def func(a:Int) = {}""")
     shouldnt("""def func(a:Int) {}""")
     shouldnt("""def func(a:Int) = ???""")
+
+    should("""
+      trait A { def a(b:Int): Traversable[Int] }
+      trait C { def a(b: Int): List[Int] = { println; Nil } }
+    """)
+    shouldnt("""
+      trait A { def a(b:Int): Traversable[Int] }
+      trait C extends A { def a(b: Int): List[Int] = { println; Nil } }
+    """)
   }
 
   @Test
@@ -883,6 +892,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
   
   @Test
+  @Ignore
   def probableBugs__sameExpression() {
     implicit val msg = /*Same value/expression */"on both sides"
 

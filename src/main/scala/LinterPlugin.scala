@@ -48,7 +48,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
   val name = "linter"
   val description = "a static analysis compiler plugin"
-  val components = List[PluginComponent](PreTyperComponent, LinterComponent)//, AfterLinterComponent)
+  val components = List[PluginComponent](PreTyperComponent, PostTyperComponent, PostRefChecksComponent)
   
   override val optionsHelp: Option[String] = Some("  -P:linter No options yet, just letting you know I'm here")
 
@@ -124,31 +124,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             inferred += tpe.pos
 
           case DefDef(mods: Modifiers, name, _, valDefs, typeTree, body) =>
-            /// Unused method parameters
-            //TODO: This nags, when a class overrides a method, but doesn't mark it as such - check out if this gets set later: 
-            // http://harrah.github.io/browse/samples/compiler/scala/tools/nsc/symtab/Flags.scala.html
-            if(name.toString != "<init>" && !body.isEmpty && !mods.isOverride) {
-              //Get the parameters, except the implicit ones
-              val params = valDefs.flatMap(_.filterNot(_.mods.isImplicit)).map(_.name.toString).toBuffer
-
-              //TODO: Put into utils
-              // Is the body simple enough to ignore?
-              def isBodySimple(body: Tree): Boolean = !body.isInstanceOf[Block]
-              
-              
-              if(!(name.toString == "main" && params.size == 1 && params.head == "args") && !isBodySimple(body)) { // filter main method
-                val used = for(Ident(name) <- tree if params contains name.toString) yield name.toString
-                val unused = params -- used
-                
-                //TODO: scalaz is a good codebase for finding interesting false positives
-                //TODO: macro impl is special case?
-                unused.size match {
-                  case 0 => //
-                  case 1 => warn(tree, "Parameter %s is not used in method %s. (Add override if that's the reason)" format (unused.mkString(", "), name))
-                  case _ => warn(tree, "Parameters (%s) are not used in method %s. (Add override if that's the reason)" format (unused.mkString(", "), name))
-                }
-              }
-              
+            //if(name.toString != "<init>" && !body.isEmpty && !mods.isAnyOverride) {
               /// Recursive call with exactly the same params
               //TODO: Currenlty doesn't cover shadowing or mutable changes of params, or the method shadowing/overriding
               /*for (
@@ -158,7 +134,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 && (funcParams.map(_.toString).toList == params.map(_.toString).toList)
               ) warn(call, "Possible infinite recursive call. (Except if params are mutable, or the names are shadowed)")
               */
-            }
+            //}
 
             /// Implicit method needs explicit return type
             //TODO: I'd add a bunch of exceptions for when the return type is actually clear:
@@ -174,7 +150,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     }
   }
 
-  private object LinterComponent extends PluginComponent {
+  private object PostTyperComponent extends PluginComponent {
     import global._
 
     implicit val global = LinterPlugin.this.global
@@ -614,7 +590,10 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           /// If checks
           case Apply(Select(left, func), List(right)) 
-            if (func == nme.ZAND || func == nme.ZOR) && (left equalsStructure right) && tree.tpe.widen <:< definitions.BooleanClass.tpe =>
+            if (func == nme.ZAND || func == nme.ZOR) 
+            && (left.symbol == null || !left.symbol.isMethod)
+            && (left equalsStructure right) 
+            && tree.tpe.widen <:< definitions.BooleanClass.tpe =>
             
             warn(tree, "Same expression on both sides of boolean statement.")
            
@@ -693,14 +672,14 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(cond, "This condition will always be "+bool+".")*/
             
           //TODO: Move to abstract interpreter once it handles booleans
-          case Apply(Select(Literal(Constant(false)), nme.ZAND), _) =>
+          /*case Apply(Select(Literal(Constant(false)), nme.ZAND), _) =>
             warn(tree, "This part of boolean expression will always be false.")
           case Apply(Select(_, nme.ZAND), List(lite @ Literal(Constant(false)))) =>
             warn(lite, "This part of boolean expression will always be false.")
           case Apply(Select(Literal(Constant(true)), nme.ZOR), _) =>
             warn(tree, "This part of boolean expression will always be true.")
           case Apply(Select(_, nme.ZOR), List(lite @ Literal(Constant(true)))) =>
-            warn(lite, "This part of boolean expression will always be true.")
+            warn(lite, "This part of boolean expression will always be true.")*/
             
           /// if(cond1) { if(cond2) ... } is the same as if(cond1 && cond2) ...
           case If(_, If(_, body, Literal(Constant(()))), Literal(Constant(()))) =>
@@ -1002,4 +981,67 @@ class LinterPlugin(val global: Global) extends Plugin {
       }
     }
   }
+  private object PostRefChecksComponent extends PluginComponent {
+    import global._
+    
+    val global = LinterPlugin.this.global
+    
+    override val runsAfter = List("refchecks")
+    
+    val phaseName = "linter-refchecked"
+    
+    override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
+      override def apply(unit: global.CompilationUnit) {
+        if(!unit.isJava) new PostRefChecksTraverser(unit).traverse(unit.body)
+      }
+    }
+    
+    class PostRefChecksTraverser(unit: CompilationUnit) extends Traverser {
+      implicit val unitt = unit
+
+      override def traverse(tree: Tree) {
+        tree match {
+          case DefDef(mods: Modifiers, name, _, valDefs, typeTree, body) =>
+            //workaround for scala 2.9 - copied from compiler code
+            def isOverridingSymbol(s: Symbol) = {
+              def canMatchInheritedSymbols = (
+                   (s ne NoSymbol)
+                && s.owner.isClass
+                && !s.isClass
+                && !s.isConstructor
+              )
+
+              (canMatchInheritedSymbols && s.owner.ancestors.exists(base => s.overriddenSymbol(base) != NoSymbol))
+            }
+          
+            /// Unused method parameters
+            if(name.toString != "<init>" && !body.isEmpty && !(mods.isOverride || isOverridingSymbol(tree.symbol))) {
+              //Get the parameters, except the implicit ones
+              val params = valDefs.flatMap(_.filterNot(_.mods.isImplicit)).map(_.name.toString).toBuffer
+
+              //TODO: Put into utils
+              // Is the body simple enough to ignore?
+              def isBodySimple(body: Tree): Boolean = !body.isInstanceOf[Block]
+              
+              if(!(name.toString == "main" && params.size == 1 && params.head == "args") && !isBodySimple(body)) { // filter main method
+                val used = for(Ident(name) <- tree if params contains name.toString) yield name.toString
+                val unused = params -- used
+                
+                //TODO: scalaz is a good codebase for finding interesting false positives
+                //TODO: macro impl is special case?
+                unused.size match {
+                  case 0 => //
+                  case 1 => warn(tree, "Parameter %s is not used in method %s." format (unused.mkString(", "), name))
+                  case _ => warn(tree, "Parameters (%s) are not used in method %s." format (unused.mkString(", "), name))
+                }
+              }
+            }
+            
+          case _ => 
+        }
+        super.traverse(tree)
+      }
+    }
+  }
+
 }
