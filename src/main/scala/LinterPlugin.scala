@@ -25,9 +25,11 @@ package object global {
   type GUnit = Global#CompilationUnit
   type GPos = Global#Position
   
+  val nowarnPositions = mutable.HashSet[GPos]()
+  
   def warn(pos: GPos, msg: String)(implicit unit: GUnit) {
     val line = pos.lineContent
-    if(line matches ".*// *nolint *") {
+    if((line matches ".*// *nolint *") || (nowarnPositions contains pos)) {
       // skip
     } else {
       // scalastyle:off regex
@@ -197,6 +199,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       val SeqLikeClass: Symbol = definitions.getClass(newTermName("scala.collection.SeqLike"))
       val SeqLikeContains: Symbol = SeqLikeClass.info.member(newTermName("contains"))
       val SeqLikeApply: Symbol = SeqLikeClass.info.member(newTermName("apply"))
+
       val OptionGet: Symbol = OptionClass.info.member(nme.get)
       
       val IsInstanceOf = AnyClass.info.member(nme.isInstanceOf_)
@@ -380,6 +383,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           /// Checks if you read from a file without closing it: scala.io.Source.fromFile(file).mkString
           //TODO: Only checks one-liners where you chain it - doesn't actually check if you close it
+          //TODO: Possibly skipps checking code in higher order functions later on
           case Select(fromFile, _) if fromFile startsWith "scala.io.Source.fromFile" =>
             warn(fromFile, "You should close the file stream after use.")
             return
@@ -537,8 +541,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 //This one always turns out to be a false positive :)
                 //warn(tree, "All "+cases.size+" cases will return "+cases.head.body+", regardless of pattern value") 
               } else if(streak.streak > 1) {
-                //TODO: should check actual cases - only simple values can be merged
-                warn(streak.tree.body, streak.streak+" neighbouring cases are identical, and could be merged.")
+                warn(streak.tree.body, "Bodies of "+streak.streak+" neighbouring cases are identical, and could be merged.")
               }
             }
             
@@ -622,9 +625,20 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, "Same expression on both sides of comparison.")
 
           /// Yoda conditions (http://www.codinghorror.com/blog/2012/07/new-programming-jargon.html): if(6 == a) ...
+          //workaround for ranges, where it's acceptable - if(6 < a && a < 10) ...
+          case Apply(Select(
+            yoda @ Apply(Select(Literal(Constant(const1)), func1), List(notLiteral1)), opLogic), 
+            List(Apply(Select(notLiteral2, func2), List(arg2))))
+            if (func1.toString matches "[$](greater|less)([$]eq)?") && !isLiteral(notLiteral1) 
+            && (func2.toString matches "[$](greater|less)([$]eq)?")  && !isLiteral(notLiteral2) 
+            && (func1.toString.take(5) == func2.toString.take(5)) => // cheap way of saying < and <= can appear in range together
+            
+            nowarnPositions += yoda.pos
+            
           case Apply(Select(Literal(Constant(const)), func), List(notLiteral)) if (func.toString matches "[$](greater|less|eq)([$]eq)?") && !isLiteral(notLiteral) =>
             warn(tree, "You are using Yoda conditions")
 
+          /// Unnecessary Ifs
           case If(cond, Literal(Constant(true)), Literal(Constant(false))) =>
             warn(cond, "Remove the if and just use the condition.")
           case If(cond, Literal(Constant(false)), Literal(Constant(true))) =>
@@ -690,8 +704,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             
           /// if(cond1) { if(cond2) ... } is the same as if(cond1 && cond2) ...
           case If(_, If(_, body, Literal(Constant(()))), Literal(Constant(()))) =>
-            warn(tree, "These two ifs can be merged into one.")
-          
+            warn(tree, "These two nested ifs can be merged into one.")
           
           /// Abstract interpretation, and multiple-statement checks
           //TODO: make abs-interpreter good enough to handle the whole units and even some cross-unit stuff
@@ -794,7 +807,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case DefDef(_, _, _, _, _, block) => 
             abstractInterpretation.traverseBlock(block)
 
-          //TODO: these two are probably superdeded by abs-interpreter
+          //TODO: these two are probably superseded by abs-interpreter
           case pos @ Apply(Select(seq, apply), List(Literal(Constant(index: Int)))) 
             if methodImplements(pos.symbol, SeqLikeApply) && index < 0 =>
             warn(pos, "Using a negative index for a collection.")
@@ -948,6 +961,40 @@ class LinterPlugin(val global: Global) extends Plugin {
               else
                 warn(t, "Using Option.size is not recommended, use Option.isDefined instead")
               
+          case _ =>
+        }
+        
+        val MapFactoryClass = definitions.getClass(newTermName("scala.collection.generic.MapFactory"))
+        tree match {
+          case Apply(TypeApply(Select(map, apply), _), args)
+            if (apply is "apply")
+            && (map.tpe.baseClasses.exists(_.tpe <:< MapFactoryClass.tpe)) =>
+            
+            val keys = args flatMap {
+              case Apply(TypeApply(Select(Apply(any2ArrowAssoc, List(lhs)), arrow), _), rhs)
+                if (arrow is "$minus$greater")
+                && (any2ArrowAssoc startsWith "scala.this.Predef.any2ArrowAssoc") 
+                && (lhs.isInstanceOf[Literal] || lhs.isInstanceOf[Ident]) => //TODO: support pure functions someday
+                List(lhs)
+                
+              case Apply(tuple2apply, List(lhs, rhs)) 
+                if (tuple2apply startsWith "scala.Tuple2.apply") 
+                && (lhs.isInstanceOf[Literal] || lhs.isInstanceOf[Ident]) =>
+                List(lhs)
+
+              case _ => //unknown mapping format, TODO
+                Nil
+            }
+            
+            keys.foldLeft(List[Tree]())((acc, newItem) => 
+              if(acc.exists(item => item equalsStructure newItem)) {
+                warn(newItem, "This key has already been defined, and will override the previous mapping.")
+                acc
+              } else {
+                acc :+ newItem
+              }
+            )
+            
           case _ =>
         }
 

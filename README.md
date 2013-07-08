@@ -175,6 +175,7 @@ You can also check the [test code](https://github.com/HairyFotr/linter/blob/mast
 * Pick and choose which warnings you want (configuration)
 * Choose whether they should be warnings or errors
 * Improve testing (larger samples, generated tests, ...)
+* Drop Scala 2.9 and check out new stuff such as quasiquotes
 
 ### Ideas for new warnings
 
@@ -192,6 +193,7 @@ Rule lists from other static analysis tools for inspiration:
 * ScalaStyle - https://github.com/scalastyle/scalastyle/wiki
 * CheckStyle(Java) - http://checkstyle.sourceforge.net/availablechecks.html
 * PMD(Java) - http://pmd.sourceforge.net/pmd-5.0.3/rules/index.html
+* CodeNarc(Groovy) - http://codenarc.sourceforge.net/codenarc-rule-index.html
 * PVS-Studio(C++) - http://www.viva64.com/en/d/
 * Coverity(C++) - http://www.slideshare.net/Coverity/static-analysis-primer-22874326 (6,7)
  

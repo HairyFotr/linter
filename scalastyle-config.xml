@@ -96,6 +96,7 @@
    <parameter name="ignoreRegex"><![CDATA[^".?"$]]></parameter>
   </parameters>
  </check>
+ <check class="org.scalastyle.scalariform.ProcedureDeclarationChecker" level="warning" enabled="true"></check>
  
 
  <!-- Custom rules -->

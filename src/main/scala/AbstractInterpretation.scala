@@ -788,6 +788,9 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
   var vars = mutable.Set[String]()
   var stringVals = mutable.Set[StringAttrs]()
   var defModels = mutable.Map[String, Either[Values, StringAttrs]]().withDefaultValue(Left(Values.empty))
+  def discardVars() {
+    for(v <- vars) vals(v) = Values.empty
+  }
   def discardVars(tree: Tree, force: String*) {
     for(v <- vars; if isAssigned(tree, v) || (force contains v)) {
       vals(v) = Values.empty
@@ -1375,10 +1378,12 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
           //println("stringVals1: "+stringVals)
         }
 
-        val valNameStr = valName.toString
-        val res = computeExpr(expr).addName(valNameStr)
-        vals += valNameStr -> res
-        if(m.hasFlag(MUTABLE)) vars += valNameStr
+        if(!(m.isPrivateLocal && m.isMutable)) { // private[this] var k = 4 messes up a few things
+          val valNameStr = valName.toString
+          val res = computeExpr(expr).addName(valNameStr)
+          vals += valNameStr -> res
+          if(m.hasFlag(MUTABLE)) vars += valNameStr
+        }
         
        
         //println("newVal: "+computeExpr(expr).addName(valNameStr))
@@ -1446,10 +1451,11 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
         }*/
         
         pushDefinitions()
-        
+
         //TODO: handle params
         val paramNames = params.flatten.map(_.name.toString)        
         vals = vals.filterNot(paramNames contains _._1)
+        discardVars()
         visitedBlocks ++= params.flatten
         
         if(block.children.isEmpty)

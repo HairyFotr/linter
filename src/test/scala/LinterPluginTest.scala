@@ -936,6 +936,10 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       var a = util.Random.nextInt
       if(a == 5) "foo"
     """)
+    shouldnt("""
+      var a = util.Random.nextInt
+      if(5 < a && a <= 10) "foo"
+    """)
   }
   
   
@@ -978,7 +982,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def if__mergeInner() {
-    implicit val msg = "These two ifs can be merged"
+    implicit val msg = "These two nested ifs can be merged"
     
     should("""
       val a,b = 4
@@ -1453,6 +1457,20 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt("""var a = new util.Random; a.nextInt(1)""")("""The parameter of this nextInt might be lower than 1 here.""")
   }
     
+  @Test
+  def map__apply() {
+    implicit val msg = "This key has already been defined"
+    
+    should(""" val a = 5; Map(a -> 5, 2 -> 4, a -> 2) """)
+    should(""" val a = 5; collection.mutable.HashMap(a -> 5, 2 -> 4, a -> 2) """)
+    should(""" val a = 5; Map((a,5), 2 -> 4, a -> 2) """)
+
+    shouldnt(""" Map(1 -> 2, 2 -> 3, 3 -> 4) """)
+    shouldnt(""" val a = 5; Map(a -> 5, 2 -> 4, (a+1) -> 2) """)
+    shouldnt(""" val a = 5; collection.mutable.HashMap(a -> 5, 2 -> 4, (a-1) -> 2) """)
+  }
+
+
   //stuff that doesn't work and I don't know why
   @Test 
   def broken() {
