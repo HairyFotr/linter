@@ -91,6 +91,7 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
     def notSeq: Values = new Values(ranges, values, conditions, name, false)
     
     def contains(i: Int): Boolean = (values contains i) || rangesContain(i)
+    def containsAny(i: Int*): Boolean = i exists { i => this.contains(i) }
     def apply(i: Int): Boolean = contains(i)
     //TODO: this crashes if (high-low) > Int.MaxValue - code manually, or break large ranges into several parts
     //def exists(func: Int => Boolean) = (values exists func) || (ranges exists { case (low, high) => (low to high) exists func })
@@ -629,8 +630,23 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
         StringAttrs.stringFunc(string, func, params).right.getOrElse(Values.empty)
 
       /// Division by zero
-      case pos @ Apply(Select(_, op), List(expr)) if (op == nme.DIV || op == nme.MOD) && (computeExpr(expr).contains(0)) => 
-        warn(pos, "You will likely divide by zero here.")
+      case pos @ Apply(Select(_, op), List(expr)) if (op == nme.DIV || op == nme.MOD) && {
+        val value = computeExpr(expr)
+        if(value.isValue && value.getValue == 1) {
+          if(op == nme.MOD)
+            warn(pos, "Taking the modulo by one will always return zero.")
+          else
+            warn(pos, "Dividing by one will always return the original number.")
+
+          true
+        } else if(value.contains(0)) {
+          warn(pos, "You will likely divide by zero here.")
+
+          true
+        } else {
+          false //Fallthrough
+        }
+      } =>
         Values.empty
 
       // Range
@@ -1562,13 +1578,8 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
         popDefinitions()
 
       /// Pass on expressions
-      case pos @ Apply(Select(_, op), List(expr)) =>
-        //if (op == nme.DIV || op == nme.MOD) && (computeExpr(expr).contains(0)) => 
-        
-        computeExpr(pos)
-        tree.children.foreach(traverse)
-
-      case _ =>
+      case a =>
+        if(a.tpe != null) computeExpr(a)
         //if(vals.nonEmpty)println("in: "+showRaw(tree))
         //if(vals.nonEmpty)println(">   "+vals);
         //if(showRaw(tree).startsWith("Literal") || showRaw(tree).startsWith("Constant"))println("in: "+showRaw(tree))

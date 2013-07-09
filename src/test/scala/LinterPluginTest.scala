@@ -245,6 +245,16 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
         case _ => println("how low")
       }""")
     shouldnt("""
+      val a = 7
+      a match { 
+        case 3 => println("hello") 
+        case 4 if util.Random.nextBoolean => println("hello") 
+        case 5 if util.Random.nextBoolean => println("hello") 
+        case 5 if util.Random.nextBoolean => println("hello") 
+        case 6 => println("hello") 
+        case _ => println("how low") 
+      }""")
+    shouldnt("""
       import scala.concurrent._
       import ExecutionContext.Implicits.global
       import scala.util.{Failure,Success}

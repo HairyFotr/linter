@@ -303,7 +303,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             if(left equalsStructure right) 
               warn(tree, "Use .isNan instead of comparing to itself.")
             else
-              warn(tree, "Use .isNan instead of comparing to NaN.")
+              warn(tree, "Use .isNan instead of comparing to NaN, which is wrong.")
 
           /// Signum function checks
           case pos @ Apply(Select(expr1, nme.DIV), List(expr2)) if ((expr1, expr2) match {
@@ -506,7 +506,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             case class Streak(streak: Int, tree: CaseDef)
             var streak = Streak(0, cases.head)
             def checkStreak(c: CaseDef) {
-              if((c.body equalsStructure streak.tree.body) && isLiteral(c.pat) && !(c.body == EmptyTree)) {
+              if((c.body equalsStructure streak.tree.body) && isLiteral(c.pat) && (c.guard == EmptyTree && streak.tree.guard == EmptyTree) && (c.body != EmptyTree)) {
                 streak = Streak(streak.streak + 1, c)
               } else {
                 printStreakWarning()
@@ -609,8 +609,8 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Apply(Select(
             yoda @ Apply(Select(Literal(Constant(const1)), func1), List(notLiteral1)), opLogic), 
             List(Apply(Select(notLiteral2, func2), List(arg2))))
-            if (func1.toString matches "[$](greater|less)([$]eq)?") && !isLiteral(notLiteral1) 
-            && (func2.toString matches "[$](greater|less)([$]eq)?")  && !isLiteral(notLiteral2) 
+            if (func1.toString matches "[$](greater|less)([$]eq)?") && !isLiteral(notLiteral1)
+            && (func2.toString matches "[$](greater|less)([$]eq)?")  && (notLiteral1 equalsStructure notLiteral2)
             && (func1.toString.take(5) == func2.toString.take(5)) => // cheap way of saying < and <= can appear in range together
             
             nowarnPositions += yoda.pos
@@ -823,6 +823,8 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             val exceptions = body match {
               case Apply(Select(New(_), nme.CONSTRUCTOR), _) => true
+              case TypeApply(Select(_, asInstanceOf), _) if asInstanceOf is "asInstanceOf" => true
+              case Ident(_) => true              
               case _ => false
             }
             
@@ -946,6 +948,7 @@ class LinterPlugin(val global: Global) extends Plugin {
         
         val MapFactoryClass = definitions.getClass(newTermName("scala.collection.generic.MapFactory"))
         tree match {
+          /// Checks for duplicate mappings in a Map
           case Apply(TypeApply(Select(map, apply), _), args)
             if (apply is "apply")
             && (map.tpe.baseClasses.exists(_.tpe <:< MapFactoryClass.tpe)) =>
@@ -974,7 +977,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 acc :+ newItem
               }
             )
-            
+                        
           case _ =>
         }
 
