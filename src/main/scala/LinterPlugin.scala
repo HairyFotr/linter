@@ -93,6 +93,7 @@ class LinterPlugin(val global: Global) extends Plugin {
         tree match {
           /// Unused sealed traits (Idea by edofic)
           case ClassDef(mods, name, _, Template(extendsList, _, body)) if !mods.isSealed && mods.isTrait =>
+            for(Ident(traitName) <- extendsList) usedTraits += traitName
             inTrait = true
             for(stmt <- body) traverse(stmt)
             inTrait = false
