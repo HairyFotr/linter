@@ -1150,7 +1150,56 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
           } else {
             Left(empty)
           }
-
+        case f @ "format"
+          if (params.nonEmpty) && !(params.head.tpe.widen <:< definitions.StringClass.tpe) && !(params.head.tpe.widen <:< definitions.getClass(newTermName("java.util.Locale")).tpe) => 
+          //Ignore the default Java impl, just work with scala's format(Any*)
+          //TODO: scrap the whole thing, and tell people to use string interpolators :)
+          
+          val parActual = params map {
+            case param if(param.tpe.widen <:< definitions.IntClass.tpe) => computeExpr(param)
+            case param if(param.tpe.widen <:< definitions.StringClass.tpe) => StringAttrs(param)
+            case Literal(Constant(x)) => x
+            case _ => Values.empty
+          }
+          
+          val areValues = parActual forall { 
+            case v: Values => v.isValue
+            case s: StringAttrs => s.exactValue.isDefined
+            case _ => true
+          }
+          
+          if(str.exactValue.isDefined && areValues) {
+            try {
+              Left(new StringAttrs(exactValue = Some(str.exactValue.get.format(parActual map {
+                case v: Values => v.getValue
+                case s: StringAttrs => s.exactValue.get
+                case x => x
+              }:_*))))
+            } catch {
+              case e: java.util.UnknownFormatConversionException =>
+                warn(string, "This string format will fail with: " + e.getMessage)
+                Left(empty)
+              case e: java.util.IllegalFormatConversionException if !e.getMessage.contains("!= java.lang.String") =>
+                warn(string, "This string format will fail with: " + e.getMessage)
+                Left(empty)
+              case e: java.util.MissingFormatArgumentException =>
+                warn(string, "This string format will fail with: " + e.getMessage)
+                Left(empty)
+              case e: Exception =>
+                Left(empty)
+            }
+          } else if(str.exactValue.isDefined && !areValues) {
+            try {
+              str.exactValue.get.format()
+            } catch {
+              case e: java.util.UnknownFormatConversionException =>
+                warn(string, "This string format will fail with: " + e.getMessage)
+              case e: Exception => 
+            }
+            Left(empty)
+          } else {
+            Left(empty)
+          }
         case _ =>
           //if(str.exactValue.isDefined)println((str, func, params))
           Left(empty)
