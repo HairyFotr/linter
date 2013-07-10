@@ -1011,6 +1011,8 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
           if(str.alwaysNonEmpty) warn(treePosHolder, "This string will never be empty.")
           if(str.alwaysIsEmpty) warn(treePosHolder, "This string will always be empty.")
           Left(empty)
+        case "hashCode" if str.exactValue.isDefined => 
+          Right(Values(str.exactValue.get.hashCode))
         case "toInt" if str.exactValue.isDefined =>
           try {
             Right(Values(str.exactValue.get.toInt))
