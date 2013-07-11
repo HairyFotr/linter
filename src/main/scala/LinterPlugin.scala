@@ -953,7 +953,18 @@ class LinterPlugin(val global: Global) extends Plugin {
                 acc :+ newItem
               }
             )
-                        
+            
+          /// Checks for inefficient use of .size
+          case Apply(Select(pos @ Select(list, size), op), List(Literal(Constant(0)))) 
+            if (list.tpe.widen.baseClasses.exists(_.tpe =:= definitions.ListClass.tpe))
+            && (op == nme.EQ || op == nme.GT || op == nme.NE)
+            && (size isAny ("size", "length")) =>
+            
+            if(op == nme.EQ)
+              warn(pos, "Use isEmpty instead of comparing to size, because checking size is slow for List.")
+            else
+              warn(pos, "Use nonEmpty instead of comparing to size, because checking size is slow for List.")
+          
           case _ =>
         }
 
