@@ -20,31 +20,9 @@ import scala.tools.nsc.{Global, Phase}
 import scala.tools.nsc.plugins.{Plugin, PluginComponent}
 import collection.mutable
 
-package object global {
-  type GTree = Global#Tree
-  type GUnit = Global#CompilationUnit
-  type GPos = Global#Position
-  
-  val nowarnPositions = mutable.HashSet[GPos]()
-  
-  def warn(pos: GPos, msg: String)(implicit unit: GUnit) {
-    val line = pos.lineContent
-    if((line matches ".*// *nolint *") || (nowarnPositions contains pos)) {
-      // skip
-    } else {
-      // scalastyle:off regex
-      unit.warning(pos, msg)
-      // scalastyle:on regex
-    }
-  }
-  def warn(tree: GTree, msg: String)(implicit unit: GUnit) {
-    warn(tree.pos, msg)
-  }
-}
-
 class LinterPlugin(val global: Global) extends Plugin {
   import global._
-  import com.foursquare.lint.global._
+  import Utils._
 
   val name = "linter"
   val description = "a static analysis compiler plugin"
@@ -55,9 +33,8 @@ class LinterPlugin(val global: Global) extends Plugin {
   val inferred = mutable.HashSet[Position]() // Used for a scala 2.9 hack (can't find out which types are inferred)
 
   private object PreTyperComponent extends PluginComponent {
-    import global._
-    
     val global = LinterPlugin.this.global
+    import global._
     
     override val runsAfter = List("parser")
     
@@ -152,9 +129,8 @@ class LinterPlugin(val global: Global) extends Plugin {
   }
 
   private object PostTyperComponent extends PluginComponent {
+    val global = LinterPlugin.this.global
     import global._
-
-    implicit val global = LinterPlugin.this.global
 
     override val runsAfter = List("typer")
 
@@ -163,12 +139,12 @@ class LinterPlugin(val global: Global) extends Plugin {
     override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
       override def apply(unit: global.CompilationUnit) {
         if(!unit.isJava) {
-          new LinterTraverser(unit).traverse(unit.body)
+          new PostTyperTraverser(unit).traverse(unit.body)
         }
       }
     }
 
-    class LinterTraverser(unit: CompilationUnit) extends Traverser {
+    class PostTyperTraverser(unit: CompilationUnit) extends Traverser {
       implicit val unitt = unit
       import definitions.{AnyClass, NothingClass, ObjectClass, Object_==, OptionClass, SeqClass}
       
@@ -244,7 +220,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           None
       }
       
-      val abstractInterpretation = new AbstractInterpretation(global, unit)
+      val abstractInterpretation = new AbstractInterpretation(global)
 
       override def traverse(tree: Tree) { 
         //TODO: the matchers are broken up for one reason only - Scala 2.9 pattern matcher :)
@@ -986,9 +962,8 @@ class LinterPlugin(val global: Global) extends Plugin {
     }
   }
   private object PostRefChecksComponent extends PluginComponent {
-    import global._
-    
     val global = LinterPlugin.this.global
+    import global._
     
     override val runsAfter = List("refchecks")
     
@@ -1023,10 +998,6 @@ class LinterPlugin(val global: Global) extends Plugin {
               //Get the parameters, except the implicit ones
               val params = valDefs.flatMap(_.filterNot(_.mods.isImplicit)).map(_.name.toString).toBuffer
 
-              //TODO: Put into utils
-              // Is the body simple enough to ignore?
-              def isBodySimple(body: Tree): Boolean = !body.isInstanceOf[Block]
-              
               if(!(name.toString == "main" && params.size == 1 && params.head == "args") && !isBodySimple(body)) { // filter main method
                 val used = for(Ident(name) <- tree if params contains name.toString) yield name.toString
                 val unused = params -- used

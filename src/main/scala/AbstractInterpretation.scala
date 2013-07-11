@@ -3,51 +3,16 @@ package com.foursquare.lint
 import scala.tools.nsc.{Global}
 import scala.tools.nsc.plugins.{Plugin, PluginComponent}
 import scala.tools.nsc.symtab.Flags.{IMPLICIT, OVERRIDE, MUTABLE, CASE, LAZY, FINAL}
-import com.foursquare.lint.global._
 import collection.mutable
 
 // Warning: Don't try too hard to understand this code, it's a mess and needs
 // to be rewritten in a type-safe and transparent way.
 
-class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
+class AbstractInterpretation[G <: Global](val global: G)(implicit val unit: G#CompilationUnit) {
   import global._
-
-  //TODO: move these to utils
-  def isUsed(t: GTree, name: String): Boolean = {
-    val tree = t.asInstanceOf[Tree]
-    var used = 0
-
-    for(Ident(id) <- tree; if id.toString == name) used += 1
-    //TODO: Only for select types, also, maybe this doesn't belong in all uses of isUsed (e.g. Assignment right after declaration)
-    // isSideEffectFreeFor(...)
-    for(Select(Ident(id), func) <- tree; if (func.toString matches "size|length|head|last") && (id.toString == name)) used -= 1
-    
-    (used > 0)
-  }
-  
-  def getUsed(tree: Tree): mutable.Set[String] = {
-    val used = mutable.Set[String]()
-    for(Ident(id) <- tree) used += id.toString
-    used
-  }
-
-  def isAssigned(tree: Tree, name: String): Boolean = {
-    for(Assign(Ident(id), _) <- tree; if id.toString == name) 
-      return true
-    
-    false
-  }
-    
-  def returnCount(tree: Tree): Int = {
-    var used = 0
-    for(Return(id) <- tree) used += 1
-    used
-  }
-  def throwsCount(tree: Tree): Int = {
-    var used = 0
-    for(Throw(id) <- tree) used += 1
-    used
-  }
+  import Utils._
+  val utils = new Utils[global.type](global)
+  import utils._
 
   def checkRegex(reg: String) {
     try {
@@ -798,7 +763,7 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
   }
   //val exprs = mutable.HashSet[String]()
       
-  var treePosHolder: GTree = null //ugly hack to get position for a few warnings
+  var treePosHolder: Global#Tree = null //ugly hack to get position for a few warnings
   // go immutable?
   var vals = mutable.Map[String, Values]().withDefaultValue(Values.empty)
   var vars = mutable.Set[String]()
@@ -836,7 +801,7 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
     defModels = defModelsBack.map(a => a).withDefaultValue(Left(Values.empty))
   }
   
-  def forLoop(tree: GTree) {
+  def forLoop(tree: Global#Tree) {
     treePosHolder = tree
     //TODO: actually anything that takes (A <: (a Number) => _), this is awful
     val funcs = "foreach|map|filter(Not)?|exists|find|flatMap|forall|groupBy|count|((drop|take)While)|(min|max)By|partition|span"
@@ -1353,11 +1318,9 @@ class AbstractInterpretation(val global: Global, implicit val unit: GUnit) {
     override def toString: String = (exactValue, name, getMinLength, getTrimmedMinLength, getMaxLength, getTrimmedMaxLength).toString
   }
  
-  def traverseBlock(tree: GTree) {
+  def traverseBlock(tree: Global#Tree) {
     pushDefinitions()
-    
     traverse(tree.asInstanceOf[Tree])
-    
     popDefinitions()
   }
   def traverse(tree: Tree) {
