@@ -1107,11 +1107,14 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     
     should("""{ var a = List(if(3 == 3) throw new Exception() else throw new Error()); println(a) }""")
     shouldnt("""{ var a:List[Nothing] = List(if(3 == 3) throw new Exception() else throw new Error()); println(a) }""")
+
+    should("""{ var a = List(1, "2") }""")
+    shouldnt("""{ var a = List[Any](1, "2") }""")
   }
   
   @Test
   def possibleBugs__assignment() {
-    implicit val msg = "unused value before"//"Assignment right after declaration"
+    implicit val msg = "unused value before"
     
     should("""
       var a = 6L
@@ -1135,7 +1138,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def possibleBugs__assignment2() {
-    implicit val msg = "unused value before"//"Two subsequent assigns"
+    implicit val msg = "unused value before"
     
     should("""
       var a = 6L
@@ -1301,7 +1304,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   
   @Test
   def numeric__BigDecimalFromFloat() {
-    implicit val msg = "use a string constant"
+    implicit val msg = "Possible loss of precision"
     
     should("""BigDecimal(0.55555555555555555555555555555)""")
     should("""new java.math.BigDecimal(0.1)""")
@@ -1313,6 +1316,11 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
          -0.12345678901234567890
       )
     """)
+
+    should("""BigDecimal(0.5555555555555555555555555555555555555555555555555555555555555)""")
+    should("""BigDecimal("1.333333333333333333333333333333333333333333333e223")""")
+    should("""BigDecimal("1.33333333333333333333333333", new java.math.MathContext(5))""")
+    shouldnt("""BigDecimal("1.33333333333333333333333333", new java.math.MathContext(50))""")
     
     shouldnt("""BigDecimal(0.1)""")
     shouldnt("""BigDecimal("0.1")""")
@@ -1488,6 +1496,21 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt(""" Map(1 -> 2, 2 -> 3, 3 -> 4) """)
     shouldnt(""" val a = 5; Map(a -> 5, 2 -> 4, (a+1) -> 2) """)
     shouldnt(""" val a = 5; collection.mutable.HashMap(a -> 5, 2 -> 4, (a-1) -> 2) """)
+  }
+
+  @Test
+  def list__isEmpty() {
+    implicit val msg = "instead of comparing to size"//slow for lists, etc
+    
+    should(""" val a = List(1,2,3); if(a.size > 0) "" """)
+    should(""" val a = List(1,2,3); if(a.size == 0) "" """)
+    should(""" val a = List(1,2,3); if(a.size != 0) "" """)
+
+    shouldnt(""" val a = List(1,2,3); if(a.size > 1) "" """)
+    shouldnt(""" val a = List(1,2,3); if(a.size == 1) "" """)
+    shouldnt(""" val a = List(1,2,3); if(a.size != 1) "" """)
+    shouldnt(""" val a = List(1,2,3); if(a.isEmpty) "" """)
+    shouldnt(""" val a = List(1,2,3); if(a.nonEmpty) "" """)
   }
 
 

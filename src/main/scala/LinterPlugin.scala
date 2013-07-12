@@ -291,10 +291,14 @@ class LinterPlugin(val global: Global) extends Plugin {
             }) =>
             
             warn(pos, "Did you mean to use the signum function here? (signum also avoids division by zero errors)")
-
+            
+          case _ => 
+        }
+        
+        tree match {
           /// BigDecimal checks
-          // BigDecimal(0.1)
-          case Apply(Select(bigDecimal, apply_valueOf), List(c @ Literal(Constant(double: Double))))
+          // BigDecimal(0.1) //TODO: someday move to interpreter - detect this for known values
+          case Apply(Select(bigDecimal, apply_valueOf), (c @ Literal(Constant(literal: Double))) :: context)
             if ((bigDecimal is "scala.`package`.BigDecimal") || (bigDecimal endsWith "math.BigDecimal")) && (apply_valueOf isAny ("apply", "valueOf")) =>
             
             val warnMsg = "Possible loss of precision - use a string constant"
@@ -305,8 +309,8 @@ class LinterPlugin(val global: Global) extends Plugin {
               var token = p.lineContent.substring(p.column -1).takeWhile(_.toString matches "[-+0-9.edfEDF]").toLowerCase
               if(!token.isEmpty) {
                 if(token.last == 'f' || token.last == 'd') token = token.dropRight(1)
-                //println((token, double))
-                if(BigDecimal(token) != BigDecimal(double)) warn(tree, warnMsg)
+                //println((token, literal))
+                if(BigDecimal(token) != BigDecimal(literal)) warn(tree, warnMsg)
               } else {
                 warn(tree, warnMsg)
               }
@@ -317,6 +321,35 @@ class LinterPlugin(val global: Global) extends Plugin {
               case e: java.lang.NumberFormatException =>
                 warn(tree, warnMsg)
             }
+          case Apply(Select(bigDecimal, apply_valueOf), (c @ Literal(Constant(literal: String))) :: context)
+            if ((bigDecimal is "scala.`package`.BigDecimal") || (bigDecimal endsWith "math.BigDecimal")) && (apply_valueOf isAny ("apply", "valueOf")) =>
+            
+            val (warnMsg, mathContext) = 
+              if(context.size == 1 && context.head.tpe <:< definitions.getClass(newTermName("java.math.MathContext")).tpe) {
+                import java.math.MathContext
+                def getMathContext(t: Tree): Option[MathContext] = t match {
+                  case Apply(Select(New(mc), nme.CONSTRUCTOR), (Literal(Constant(precision: Int)) :: roundingMode)) =>
+                    Some(new MathContext(precision)) // I think roundingMode is irrelevant, because the check will warn anyway
+                  case _ =>
+                    None
+                }
+                
+                ("Possible loss of precision - use a larger MathContext", getMathContext(context.head))
+              } else {
+                ("Possible loss of precision - add a custom MathContext", None)
+              }
+            
+            try {
+              // Ugly hack to get around a few different representations: 0.005, 5E-3, ...
+              def crop(s: String): String = s.replaceAll("[.]|[Ee].*$|0.0*", "")
+              
+              val bd = if(mathContext.isDefined) BigDecimal(literal, mathContext.get) else BigDecimal(literal)
+              if(crop(bd.toString) != crop(literal)) warn(tree, warnMsg)
+            } catch {
+              case e: java.lang.NumberFormatException =>
+                warn(tree, "This BigDecimal constructor will likely throw a NumberFormatException.")
+            }
+
           // new java.math.BigDecimal(0.1)
           case Apply(Select(New(java_math_BigDecimal), nme.CONSTRUCTOR), List(Literal(Constant(d: Double)))) 
             if java_math_BigDecimal is "java.math.BigDecimal" =>
@@ -741,12 +774,18 @@ class LinterPlugin(val global: Global) extends Plugin {
               //  warn(v, "You don't need that temp variable.")
 
               case (i1 @ If(cond1, _, _), i2 @ If(cond2, _, _)) if (cond1 equalsStructure cond2) && (i1 match {
-                case If(Ident(_), _, _) => //Ignore single booleans - usually if(debug)
+                case If(Ident(_), _, _) => //Ignore single booleans - probably debug/logging
                   false 
-                case If(Select(Ident(_), nme.UNARY_!), _, _) => //Ignore single booleans - usually if(!debug)
+                case If(Select(Ident(_), nme.UNARY_!), _, _) => //Ignore single booleans - probably debug/logging
                   false
-                case If(cond, t, f) => //Ignore if assigning variables which appear in condition
-                  (getUsed(cond) & (getAssigned(t) ++ getAssigned(f))).size == 0
+                case If(cond, t, f) if (getUsed(cond) & (getAssigned(t) ++ getAssigned(f))).nonEmpty => //Ignore if assigning variables which appear in condition
+                  false
+                case If(cond, notBlock, empty) 
+                  if !notBlock.isInstanceOf[Block] && !notBlock.isInstanceOf[ValDef] 
+                  && (empty equalsStructure Literal(Constant(()))) => //Ignore simple things - probably debug/logging
+                  false
+                case _ =>
+                  true
                 }) =>
                   
                 warn(cond2, "Two subsequent ifs have the same condition")
@@ -800,6 +839,8 @@ class LinterPlugin(val global: Global) extends Plugin {
             val exceptions = body match {
               case Apply(Select(New(_), nme.CONSTRUCTOR), _) => true
               case TypeApply(Select(_, asInstanceOf), _) if asInstanceOf is "asInstanceOf" => true
+              case Apply(TypeApply(Select(collection, apply), List(typeTree: TypeTree)), elems) 
+                if (apply is "apply") && !(typeTree.original == null) => true
               case Ident(_) => true              
               case _ => false
             }
@@ -961,9 +1002,9 @@ class LinterPlugin(val global: Global) extends Plugin {
             && (size isAny ("size", "length")) =>
             
             if(op == nme.EQ)
-              warn(pos, "Use isEmpty instead of comparing to size, because checking size is slow for List.")
+              warn(pos, "Use isEmpty instead of comparing to size, because checking the size of List is slow.")
             else
-              warn(pos, "Use nonEmpty instead of comparing to size, because checking size is slow for List.")
+              warn(pos, "Use nonEmpty instead of comparing to size, because checking the size of List is slow.")
           
           case _ =>
         }
