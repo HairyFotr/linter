@@ -47,7 +47,7 @@ You can also check the [test code](https://github.com/HairyFotr/linter/blob/mast
 ### If checks
 #### Repeated condition in an else-if chain
     scala> if(a == 10 || b == 10) 0 else if(a == 20 && b == 10) 1 else 2
-    <console>:10: warning: This condition has appeared earlier in the else-if chain, and will never hold here.
+    <console>:10: warning: This condition has appeared earlier in the if-else chain, and will never hold here.
                   if(a == 10 || b == 10) 0 else if(a == 20 && b == 10) 1 else 2
                                                                 ^
 
@@ -108,13 +108,13 @@ You can also check the [test code](https://github.com/HairyFotr/linter/blob/mast
 
 #### Regex syntax warnings
     scala> str.replaceAll("?", ".")
-    <console>:9: warning: Regex pattern syntax warning: Dangling meta character '?'
+    <console>:9: warning: Regex pattern syntax error: Dangling meta character '?'
                   str.replaceAll("?", ".")
                                  ^
 ### Numeric checks
 #### Using `log(1 + a)` instead of `log1p(a)`
-    scala> math.log(1 + a)
-    <console>:9: warning: Use math.log1p(x) instead of math.log(1 + x) for added accuracy (if x is near 0
+    scala> math.log(1d + a)
+    <console>:9: warning: Use math.log1p(x) instead of math.log(1 + x) for added accuracy when x is near 0
                   math.log(1 + a)
                           ^
 
@@ -152,9 +152,9 @@ You can also check the [test code](https://github.com/HairyFotr/linter/blob/mast
 
 ### Various possible bugs
 #### Unused method parameters
-    scala> def func(b: Int, c: String, d: String) = b+c
+    scala> def func(b: Int, c: String, d: String) = { println(b); b+c }
     <console>:7: warning: Parameter d is not used in method func
-           def func(b: Int, c: String, d: String) = b+c
+           def func(b: Int, c: String, d: String) = { println(b); b+c }
                ^
 
 #### Unsafe `contains`

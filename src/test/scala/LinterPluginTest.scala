@@ -1514,6 +1514,41 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
 
 
+  @Test
+  def readmeExamples() {
+    val defs = """
+    
+      val a,b,x,y = util.Random.nextInt
+      val bool = util.Random.nextBoolean
+      val str = util.Random.nextString(5)
+      val strOption = Option(str)
+      
+    """
+  
+    should(defs+"""if(a == 10 || b == 10) 0 else if(a == 20 && b == 10) 1 else 2""")("""This condition has appeared earlier in the if-else chain, and will never hold here.""")
+    should(defs+"""if(b > 4) (2,a) else (2,a)""")("""If statement branches have the same structure.""")
+    should(defs+"""if(a == b) true else false""")("""Remove the if and just use the condition.""")
+    should(defs+"""(x,y) match { case (a,5) if a > 5 => 0 case (c,5) if c > 5 => 1 }""")("""Identical case detected above - this will never match.""")
+    should(defs+"""a match { case 3 => "hello" case 4 => "hello" case 5 => "hello" case _ => "how low" }""")("""3 neighbouring cases are identical, and could be merged.""")
+    should(defs+"""bool match { case true => 0 case false => 1 }""")("""This is probably better written as an if statement.""")
+    should(defs+"""for(i <- 10 to 20) { if(i > 20) "" }""")("""This condition will never hold.""")
+    should(defs+"""for(i <- 1 to 10) { 1/(i-1)  }""")("""You will likely divide by zero here.""")
+    should(defs+"""{ val a = List(1,2,3); for(i <- 1 to 10) { println(a(i)) } }""")("""You will likely use a too large index for a collection here.""")
+    should(defs+"""for(i <- 10 to 20) { if(i.toString.length == 3) "" }""")("""This condition will never hold.""")
+    should(defs+"""str.replaceAll("?", ".")""")("""Regex pattern syntax error: Dangling meta character '?'""")
+    should(defs+"""math.log(1d + a)""")("""Use math.log1p(x) instead of math.log(1 + x) for added accuracy when x is near 0""")
+    should(defs+"""BigDecimal(0.555555555555555555555555555)""")("""Possible loss of precision - use a string constant""")
+    should(defs+"""{val a = Some(List(1,2,3)); if(a.size > 3) ""}""")("""Did you mean to take the size of the collection inside the Option?""")
+    should(defs+"""if(strOption.isDefined) strOption.get else """"")("""Use opt.getOrElse(...) instead of if(opt.isDefined) opt.get else ...""")
+    should(defs+"""List(1,2,3,4).find(x => x % 2 == 0).isDefined""")("""Use exists(...) instead of find(...).isDefined""")
+    should(defs+"""List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)""")("""Use filter(x => condition) instead of flatMap(x => if(condition) ... else ...)""")
+    should(defs+"""def func(b: Int, c: String, d: String) = { println(b); b+c }""")("""Parameter d is not used in method func""")
+    //should(defs+"""List(1, 2, 3).contains("4")""")("""List[Int].contains(String) will probably return false.""")
+    //should(defs+"""Nil == None""")("""Comparing with == on instances of different types (object Nil, object None) will probably return false.""")
+    should(defs+"""List(1, 2, 3).contains("4")""")(""" will probably return false.""")
+    should(defs+"""Nil == None""")(""" will probably return false.""")
+  }
+
   //stuff that doesn't work and I don't know why
   @Test 
   def broken() {
