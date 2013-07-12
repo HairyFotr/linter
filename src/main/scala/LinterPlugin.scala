@@ -1050,6 +1050,9 @@ class LinterPlugin(val global: Global) extends Plugin {
               //Get the parameters, except the implicit ones
               val params = valDefs.flatMap(_.filterNot(_.mods.isImplicit)).map(_.name.toString).toBuffer
 
+              // Is the body simple enough to ignore?
+              def isBodySimple(body: Tree): Boolean = (for(Block(_, _) <- body) yield true).isEmpty
+
               if(!(name.toString == "main" && params.size == 1 && params.head == "args") && !isBodySimple(body)) { // filter main method
                 val used = for(Ident(name) <- tree if params contains name.toString) yield name.toString
                 val unused = params -- used

@@ -19,9 +19,6 @@ object Utils {
   def warn(tree: Global#Tree, msg: String)(implicit unit: Global#CompilationUnit) {
     warn(tree.pos, msg)
   }
-
-  // Is the body simple enough to ignore?
-  def isBodySimple(body: Global#Tree): Boolean = !body.isInstanceOf[Global#Block]
 }
 
 // Put only those that need the right global here:
