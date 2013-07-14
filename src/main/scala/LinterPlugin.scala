@@ -996,16 +996,26 @@ class LinterPlugin(val global: Global) extends Plugin {
             )
             
           /// Checks for inefficient use of .size
-          case Apply(Select(pos @ Select(list, size), op), List(Literal(Constant(0)))) 
-            if (list.tpe.widen.baseClasses.exists(_.tpe =:= definitions.ListClass.tpe))
-            && (op == nme.EQ || op == nme.GT || op == nme.NE)
-            && (size isAny ("size", "length")) =>
+          case Apply(Select(pos @ Select(obj, size), op), List(Literal(Constant(x))))
+            if (size isAny ("size", "length"))
+            && (obj.tpe.widen.baseClasses.exists(_.tpe =:= definitions.ListClass.tpe) || obj.tpe.widen <:< definitions.StringClass.tpe)
+            && ((x == 0 && (op == nme.EQ || op == nme.GT || op == nme.LE || op == nme.NE))
+            || (x == 1 && (op == nme.LT || op == nme.GE))) =>
+          
+            if(op == nme.EQ || op == nme.LE || op == nme.LT)
+              warn(pos, "Use isEmpty instead of comparing to size.")
+            else
+              warn(pos, "Use nonEmpty instead of comparing to size.")
+
+          /*case Apply(Select(obj, op), List(Literal(Constant(""))))
+            if (obj.tpe.widen <:< definitions.StringClass.tpe)
+            && (op == nme.EQ || op == nme.NE) =>
             
             if(op == nme.EQ)
-              warn(pos, "Use isEmpty instead of comparing to size, because checking the size of List is slow.")
+              warn(tree, "Use isEmpty instead of comparing to empty string.")
             else
-              warn(pos, "Use nonEmpty instead of comparing to size, because checking the size of List is slow.")
-          
+              warn(tree, "Use nonEmpty instead of comparing to empty string.")*/
+              
           case _ =>
         }
 
