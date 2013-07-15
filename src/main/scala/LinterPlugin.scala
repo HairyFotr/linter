@@ -146,7 +146,9 @@ class LinterPlugin(val global: Global) extends Plugin {
 
     class PostTyperTraverser(unit: CompilationUnit) extends Traverser {
       implicit val unitt = unit
-      import definitions.{AnyClass, NothingClass, ObjectClass, Object_==, OptionClass, SeqClass}
+      import definitions.{AnyClass, NothingClass, ObjectClass, Object_==}
+      import definitions.{OptionClass, SeqClass, TraversableClass, ListClass, StringClass}
+      import definitions.{DoubleClass, FloatClass, CharClass, ByteClass, ShortClass, IntClass, LongClass, BooleanClass}
       
       val JavaConversionsModule: Symbol = definitions.getModule(newTermName("scala.collection.JavaConversions"))
       val SeqLikeClass: Symbol = definitions.getClass(newTermName("scala.collection.SeqLike"))
@@ -205,13 +207,13 @@ class LinterPlugin(val global: Global) extends Plugin {
       // Returns the string subtree of a string.length/size subtree
       def getStringFromLength(t: Tree): Option[Tree] = t match {
         case Apply(Select(str, length), List()) 
-          if str.tpe <:< definitions.StringClass.tpe
+          if str.tpe <:< StringClass.tpe
           && (length is "length") =>
           
           Some(str)
           
         case Select(Apply(scala_Predef_augmentString, List(str)), size)
-          if str.tpe <:< definitions.StringClass.tpe 
+          if str.tpe <:< StringClass.tpe 
           && (size is "size") && (scala_Predef_augmentString is "scala.this.Predef.augmentString") =>
           
           Some(str)
@@ -272,7 +274,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           /// Use xxx.isNaN instead of (xxx != xxx)
           case Apply(Select(left, func), List(right))
-            if (left.tpe.widen <:< definitions.DoubleClass.tpe || left.tpe.widen <:< definitions.FloatClass.tpe)
+            if (left.tpe.widen <:< DoubleClass.tpe || left.tpe.widen <:< FloatClass.tpe)
             && (func == nme.EQ || func == nme.NE)
             && ((left equalsStructure right) || (right equalsStructure Literal(Constant(Double.NaN))) || (right equalsStructure Literal(Constant(Float.NaN)))) =>
             
@@ -341,7 +343,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             try {
               // Ugly hack to get around a few different representations: 0.005, 5E-3, ...
-              def crop(s: String): String = s.replaceAll("[.]|[Ee].*$|0.0*", "")
+              def crop(s: String): String = s.replaceAll("[.]|[Ee].*$|(0[.])?0*", "")
               
               val bd = if(mathContext.isDefined) BigDecimal(literal, mathContext.get) else BigDecimal(literal)
               if(crop(bd.toString) != crop(literal)) warn(tree, warnMsg)
@@ -603,7 +605,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             if (func == nme.ZAND || func == nme.ZOR) 
             && (left.symbol == null || !left.symbol.isMethod)
             && (left equalsStructure right) 
-            && tree.tpe.widen <:< definitions.BooleanClass.tpe =>
+            && tree.tpe.widen <:< BooleanClass.tpe =>
             
             warn(tree, "Same expression on both sides of boolean statement.")
            
@@ -741,7 +743,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                   checkAssigns(right, onlySetUsed)
                   if(!onlySetUsed) assigns(id) match {
                     case Unused() =>
-                      if(!(ident.tpe <:< definitions.BooleanClass.tpe || ident.tpe <:< definitions.IntClass.tpe)) //Ignore Boolean and Int
+                      if(!(ident.tpe <:< BooleanClass.tpe || ident.tpe <:< IntClass.tpe)) //Ignore Boolean and Int
                         warn(tree, "Variable "+id.toString+" has an unused value before this reassign.")
                     case Used() =>
                       assigns(id) = Unused()
@@ -810,10 +812,10 @@ class LinterPlugin(val global: Global) extends Plugin {
           // cannot check double/float, as typer will automatically translate it to Infinity
           case divByZero @ Apply(Select(rcvr, op), List(Literal(Constant(0))))
             if (op == nme.DIV || op == nme.MOD)
-            && (rcvr.tpe <:< definitions.ByteClass.tpe
-             || rcvr.tpe <:< definitions.ShortClass.tpe
-             || rcvr.tpe <:< definitions.IntClass.tpe
-             || rcvr.tpe <:< definitions.LongClass.tpe) =>
+            && (rcvr.tpe <:< ByteClass.tpe
+             || rcvr.tpe <:< ShortClass.tpe
+             || rcvr.tpe <:< IntClass.tpe
+             || rcvr.tpe <:< LongClass.tpe) =>
             warn(divByZero, "Literal division by zero.")
 
           case _ =>
@@ -894,7 +896,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// if(opt.isDefined) opt.get else something is better written as getOrElse(something)
           //TODO: improve the warning text, and curb the code duplication
           case If(Select(opt1, isDefined), getCase @ Select(opt2, get), elseCase) //duplication
-            if (isDefined is "isDefined") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< definitions.NothingClass.tpe) =>
+            if (isDefined is "isDefined") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
             if(elseCase equalsStructure Literal(Constant(null))) {
               warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(opt.isDefined) opt.get else null")
@@ -902,7 +904,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               warn(opt2, "Use opt.getOrElse(...) instead of if(opt.isDefined) opt.get else ...")
             }
           case If(Select(Select(opt1, isDefined), nme.UNARY_!), elseCase, getCase @ Select(opt2, get)) //duplication
-            if (isDefined is "isDefined") && (get is "get") && (opt1 equalsStructure opt2) && !(getCase.tpe.widen <:< definitions.NothingClass.tpe) =>
+            if (isDefined is "isDefined") && (get is "get") && (opt1 equalsStructure opt2) && !(getCase.tpe.widen <:< NothingClass.tpe) =>
             
             if(elseCase equalsStructure Literal(Constant(null))) {
               warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(!opt.isDefined) null else opt.get")
@@ -910,7 +912,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               warn(opt2, "Use opt.getOrElse(...) instead of if(!opt.isDefined) ... else opt.get")
             }
           case If(Apply(Select(opt1, nme.NE), List(scala_None)), getCase @ Select(opt2, get), elseCase) //duplication
-            if (scala_None is "scala.None") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< definitions.NothingClass.tpe) =>
+            if (scala_None is "scala.None") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
             if(elseCase equalsStructure Literal(Constant(null))) {
               warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(opt != None) opt.get else null")
@@ -953,9 +955,9 @@ class LinterPlugin(val global: Global) extends Plugin {
             /// Checks for Option.size, which is probably a bug (use .isDefined instead)
             case t @ Select(Apply(option2Iterable, List(opt)), size) if (option2Iterable.toString contains "Option.option2Iterable") && (size is "size") =>
               
-              if(opt.tpe.widen.typeArgs.exists(tp => tp.widen <:< definitions.StringClass.tpe))
+              if(opt.tpe.widen.typeArgs.exists(tp => tp.widen <:< StringClass.tpe))
                 warn(t, "Did you mean to take the size of the string inside the Option?")
-              else if(opt.tpe.widen.typeArgs.exists(tp => tp.widen.baseClasses.exists(_.tpe =:= definitions.TraversableClass.tpe)))
+              else if(opt.tpe.widen.typeArgs.exists(tp => tp.widen.baseClasses.exists(_.tpe =:= TraversableClass.tpe)))
                 warn(t, "Did you mean to take the size of the collection inside the Option?")
               else
                 warn(t, "Using Option.size is not recommended, use Option.isDefined instead")
@@ -998,7 +1000,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// Checks for inefficient use of .size
           case Apply(Select(pos @ Select(obj, size), op), List(Literal(Constant(x))))
             if (size isAny ("size", "length"))
-            && (obj.tpe.widen.baseClasses.exists(_.tpe =:= definitions.ListClass.tpe) || obj.tpe.widen <:< definitions.StringClass.tpe)
+            && (obj.tpe.widen.baseClasses.exists(_.tpe =:= ListClass.tpe) || obj.tpe.widen <:< StringClass.tpe)
             && ((x == 0 && (op == nme.EQ || op == nme.GT || op == nme.LE || op == nme.NE))
             || (x == 1 && (op == nme.LT || op == nme.GE))) =>
           
@@ -1008,7 +1010,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               warn(pos, "Use nonEmpty instead of comparing to size.")
 
           /*case Apply(Select(obj, op), List(Literal(Constant(""))))
-            if (obj.tpe.widen <:< definitions.StringClass.tpe)
+            if (obj.tpe.widen <:< StringClass.tpe)
             && (op == nme.EQ || op == nme.NE) =>
             
             if(op == nme.EQ)

@@ -13,6 +13,9 @@ class AbstractInterpretation[G <: Global](val global: G)(implicit val unit: G#Co
   import Utils._
   val utils = new Utils[global.type](global)
   import utils._
+  import definitions.{AnyClass, NothingClass, PredefModule}
+  import definitions.{OptionClass, SeqClass, TraversableClass, ListClass, StringClass}
+  import definitions.{DoubleClass, FloatClass, CharClass, ByteClass, ShortClass, IntClass, LongClass, BooleanClass}
 
   def checkRegex(reg: String) {
     try {
@@ -151,7 +154,7 @@ class AbstractInterpretation[G <: Global](val global: G)(implicit val unit: G#Co
             this.name)
 
         /// String stuff
-        case strFun @ Apply(Select(string, func), params) if string.tpe != null && string.tpe.widen <:< definitions.StringClass.tpe =>
+        case strFun @ Apply(Select(string, func), params) if string.tpe != null && string.tpe.widen <:< StringClass.tpe =>
           computeExpr(strFun)
           
         case strFun @ Select(Apply(scala_augmentString, List(string)), func)
@@ -581,7 +584,7 @@ class AbstractInterpretation[G <: Global](val global: G)(implicit val unit: G#Co
         exactValue.map(v => Values(v.size)).getOrElse(Values.empty)
 */
       /// String stuff (TODO: there's a copy up at applyCond)
-      case strFun @ Apply(Select(string, func), params) if string.tpe.widen <:< definitions.StringClass.tpe =>
+      case strFun @ Apply(Select(string, func), params) if string.tpe.widen <:< StringClass.tpe =>
         StringAttrs.stringFunc(string, func, params).right.getOrElse(Values.empty)
         
       case strFun @ Select(Apply(scala_augmentString, List(string)), func)
@@ -742,9 +745,9 @@ class AbstractInterpretation[G <: Global](val global: G)(implicit val unit: G#Co
         println("e2"+e1)*/
         
         //if(e1.isValue && e2.isValue) new Values(values = e1.values ++ e2.values) else Values.empty
-        if(expr1.tpe <:< definitions.NothingClass.tpe) {
+        if(expr1.tpe <:< NothingClass.tpe) {
           e2
-        } else if(expr2.tpe <:< definitions.NothingClass.tpe) {
+        } else if(expr2.tpe <:< NothingClass.tpe) {
           e1
         } else if(!e1.isSeq && !e2.isSeq && e1.nonEmpty && e2.nonEmpty) {
           new Values(values = e1.values ++ e2.values, ranges = e1.ranges ++ e2.ranges)
@@ -857,19 +860,19 @@ class AbstractInterpretation[G <: Global](val global: G)(implicit val unit: G#Co
       } else if(param match { case Literal(Constant(a)) => true case _  => false }) param match { //groan.
         case Literal(Constant(null)) => new StringAttrs(exactValue = Some("null"))
         case Literal(Constant(a))    => new StringAttrs(Some(a.toString))
-      } else if(param.tpe.widen <:< definitions.CharClass.tpe)  new StringAttrs(minLength = 1, trimmedMinLength = 0, maxLength = 1, trimmedMaxLength = 0)
-      else if(param.tpe.widen <:< definitions.ByteClass.tpe)    new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 4, trimmedMaxLength = 4)
-      else if(param.tpe.widen <:< definitions.ShortClass.tpe)   new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 6, trimmedMaxLength = 6)
-      else if(param.tpe.widen <:< definitions.IntClass.tpe)     new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 11, trimmedMaxLength = 11)
-      else if(param.tpe.widen <:< definitions.LongClass.tpe)    new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 20, trimmedMaxLength = 20)
+      } else if(param.tpe.widen <:< CharClass.tpe)  new StringAttrs(minLength = 1, trimmedMinLength = 0, maxLength = 1, trimmedMaxLength = 0)
+      else if(param.tpe.widen <:< ByteClass.tpe)    new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 4, trimmedMaxLength = 4)
+      else if(param.tpe.widen <:< ShortClass.tpe)   new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 6, trimmedMaxLength = 6)
+      else if(param.tpe.widen <:< IntClass.tpe)     new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 11, trimmedMaxLength = 11)
+      else if(param.tpe.widen <:< LongClass.tpe)    new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 20, trimmedMaxLength = 20)
       //http://stackoverflow.com/questions/1701055/what-is-the-maximum-length-in-chars-needed-to-represent-any-double-value :)
-      else if(param.tpe.widen <:< definitions.DoubleClass.tpe)  new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 1079, trimmedMaxLength = 1079)
-      else if(param.tpe.widen <:< definitions.FloatClass.tpe)   new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 154, trimmedMaxLength = 154)
-      else if(param.tpe.widen <:< definitions.BooleanClass.tpe) new StringAttrs(minLength = 4, trimmedMinLength = 4, maxLength = 5, trimmedMaxLength = 5)
+      else if(param.tpe.widen <:< DoubleClass.tpe)  new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 1079, trimmedMaxLength = 1079)
+      else if(param.tpe.widen <:< FloatClass.tpe)   new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 154, trimmedMaxLength = 154)
+      else if(param.tpe.widen <:< BooleanClass.tpe) new StringAttrs(minLength = 4, trimmedMinLength = 4, maxLength = 5, trimmedMaxLength = 5)
       else {
-        //TODO: not sure if this is the right way, but <:< definitions.TraversableClass.tpe does not work directly
+        //TODO: not sure if this is the right way, but <:< TraversableClass.tpe does not work directly
         // also, it's possible to have a Traversable, which has a shorter toString - check if you're in scala. or Predef
-        if((param.tpe.baseClasses.exists(_.tpe =:= definitions.TraversableClass.tpe)) && !(param.tpe.widen <:< definitions.StringClass.tpe)) {
+        if((param.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe)) && !(param.tpe.widen <:< StringClass.tpe)) {
           // collections: minimal is Nil or Type()
           //TODO: Surely I can do moar... intParam.isSeq, etc
           val minLen = 3
@@ -877,7 +880,7 @@ class AbstractInterpretation[G <: Global](val global: G)(implicit val unit: G#Co
           new StringAttrs(minLength = minLen, trimmedMinLength = minLen)
         } else {
           //TODO:discover moar
-          //if(!(param.tpe.widen <:< definitions.StringClass.tpe) && !(param.tpe.widen <:< definitions.AnyClass.tpe))println(((str, param), (param.tpe, param.tpe.widen)))
+          //if(!(param.tpe.widen <:< StringClass.tpe) && !(param.tpe.widen <:< AnyClass.tpe))println(((str, param), (param.tpe, param.tpe.widen)))
         
           StringAttrs(param)
         }
@@ -888,15 +891,15 @@ class AbstractInterpretation[G <: Global](val global: G)(implicit val unit: G#Co
     /// Tries to execute string functions and return either a String or Int representation
     def stringFunc(string: Tree, func: Name, params: List[Tree] = List[Tree]()): Either[StringAttrs, Values] = {
       val str = StringAttrs(string)
-      lazy val intParam = if(params.size == 1 && params.head.tpe.widen <:< definitions.IntClass.tpe) computeExpr(params.head) else Values.empty
-      lazy val intParams = if(params.forall(_.tpe.widen <:< definitions.IntClass.tpe)) params.map(computeExpr).toList else List() //option?
-      lazy val stringParam = if(params.size == 1 && params.head.tpe.widen <:< definitions.StringClass.tpe) StringAttrs(params.head) else empty
-      lazy val stringParams = if(params.forall(_.tpe.widen <:< definitions.StringClass.tpe)) params.map(StringAttrs.apply) else List()
+      lazy val intParam = if(params.size == 1 && params.head.tpe.widen <:< IntClass.tpe) computeExpr(params.head) else Values.empty
+      lazy val intParams = if(params.forall(_.tpe.widen <:< IntClass.tpe)) params.map(computeExpr).toList else List() //option?
+      lazy val stringParam = if(params.size == 1 && params.head.tpe.widen <:< StringClass.tpe) StringAttrs(params.head) else empty
+      lazy val stringParams = if(params.forall(_.tpe.widen <:< StringClass.tpe)) params.map(StringAttrs.apply) else List()
 
       //println((string, func, params, str, intParam))
       //println(str.exactValue)
-      //if(!(string.tpe.widen <:< definitions.StringClass.tpe))
-      //if((string.tpe.widen <:< definitions.StringClass.tpe))println((string, func, params, str, intParam))
+      //if(!(string.tpe.widen <:< StringClass.tpe))
+      //if((string.tpe.widen <:< StringClass.tpe))println((string, func, params, str, intParam))
             
       // We can get some information, even if the string is unknown
       //if(str == StringAttrs.empty) {
@@ -1118,13 +1121,13 @@ class AbstractInterpretation[G <: Global](val global: G)(implicit val unit: G#Co
             Left(empty)
           }
         case f @ "format"
-          if (params.nonEmpty) && !(params.head.tpe.widen <:< definitions.StringClass.tpe) && !(params.head.tpe.widen <:< definitions.getClass(newTermName("java.util.Locale")).tpe) => 
+          if (params.nonEmpty) && !(params.head.tpe.widen <:< StringClass.tpe) && !(params.head.tpe.widen <:< definitions.getClass(newTermName("java.util.Locale")).tpe) => 
           //Ignore the default Java impl, just work with scala's format(Any*)
           //TODO: scrap the whole thing, and tell people to use string interpolators :)
           
           val parActual = params map {
-            case param if(param.tpe.widen <:< definitions.IntClass.tpe) => computeExpr(param)
-            case param if(param.tpe.widen <:< definitions.StringClass.tpe) => StringAttrs(param)
+            case param if(param.tpe.widen <:< IntClass.tpe) => computeExpr(param)
+            case param if(param.tpe.widen <:< StringClass.tpe) => StringAttrs(param)
             case Literal(Constant(x)) => x
             case _ => Values.empty
           }
@@ -1198,9 +1201,9 @@ class AbstractInterpretation[G <: Global](val global: G)(implicit val unit: G#Co
         case If(cond, expr1, expr2) =>
           val (e1, e2) = (traverseString(expr1), traverseString(expr2))
           
-          if(expr1.tpe <:< definitions.NothingClass.tpe) {
+          if(expr1.tpe <:< NothingClass.tpe) {
             e2
-          } else if(expr2.tpe <:< definitions.NothingClass.tpe) {
+          } else if(expr2.tpe <:< NothingClass.tpe) {
             e1
           } else {
             new StringAttrs(
@@ -1214,7 +1217,7 @@ class AbstractInterpretation[G <: Global](val global: G)(implicit val unit: G#Co
           StringAttrs(expr)
           
         // Implicit toString
-        case Apply(Select(expr1, nme.ADD), List(expr2)) if (expr1.tpe.widen <:< definitions.StringClass.tpe ^ expr2.tpe.widen <:< definitions.StringClass.tpe) =>
+        case Apply(Select(expr1, nme.ADD), List(expr2)) if (expr1.tpe.widen <:< StringClass.tpe ^ expr2.tpe.widen <:< StringClass.tpe) =>
           toStringAttrs(expr1) + toStringAttrs(expr2)
 
         /// Pass on functions on strings
@@ -1365,7 +1368,7 @@ class AbstractInterpretation[G <: Global](val global: G)(implicit val unit: G#Co
       
       /// Assertions checks
       case Apply(Select(scala_Predef, assertion), List(condExpr)) 
-        if (scala_Predef.tpe.widen <:< definitions.PredefModule.tpe) && (assertion.toString matches "assert|assume|require") => 
+        if (scala_Predef.tpe.widen <:< PredefModule.tpe) && (assertion.toString matches "assert|assume|require") => 
         
         // we can apply these conditions to vals - if they don't hold, it'll throw an exception anyway
         // and they'll reset at the end of the current block
@@ -1398,7 +1401,7 @@ class AbstractInterpretation[G <: Global](val global: G)(implicit val unit: G#Co
         //ADD: aliasing... val a = i, where i is an iterator, then 1/i-a is divbyzero
         //ADD: isSeq and actualSize
 
-        if(expr.tpe.widen <:< definitions.StringClass.tpe) {
+        if(expr.tpe.widen <:< StringClass.tpe) {
           val str = StringAttrs.toStringAttrs(expr).addName(valName.toString)
           //println("str1: "+str)
           if(str.exactValue.isDefined || str.getMinLength > 0) {
@@ -1532,11 +1535,11 @@ class AbstractInterpretation[G <: Global](val global: G)(implicit val unit: G#Co
         treePosHolder = regExpr
         StringAttrs(regExpr).exactValue.foreach(checkRegex)
       
-      case Apply(Select(str, func), List(regExpr)) if (str.tpe.widen <:< definitions.StringClass.tpe) && (func.toString matches "matches|split") =>
+      case Apply(Select(str, func), List(regExpr)) if (str.tpe.widen <:< StringClass.tpe) && (func.toString matches "matches|split") =>
         treePosHolder = regExpr
         StringAttrs(regExpr).exactValue.foreach(checkRegex)
         
-      case Apply(Select(str, func), List(regExpr, str2)) if (str.tpe.widen <:< definitions.StringClass.tpe) && (func.toString matches "replace(All|First)") =>
+      case Apply(Select(str, func), List(regExpr, str2)) if (str.tpe.widen <:< StringClass.tpe) && (func.toString matches "replace(All|First)") =>
         treePosHolder = regExpr
         StringAttrs(regExpr).exactValue.foreach(checkRegex)
 
@@ -1549,7 +1552,7 @@ class AbstractInterpretation[G <: Global](val global: G)(implicit val unit: G#Co
       ///Checking the .size (there's a separate warning about using .size)
       //ADD: Generalize... move to applyCond completely, make it less hacky
       case t @ Apply(Select(Select(Apply(option2Iterable, List(opt)), size), op), List(expr))
-        if (option2Iterable.toString contains "Option.option2Iterable") && size.toString == "size" && t.tpe.widen <:< definitions.BooleanClass.tpe =>
+        if (option2Iterable.toString contains "Option.option2Iterable") && size.toString == "size" && t.tpe.widen <:< BooleanClass.tpe =>
 
         pushDefinitions()
 
