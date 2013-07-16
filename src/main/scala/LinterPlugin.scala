@@ -167,7 +167,19 @@ class LinterPlugin(val global: Global) extends Plugin {
 
       def isSubtype(x: Tree, y: Tree): Boolean = { x.tpe.widen <:< y.tpe.widen }
       def isSubtype(x: Tree, y: Type): Boolean = { x.tpe.widen <:< y.widen }
+      
+      def isIntegerType(tpe: Type): Boolean =
+          (tpe <:< ByteClass.tpe
+        || tpe <:< ShortClass.tpe
+        || tpe <:< IntClass.tpe
+        || tpe <:< LongClass.tpe)
+      def isIntegerType(x: Tree): Boolean = isIntegerType(x.tpe.widen)
 
+      def isFloatingType(tpe: Type): Boolean =
+          (tpe <:< FloatClass.tpe 
+        || tpe <:< DoubleClass.tpe)
+      def isFloatingType(x: Tree): Boolean = isFloatingType(x.tpe.widen)
+        
       def methodImplements(method: Symbol, target: Symbol): Boolean = {
         method == target || method.allOverriddenSymbols.contains(target)
       }
@@ -191,6 +203,24 @@ class LinterPlugin(val global: Global) extends Plugin {
         //TODO: non-local stuff (for(Apply(Select(id, setter), List(_)) <- tree; if setter.toString endsWith "_$eq") yield setter.dropRight(4)).toSet
       }
 
+      def hasIntegerDivision(tree: Tree): Boolean = { //dat code soup... also still possible to have false positives... f = list(1/i), where list: List[Int]
+        def hasIntDiv: Boolean = tree exists {
+          case Apply(Select(param1, nme.DIV), List(param2)) if isIntegerType(param1) && isIntegerType(param2) => true
+          case _ => false
+        }
+        def isFloatConversion: Boolean = tree match { // for Int expressions... .toDouble is implicitly added
+          case Select(num, toFloat) if (toFloat.toString matches "to(Float|Double)") && isIntegerType(num) => true
+          case _ => false
+        }
+        def hasIntOpFloat: Boolean = tree exists { // detect implicit widening, e.g. float + int
+          case Apply(Select(param1, op), List(param2)) 
+            if (isIntegerType(param1) && isFloatingType(param2)) || (isFloatingType(param1) && isIntegerType(param2)) => true
+          case _ => false
+        }
+
+        hasIntDiv && (isFloatConversion || hasIntOpFloat)
+      }
+  
       // Just a way to make the Tree/Name-String comparisons more readable
       abstract class RichToStr[T](n: T) {
         def is(str: String): Boolean = n.toString == str
@@ -274,7 +304,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           /// Use xxx.isNaN instead of (xxx != xxx)
           case Apply(Select(left, func), List(right))
-            if (left.tpe.widen <:< DoubleClass.tpe || left.tpe.widen <:< FloatClass.tpe)
+            if isFloatingType(left)
             && (func == nme.EQ || func == nme.NE)
             && ((left equalsStructure right) || (right equalsStructure Literal(Constant(Double.NaN))) || (right equalsStructure Literal(Constant(Float.NaN)))) =>
             
@@ -1030,6 +1060,14 @@ class LinterPlugin(val global: Global) extends Plugin {
             && collection.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe) =>
             
             warn(block, "You're passing a block that returns a function - the statements in this block, except the last one, will only be executed once.")
+
+          /// Integer division assigned to a floating point variable
+          case Assign(varName, body) if isFloatingType(varName) && hasIntegerDivision(body) =>
+            warn(body, "Integer division detected in an expression assigned to a floating point variable.")
+          case Apply(Select(varName, varSetter), List(body)) if (varSetter endsWith "_$eq") && isFloatingType(body) && hasIntegerDivision(body) =>
+            warn(body, "Integer division detected in an expression assigned to a floating point variable.")
+          case ValDef(_, _, tpe, body) if isFloatingType(tpe) && hasIntegerDivision(body) =>
+            warn(body, "Integer division detected in an expression assigned to a floating point variable.")
 
           case _ => 
         }

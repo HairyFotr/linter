@@ -1522,6 +1522,20 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
 
   @Test
+  def numeric__IntDivIntoFloatVar() {
+    implicit val msg = "Integer division detected in an expression assigned to a floating point variable."
+    
+    should("""var a = 5; var b = 5f; println("Ignoring some other warning here... "+b); b = 1/a""")
+    shouldnt("""var a = 5; var b = 5f; println("Ignoring some other warning here... "+b); b = 1/a.toFloat""")
+    should("""var a = 5; var b: Float = 1/a""")
+    shouldnt("""var a = 5; var b = 1/a""")
+    shouldnt("""var a = 5; var b = 1/a.toFloat""")
+    should("""var a = 5; var b = 1f + 1/a + 1f""")
+    shouldnt("""var a = 5; var b = 1f + 1/a.toDouble + 1f""")
+  }
+
+
+  @Test
   def readmeExamples() {
     val defs = """
     
