@@ -1513,6 +1513,13 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt(""" val a = List(1,2,3); if(a.nonEmpty) "" """)
   }
 
+  @Test
+  def puzzlers__001() {
+    implicit val msg = "You're passing a block that returns a function"
+    
+    should("""List(1, 2).map { println("Hi"); _ + 1 }""")
+    shouldnt("""List(1, 2).map { i => println("Hi"); i + 1 }""")
+  }
 
   @Test
   def readmeExamples() {

@@ -101,7 +101,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             inferred += tpe.pos
 
-          case DefDef(mods: Modifiers, name, _, valDefs, typeTree, body) =>
+          //case DefDef(mods: Modifiers, name, _, valDefs, typeTree, body) =>
             //if(name.toString != "<init>" && !body.isEmpty && !mods.isAnyOverride) {
               /// Recursive call with exactly the same params
               //TODO: Currenlty doesn't cover shadowing or mutable changes of params, or the method shadowing/overriding
@@ -1018,7 +1018,20 @@ class LinterPlugin(val global: Global) extends Plugin {
             else
               warn(tree, "Use nonEmpty instead of comparing to empty string.")*/
               
-          case _ =>
+          /// Passing a block that returns a function to map - http://scalapuzzlers.com/#pzzlr-001
+          case Apply(TypeApply(Select(collection, op), _), List(block @ Block(list, ret @ Function(List(ValDef(paramMods, _, _, _)), funcbody))))
+            if paramMods.isSynthetic
+            && op.toString.matches("map|foreach|filter(Not)?") //TODO: add more
+            && list.nonEmpty // col.map(func), where func is an already defined function
+            && (list match { // eta expansion, similar to above
+              case List(ValDef(_, eta, _, _)) if eta.startsWith("eta$") => false 
+              case _ => true
+            })
+            && collection.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe) =>
+            
+            warn(block, "You're passing a block that returns a function - the statements in this block, except the last one, will only be executed once.")
+
+          case _ => 
         }
 
         super.traverse(tree)
@@ -1046,8 +1059,8 @@ class LinterPlugin(val global: Global) extends Plugin {
         tree match {
           case DefDef(mods: Modifiers, name, _, valDefs, typeTree, body) =>
             //workaround for scala 2.9 - copied from compiler code
-            def isOverridingSymbol(s: Symbol) = {
-              def canMatchInheritedSymbols = (
+            def isOverridingSymbol(s: Symbol): Boolean = {
+              def canMatchInheritedSymbols: Boolean = (
                    (s ne NoSymbol)
                 && s.owner.isClass
                 && !s.isClass
