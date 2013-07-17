@@ -1,12 +1,15 @@
  language: scala
  scala:
-   - 2.10.1
+   - 2.10.2
+   - 2.9.2
    - 2.9.3
-   - 2.11.0-M2
+   - 2.11.0-M4
  matrix:
    allow_failures:
-     - scala: 2.11.0-M2
+     - scala: 2.11.0-M4
  jdk:
    - oraclejdk7
+   - openjdk6
    - openjdk7
+   
  script: "sbt ++$TRAVIS_SCALA_VERSION test"
