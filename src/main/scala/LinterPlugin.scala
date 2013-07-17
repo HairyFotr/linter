@@ -602,9 +602,13 @@ class LinterPlugin(val global: Global) extends Plugin {
                     }
                     
                     ((thiz, that) match {
-                      case (Bind(x, Ident(nme.WILDCARD)), Bind(y, Ident(nme.WILDCARD))) =>
-                        wildcards += ((x, y))
-                        true
+                      case (b1 @ Bind(x, Ident(nme.WILDCARD)), b2 @ Bind(y, Ident(nme.WILDCARD))) =>
+                        if(b1.tpe =:= b2.tpe) {
+                          wildcards += ((x, y))
+                          true
+                        } else {
+                          false
+                        }
                       case _ =>
                         thiz.productIterator zip that.productIterator forall { case (x, y) => equals0(x, y) }
                     }) && compareOriginals()
