@@ -1303,7 +1303,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
   
   @Test
-  def numeric__BigDecimalFromFloat() {
+  def numeric__BigDecimal() {
     implicit val msg = "Possible loss of precision"
     
     should("""BigDecimal(0.55555555555555555555555555555)""")
@@ -1316,10 +1316,14 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
          -0.12345678901234567890
       )
     """)
+    should("""BigDecimal.valueOf(0.555555555555555555f)""")
+    shouldnt("""BigDecimal.valueOf("0.555555555555555555")""")
 
     should("""BigDecimal(0.5555555555555555555555555555555555555555555555555555555555555)""")
+    should("""BigDecimal(-0.5555555555555555555555555555555555555555555555555555555555555)""")
     should("""BigDecimal("1.333333333333333333333333333333333333333333333e223")""")
     should("""BigDecimal("1.33333333333333333333333333", new java.math.MathContext(5))""")
+    should("""BigDecimal("-1.33333333333333333333333333", new java.math.MathContext(5))""")
     shouldnt("""BigDecimal("1.33333333333333333333333333", new java.math.MathContext(50))""")
     
     shouldnt("""BigDecimal(0.1)""")
@@ -1327,6 +1331,8 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt("""new java.math.BigDecimal("0.1")""")
     shouldnt("""BigDecimal.valueOf("0.1")""")
     shouldnt("""math.BigDecimal.valueOf("0.1")""")
+    
+    should("""BigDecimal("afdsfsdafd")""")("""NumberFormatException""")
   }
 
   @Test

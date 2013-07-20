@@ -252,6 +252,15 @@ class LinterPlugin(val global: Global) extends Plugin {
           None
       }
       
+      import java.math.MathContext
+      val java_math_MathContext = definitions.getClass(newTermName("java.math.MathContext"))
+      def getMathContext(t: Tree): Option[MathContext] = t match {
+        case Apply(Select(New(mc), nme.CONSTRUCTOR), (Literal(Constant(precision: Int)) :: roundingMode)) =>
+          Some(new MathContext(precision)) // I think roundingMode is irrelevant, because the check will warn if there is any rounding
+        case _ =>
+          None
+      }
+
       val abstractInterpretation = new AbstractInterpretation(global)
 
       override def traverse(tree: Tree) { 
@@ -330,53 +339,58 @@ class LinterPlugin(val global: Global) extends Plugin {
         tree match {
           /// BigDecimal checks
           // BigDecimal(0.1) //TODO: someday move to interpreter - detect this for known values
-          case Apply(Select(bigDecimal, apply_valueOf), (c @ Literal(Constant(literal: Double))) :: context)
-            if ((bigDecimal is "scala.`package`.BigDecimal") || (bigDecimal endsWith "math.BigDecimal")) && (apply_valueOf isAny ("apply", "valueOf")) =>
+          case Apply(Select(bigDecimal, apply_valueOf), (treeLiteral @ Literal(Constant(literal))) :: context)
+            if ((bigDecimal is "scala.`package`.BigDecimal") || (bigDecimal endsWith "math.BigDecimal"))
+            && (apply_valueOf isAny ("apply", "valueOf")) 
+            && (isFloatingType(treeLiteral) || treeLiteral.tpe.widen <:< StringClass.tpe) =>
             
-            val warnMsg = "Possible loss of precision - use a string constant"
+            val isFloat = isFloatingType(treeLiteral)
             
-            try {
-              val p = c.pos
-              //TODO: There must be a less hacky way...
-              var token = p.lineContent.substring(p.column -1).takeWhile(_.toString matches "[-+0-9.edfEDF]").toLowerCase
-              if(!token.isEmpty) {
-                if(token.last == 'f' || token.last == 'd') token = token.dropRight(1)
-                //println((token, literal))
-                if(BigDecimal(token) != BigDecimal(literal)) warn(tree, warnMsg)
-              } else {
-                warn(tree, warnMsg)
-              }
-            } catch {
-              case e: java.lang.UnsupportedOperationException =>
-                // Some trees don't have positions
-                warn(tree, warnMsg)
-              case e: java.lang.NumberFormatException =>
-                warn(tree, warnMsg)
-            }
-          case Apply(Select(bigDecimal, apply_valueOf), (c @ Literal(Constant(literal: String))) :: context)
-            if ((bigDecimal is "scala.`package`.BigDecimal") || (bigDecimal endsWith "math.BigDecimal")) && (apply_valueOf isAny ("apply", "valueOf")) =>
-            
-            val (warnMsg, mathContext) = 
-              if(context.size == 1 && context.head.tpe <:< definitions.getClass(newTermName("java.math.MathContext")).tpe) {
-                import java.math.MathContext
-                def getMathContext(t: Tree): Option[MathContext] = t match {
-                  case Apply(Select(New(mc), nme.CONSTRUCTOR), (Literal(Constant(precision: Int)) :: roundingMode)) =>
-                    Some(new MathContext(precision)) // I think roundingMode is irrelevant, because the check will warn anyway
-                  case _ =>
-                    None
+            // actualLiteral relevant only for double - compiler rounds it automatically
+            val (strLiteral, actualLiteral) = 
+              if(isFloat) {
+                // Get the actual token from code
+                var token = ""
+                try {
+                  val pos = treeLiteral.pos
+                  token = pos.lineContent.substring(pos.column - 1).takeWhile(_.toString matches "[-+0-9.edfEDF]").toLowerCase
+                  if(!token.isEmpty && (token.last == 'f' || token.last == 'd')) token = token.dropRight(1)
+                } catch {
+                  case e: java.lang.UnsupportedOperationException => // Happens if tree doesn't have a position
+                  case e: java.lang.NumberFormatException => // Could warn here, but I don't trust the above code enough
                 }
-                
-                ("Possible loss of precision - use a larger MathContext", getMathContext(context.head))
+                (literal.toString, token)
               } else {
-                ("Possible loss of precision - add a custom MathContext", None)
+                (literal.asInstanceOf[String], literal.asInstanceOf[String])
               }
             
+            val mathContext = 
+              if(context.size == 1 && context.head.tpe <:< java_math_MathContext.tpe) {
+                getMathContext(context.head)
+              } else {
+                None
+              }
+
+            val warnMsg =
+              if(isFloat) {
+                if(strLiteral == actualLiteral && mathContext.isDefined)
+                  "Possible loss of precision - use a larger MathContext."
+                else
+                  "Possible loss of precision - " + (if(apply_valueOf is "apply") "use a string constant." else "use a constructor with a string constant.")
+              } else {
+                if(mathContext.isDefined) {
+                  "Possible loss of precision - use a larger MathContext."
+                } else {
+                  "Possible loss of precision - add a custom MathContext."
+                }
+              }
+
             try {
               // Ugly hack to get around a few different representations: 0.005, 5E-3, ...
-              def crop(s: String): String = s.replaceAll("[.]|[Ee].*$|(0[.])?0*", "")
+              def cleanString(s: String): String = s.replaceAll("^-|[.]|[Ee].*$|(0[.])?0*", "")
               
-              val bd = if(mathContext.isDefined) BigDecimal(literal, mathContext.get) else BigDecimal(literal)
-              if(crop(bd.toString) != crop(literal)) warn(tree, warnMsg)
+              val bd = if(mathContext.isDefined) BigDecimal(strLiteral, mathContext.get) else BigDecimal(strLiteral)
+              if(cleanString(bd.toString) != cleanString(actualLiteral)) warn(tree, warnMsg)
             } catch {
               case e: java.lang.NumberFormatException =>
                 warn(tree, "This BigDecimal constructor will likely throw a NumberFormatException.")
