@@ -12,4 +12,4 @@
    - openjdk6
    - openjdk7
    
- script: "sbt ++$TRAVIS_SCALA_VERSION test"
+ script: "sbt ++$TRAVIS_SCALA_VERSION scalastyle test"
