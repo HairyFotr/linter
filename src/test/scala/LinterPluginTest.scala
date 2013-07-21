@@ -1380,7 +1380,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def style__find_isDefined_to_exists() {
-    implicit val msg = "Use exists(...) instead of find(...).isDefined"
+    implicit var msg = "Use exists(...) instead of find(...)."
     
     should("""List(1,2,3).find(_ == 2).isDefined""")
     should("""Set(1,2,3).find(_ == 2).isDefined""")
@@ -1388,8 +1388,22 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should("""Array(1,2,3).find(_ == 2).isDefined""")
     should("""def a(x:Int) = x == 2; List(1,2,3).find(a).isDefined""")
 
+    should("""List(1,2,3).find(_ == 2).isEmpty""")
+    should("""Set(1,2,3).find(_ == 2).isEmpty""")
+
     shouldnt("""List(1,2,3).headOption.isDefined""")
     shouldnt("""List(1,2,3).exists(_ == 2)""")
+
+    shouldnt("""List(1,2,3).headOption.isEmpty""")
+    shouldnt("""List(1,2,3).exists(_ == 2)""")
+
+    msg = "Use exists(...) instead of filter(...)."
+    
+    should("""List(1,2,3).filter(_ == 2).isEmpty""")
+    should("""Set(1,2,3).filter(_ == 2).isEmpty""")
+    should("""collection.mutable.HashSet(1,2,3).filter(_ == 2).isEmpty""")
+    //should("""Array(1,2,3).filter(_ == 2).isEmpty""") gets wrapped probably... don't care
+    should("""def a(x:Int) = x == 2; List(1,2,3).filter(a).isEmpty""")
   }
 
   @Test
@@ -1402,6 +1416,35 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt(""" List(1,2,3).flatMap(x => if(x == 2) Some(x+1) else None) """)
     shouldnt(""" List(1,2,3).flatMap(x => if(x == 2) Nil else List(x+1)) """)
   }
+  
+  @Test
+  def style__if_to_optstuff() {
+    implicit val msg = " instead of if" //use getOrElse, orNull, ... instead of if
+    
+    should("""val a = Option("str"); if(a.isDefined) a.get else null""")
+    should("""val a = Option("str"); if(!a.isDefined) null else a.get""")
+    should("""val a = Option("str"); if(a.isEmpty) null else a.get""")
+    should("""val a = Option("str"); if(!a.isEmpty) a.get else null""")
+    should("""val a = Option("str"); if(a != None) a.get else null""")
+    should("""val a = Option("str"); if(a == None) null else a.get""")
+    
+    // different value
+    shouldnt("""val a = Option("str"); if(a.isDefined) a.get+1 else null""")
+    shouldnt("""val a = Option("str"); if(!a.isDefined) null else a.get+1""")
+    shouldnt("""val a = Option("str"); if(a.isEmpty) null else a.get+1""")
+    shouldnt("""val a = Option("str"); if(!a.isEmpty) a.get+1 else null""")
+    shouldnt("""val a = Option("str"); if(a != None) a.get+1 else null""")
+    shouldnt("""val a = Option("str"); if(a == None) null else a.get+1""")
+    
+    // switcheroo
+    shouldnt("""val a = Option("str"); if(a.isDefined) null else a.get""")
+    shouldnt("""val a = Option("str"); if(!a.isDefined) a.get else null""")
+    shouldnt("""val a = Option("str"); if(a.isEmpty) a.get else null""")
+    shouldnt("""val a = Option("str"); if(!a.isEmpty) null else a.get""")
+    shouldnt("""val a = Option("str"); if(a != None) null else a.get""")
+    shouldnt("""val a = Option("str"); if(a == None) a.get else null""")    
+  }
+
 
   @Test
   def numeric__badAbs() {

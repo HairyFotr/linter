@@ -952,12 +952,28 @@ class LinterPlugin(val global: Global) extends Plugin {
               warn(opt2, "Use opt.getOrElse(...) instead of if(opt.isDefined) opt.get else ...")
             }
           case If(Select(Select(opt1, isDefined), nme.UNARY_!), elseCase, getCase @ Select(opt2, get)) //duplication
-            if (isDefined is "isDefined") && (get is "get") && (opt1 equalsStructure opt2) && !(getCase.tpe.widen <:< NothingClass.tpe) =>
+            if (isDefined is "isDefined") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
             if(elseCase equalsStructure Literal(Constant(null))) {
               warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(!opt.isDefined) null else opt.get")
             } else if(getCase.tpe.widen <:< elseCase.tpe.widen) {
               warn(opt2, "Use opt.getOrElse(...) instead of if(!opt.isDefined) ... else opt.get")
+            }
+          case If(Select(opt1, isEmpty), elseCase, getCase @ Select(opt2, get)) //duplication
+            if (isEmpty is "isEmpty") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
+            
+            if(elseCase equalsStructure Literal(Constant(null))) {
+              warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(opt.isEmpty) null else opt.get")
+            } else if(getCase.tpe.widen <:< elseCase.tpe.widen) {
+              warn(opt2, "Use opt.getOrElse(...) instead of if(opt.isEmpty) ... else opt.get")
+            }
+          case If(Select(Select(opt1, isEmpty), nme.UNARY_!), getCase @ Select(opt2, get), elseCase) //duplication
+            if (isEmpty is "isEmpty") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
+            
+            if(elseCase equalsStructure Literal(Constant(null))) {
+              warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(!opt.isEmpty) opt.get else null")
+            } else if(getCase.tpe.widen <:< elseCase.tpe.widen) {
+              warn(opt2, "Use opt.getOrElse(...) instead of if(!opt.isEmpty) opt.get else ...")
             }
           case If(Apply(Select(opt1, nme.NE), List(scala_None)), getCase @ Select(opt2, get), elseCase) //duplication
             if (scala_None is "scala.None") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
@@ -967,12 +983,23 @@ class LinterPlugin(val global: Global) extends Plugin {
             } else if(getCase.tpe.widen <:< elseCase.tpe.widen) {
               warn(opt2, "Use opt.getOrElse(...) instead of if(opt != None) opt.get else ...")
             }
+          case If(Apply(Select(opt1, nme.EQ), List(scala_None)), elseCase, getCase @ Select(opt2, get)) //duplication
+            if (scala_None is "scala.None") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
+            
+            if(elseCase equalsStructure Literal(Constant(null))) {
+              warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(opt == None) opt.get else null")
+            } else if(getCase.tpe.widen <:< elseCase.tpe.widen) {
+              warn(opt2, "Use opt.getOrElse(...) instead of if(opt == None) opt.get else ...")
+            }
           
           /// find(...).isDefined is better written as exists(...)
           case Select(Apply(pos @ Select(collection, find), func), isDefined) 
-            if (find is "find") && (isDefined is "isDefined") && (collection startsWithAny ("scala.", "immutable.")) =>
+            if ((find isAny ("find", "filter")) && (isDefined isAny ("isEmpty", "isDefined")))
+            && (collection startsWithAny ("scala.", "immutable.")) =>
             
-            warn(pos, "Use exists(...) instead of find(...).isDefined")
+            warn(pos, "Use exists(...) instead of "+find+"(...)."+isDefined)
+
+          /// filter(...).isEmpty is better written as exists(...)
 
           /// flatMap(if(...) x else Nil/None) is better written as filter(...)
           case Apply(TypeApply(Select(collection, flatMap), _), List(Function(List(ValDef(flags, param, _, _)), If(cond, e1, e2))))
