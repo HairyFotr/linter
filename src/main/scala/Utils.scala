@@ -1,3 +1,19 @@
+/**
+ *   Copyright 2012 Foursquare Labs, Inc.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ */
+
 package com.foursquare.lint
 
 import scala.tools.nsc.Global
@@ -22,7 +38,7 @@ object Utils {
 }
 
 // Put only those that need the right global here:
-class Utils[Glob <: Global](val global: Glob) {
+class Utils[G <: Global](val global: G) {
   import global._
   global.definitions.init
 
@@ -55,7 +71,7 @@ class Utils[Glob <: Global](val global: Glob) {
   val AsInstanceOf = AnyClass.info.member(nme.asInstanceOf_)
   val ToString: Symbol = AnyClass.info.member(nme.toString_)
 
-  def SeqMemberType(seenFrom: Type): Type = {
+  def seqMemberType(seenFrom: Type): Type = {
     SeqLikeClass.tpe.typeArgs.head.asSeenFrom(seenFrom, SeqLikeClass)
   }
 
