@@ -1618,6 +1618,17 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should(defs+"""List(1, 2, 3).contains("4")""")(""" will probably return false.""")
     should(defs+"""Nil == None""")(""" will probably return false.""")
   }
+  
+  @Test
+  def absInterpreter() {
+    should("""{ val a = 5; { val a = 6; if(a == 6) "" } }""")("This condition will always hold.")
+    shouldnt("""{ val a = 5; { val a = 6; if(a == 5) "" } }""")("This condition will always hold.")
+    
+    should("""{ val a = 5; if(a.toString.size == 20) "" }""")("This condition will never hold.")
+    should("""{ val a = "5"; if(a.toInt.toString.size <= 0) "" }""")("This condition will never hold.")
+
+    //should("""object o1 { val a = 5 }; object o2 { def d = { if(a == 6) "" }; val a = 6 }""")("This condition will never hold.")
+  }
 
   //stuff that doesn't work and I don't know why
   @Test 
