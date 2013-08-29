@@ -1123,7 +1123,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       val utils = new Utils[global.type](global)
       import utils._
 
-      import definitions.{AnyClass, NothingClass, PredefModule, ObjectClass, Object_==}
+      import definitions.{AnyClass, AnyValClass, NothingClass, PredefModule, ObjectClass, Object_==}
       import definitions.{OptionClass, SeqClass, TraversableClass, ListClass, StringClass}
       import definitions.{DoubleClass, FloatClass, CharClass, ByteClass, ShortClass, IntClass, LongClass, BooleanClass}
 
@@ -1876,41 +1876,47 @@ class LinterPlugin(val global: Global) extends Plugin {
       }
       //val exprs = mutable.HashSet[String]()
           
-      // go immutable?
-      var vals = mutable.Map[String, Values]().withDefaultValue(Values.empty)
-      var vars = mutable.Set[String]()
-      var stringVals = mutable.Set[StringAttrs]()
-      var defModels = mutable.Map[String, Either[Values, StringAttrs]]().withDefaultValue(Left(Values.empty))
+      var vals = Map[String, Values]().withDefaultValue(Values.empty)
+      var vars = Set[String]()
+      var stringVals = Set[StringAttrs]()
+      var defModels = Map[String, Either[Values, StringAttrs]]().withDefaultValue(Left(Values.empty))
+      var labels = Map[String, Tree]()
       def discardVars() {
-        for(v <- vars) vals(v) = Values.empty
+        for(v <- vars) vals += v -> Values.empty
       }
-      def discardVars(tree: Tree, force: String*) {
-        for(v <- vars; if isAssigned(tree, v) || (force contains v)) {
-          vals(v) = Values.empty
+      def discardVars(tree: Tree) {
+        for(v <- vars; if isAssigned(tree, v)) {
+          vals += v -> Values.empty
           stringVals = stringVals.filter(v => v.name.isDefined && !(vars contains v.name.get))
-          //println("discard: "+(vals))
         }
       }
-      var labels = mutable.Map[String, Tree]()        
+      def discardVars(tree: Tree, force: Set[String]) {
+        for(v <- vars; if isAssigned(tree, v) || (force contains v)) {
+          vals += v -> Values.empty
+          stringVals = stringVals.filter(v => v.name.isDefined && !(vars contains v.name.get))
+        }
+      }
+      def discardVars(force: Set[String]) {
+        for(v <- vars; if (force contains v)) {
+          vals += v -> Values.empty
+          stringVals = stringVals.filter(v => v.name.isDefined && !(vars contains v.name.get))
+        }
+      }
       
       //vals,vars,stringVals,defModels
-      val backupStack = mutable.Stack[(mutable.Map[String, Values], mutable.Set[String], mutable.Set[StringAttrs], mutable.Map[String, Either[Values, StringAttrs]])]()
+      val backupStack = mutable.Stack[(Map[String, Values], Set[String], Set[StringAttrs], Map[String, Either[Values, StringAttrs]])]()
       def pushDefinitions() {
-        backupStack.push((
-          vals.map(a => a).withDefaultValue(Values.empty),
-          vars.map(a => a),
-          stringVals.map(a => a),
-          defModels.map(a => a).withDefaultValue(Left(Values.empty))))
+        backupStack.push((vals, vars, stringVals, defModels))
       }
       def popDefinitions() {
         //discards new and discarded vars also
-        val varsCurr = vars.map(a => a)
+        val varsCurr = vars
         val (valsBack, varsBack, stringValsBack, defModelsBack) = backupStack.pop
-        vals = valsBack.map(a => a).withDefaultValue(Values.empty)
-        vars = varsBack.map(a => a)
-        discardVars(EmptyTree, ((varsCurr &~ varsBack).toSeq ++ (varsBack &~ varsCurr)):_*)
-        stringVals = stringValsBack.map(a => a)
-        defModels = defModelsBack.map(a => a).withDefaultValue(Left(Values.empty))
+        vals = valsBack
+        vars = varsBack
+        discardVars((varsCurr | varsBack) -- (varsCurr & varsBack))
+        stringVals = stringValsBack
+        defModels = defModelsBack
       }
       
       def forLoop(tree: Tree) {
@@ -1918,8 +1924,6 @@ class LinterPlugin(val global: Global) extends Plugin {
         //TODO: actually anything that takes (A <: (a Number) => _), this is awful
         val funcs = "foreach|map|filter(Not)?|exists|find|flatMap|forall|groupBy|count|((drop|take)While)|(min|max)By|partition|span"
 
-        pushDefinitions()
-        
         val (param, values, body, func, collection) = tree match {
           case Apply(TypeApply(Select(collection, func), _), List(Function(List(ValDef(_, param, _, _)), body))) if (func.toString matches funcs) =>
             //println(showRaw(collection))
@@ -1947,8 +1951,6 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           traverseBlock(body)
         }
-
-        popDefinitions()
       }
       
       val doNotTraverse = mutable.HashSet[Tree]()
@@ -2432,7 +2434,7 @@ class LinterPlugin(val global: Global) extends Plugin {
      
       def traverseBlock(tree: Tree) {
         pushDefinitions()
-        traverse(tree.asInstanceOf[Tree])
+        traverse(tree)
         popDefinitions()
       }
 
@@ -2446,13 +2448,13 @@ class LinterPlugin(val global: Global) extends Plugin {
             vals(varName.toString) = computeExpr(value)
             //println("assign: "+(vals))*/
           case Assign(varName, value) if vars contains varName.toString =>
-            vals(varName.toString) = computeExpr(value)
+            vals += varName.toString -> computeExpr(value)
             //println("reassign: "+(vals))
           
           case LabelDef(label, List(), If(cond, body, unit)) if {
             //discardVars(cond, (vars & getUsed(cond)).toSeq:_*)
             //discardVars(body)
-            discardVars(tree, (vars & getUsed(tree)).toSeq:_*)
+            discardVars(tree, (vars & getUsed(tree)))
             labels += label.toString -> tree
             false
           } => //Fallthrough
@@ -2549,8 +2551,8 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
           
           case If(condExpr, t, f) => //TODO: moved to computeExpr?
-            val backupVals = vals.map(a=> a).withDefaultValue(Values.empty)
-            val backupStrs = stringVals.clone
+            val backupVals = vals
+            val backupStrs = stringVals
             pushDefinitions()
             
             //println(vals)
@@ -2646,7 +2648,6 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Select(Apply(scala_Predef_augmentString, List(regExpr)), r)
             if(scala_Predef_augmentString.toString.endsWith(".augmentString") && r.toString == "r") =>
             treePosHolder = regExpr
-                    
             StringAttrs(regExpr).exactValue.foreach(checkRegex)
             
           ///Checking the .size (there's a separate warning about using .size)
@@ -2696,7 +2697,9 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           /// Pass on expressions
           case a =>
-            if(a.tpe != null) computeExpr(a)
+            //TODO: Range and Lists work too, I think
+            if(a.tpe != null && ((a.tpe <:< StringClass.tpe) || (a.tpe <:< AnyValClass.tpe))) computeExpr(a)
+            
             //if(vals.nonEmpty)println("in: "+showRaw(tree))
             //if(vals.nonEmpty)println(">   "+vals);
             //if(showRaw(tree).startsWith("Literal") || showRaw(tree).startsWith("Constant"))println("in: "+showRaw(tree))

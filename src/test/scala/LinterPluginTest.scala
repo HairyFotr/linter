@@ -1628,6 +1628,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should("""{ val a = "5"; if(a.toInt.toString.size <= 0) "" }""")("This condition will never hold.")
 
     //should("""object o1 { val a = 5 }; object o2 { def d = { if(a == 6) "" }; val a = 6 }""")("This condition will never hold.")
+    should("""for(i <- 1 to 10) { for(j <- 1 to i-1) { }}""")("Use (low until high) instead of (low to high-1)")
   }
 
   //stuff that doesn't work and I don't know why
