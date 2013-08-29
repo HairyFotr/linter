@@ -1092,7 +1092,17 @@ class LinterPlugin(val global: Global) extends Plugin {
           case ValDef(_, _, tpe, body) if isFloatingType(tpe) && hasIntegerDivision(body) =>
             warn(body, "Integer division detected in an expression assigned to a floating point variable.")
 
+          /// col.flatten instead of col.filter(_.isDefined).map(_.get)
+          case Apply(TypeApply(Select(Apply(Select(col, filter), List(Function(List(ValDef(_, p1, _, _)), Select(p1_, isDefined)))), map), _), List(Function(List(ValDef(_, p2, _, _)), Select(p2_, get))))
+            if(col.tpe.widen.baseClasses.exists(_.tpe =:= TraversableClass.tpe) && 
+              (p1.toString == p1_.toString) && (p1_.tpe.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe)) &&
+              (p2.toString == p2_.toString) && (p2_.tpe.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe)) &&
+              (filter is "filter") && (isDefined is "isDefined") && (map is "map") && (get is "get")) =>
+
+            warn(tree, "Use col.flatten instead of col.filter(_.isDefined).map(_.get)")
+
           case _ => 
+            //if(tree.toString contains "...") println(showRaw(tree))
         }
 
         super.traverse(tree)

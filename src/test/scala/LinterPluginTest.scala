@@ -1648,6 +1648,11 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should("""for(i <- 1 to 10) { for(j <- 1 to i-1) { }}""")("Use (low until high) instead of (low to high-1)")
   }
 
+  @Test
+  def style__flatten() {
+    should("""val a = List[Option[String]](Some("a"), None, Some("b")); a.filter(_.isDefined).map(_.get)""")("Use col.flatten instead of col.filter(_.isDefined).map(_.get)")
+  }
+
   //stuff that doesn't work and I don't know why
   @Test 
   def broken() {
