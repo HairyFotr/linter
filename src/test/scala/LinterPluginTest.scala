@@ -561,6 +561,23 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     //should(""" val a = 3; "dfd"*(-a) """)
     //shouldnt(""" val a = 3; "dfd"*(a) """)
     
+    // prefix/suffix tests
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b contains "bcd") """"")("This contains will always return true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b contains "cde") """"")("This contains will always return true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b contains "cde") """"")("This contains will always return true")
+    should("""val b = "abc"; if(b contains "abcd") """"")("This contains will always return false")
+    
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b startsWith "bc") "" """)("This startsWith will always return true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b startsWith "bcd") "" """)("This startsWith will always return true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b startsWith "bcdc") "" """)("This startsWith will always return false")
+
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b endsWith "de") "" """)("This endsWith will always return true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b endsWith "cde") "" """)("This endsWith will always return true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b endsWith "ecde") "" """)("This endsWith will always return false")
+
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b.reverse endsWith "cb") "" """)("This endsWith will always return true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b.toUpperCase endsWith "DE") "" """)("This endsWith will always return true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"CDE"; if(b.toLowerCase endsWith "de") "" """)("This endsWith will always return true")
   }
   
   def abs_interpretation__Option() {
@@ -588,9 +605,9 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt("""val a = Option(List(2))""")
 
     msg = "Use .isdefined instead of comparing to None"
-    should("""val a = Option(5); if(a == None) "foo"""")
-    should("""val a = Option(5); if(a != None) "bar"""")
-    should("""val a = Option(5); if(a.isDefined) "foo"""")
+    should("""val a = Option(5); if(a == None) "foo" """)
+    should("""val a = Option(5); if(a != None) "bar" """)
+    should("""val a = Option(5); if(a.isDefined) "foo" """)
   }
   
   def abs_interpretation__StringAndInt() {

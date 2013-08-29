@@ -2033,6 +2033,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             case "toString" if params.size == 0 =>
               Left(toStringAttrs(string))
             case ("$plus"|"concat") if params.size == 1 =>
+              //println(str.toString +" + "+toStringAttrs(params.head).toString + " == "+ (str + toStringAttrs(params.head)).toString)
               Left(str + toStringAttrs(params.head))
             case "$times" =>
               Left(str * intParam)
@@ -2048,9 +2049,9 @@ class LinterPlugin(val global: Global) extends Plugin {
               } else
                 Left(new StringAttrs(minLength = math.max(str.minLength-1, 0), maxLength = if(str.maxLength != Int.MaxValue) math.max(str.maxLength-1, 0) else Int.MaxValue))
 
-            case "capitalize" if params.size == 0 => if(str.exactValue.isDefined) Left(new StringAttrs(str.exactValue.map(_.capitalize))) else Left(str)
-            case "distinct"   if params.size == 0 => if(str.exactValue.isDefined) Left(new StringAttrs(str.exactValue.map(_.distinct))) else Left(str.zeroMinLengths)
-            case "reverse"    if params.size == 0 => if(str.exactValue.isDefined) Left(new StringAttrs(str.exactValue.map(_.reverse))) else Left(str)
+            case "capitalize" if params.size == 0 => Left(str.capitalize)
+            case "distinct"   if params.size == 0 => Left(str.distinct)
+            case "reverse"    if params.size == 0 => Left(str.reverse)
             case "count"      if params.size == 1 => 
               val out = Values.empty.addCondition(_ >= 0)
               Right(if(str.getMaxLength != Int.MaxValue) out.addCondition(_ < str.getMaxLength) else out)
@@ -2074,18 +2075,9 @@ class LinterPlugin(val global: Global) extends Plugin {
             case "stripLineEnd" if params.size == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stripLineEnd)))
             case "stripMargin"  if params.size == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stripMargin)))
             
-            case "toUpperCase" => if(str.exactValue.isDefined) Left(new StringAttrs(str.exactValue.map(_.toUpperCase))) else Left(str)
-            case "toLowerCase" => if(str.exactValue.isDefined) Left(new StringAttrs(str.exactValue.map(_.toLowerCase))) else Left(str)
-            case "trim" => 
-              val newExactValue = str.exactValue.map(_.trim)
-              val newMinLength = str.exactValue.map(_.trim.size).getOrElse(str.getTrimmedMinLength)
-              val newMaxLength = str.exactValue.map(_.trim.size).getOrElse(str.getTrimmedMaxLength)
-              Left(new StringAttrs(
-                exactValue = newExactValue, 
-                minLength = newMinLength, 
-                trimmedMinLength = newMinLength, 
-                maxLength = newMaxLength, 
-                trimmedMaxLength = newMaxLength))
+            case "toUpperCase" => Left(str.toUpperCase)
+            case "toLowerCase" => Left(str.toLowerCase)
+            case "trim" =>  Left(str.trim)
             case "nonEmpty"|"isEmpty" => 
               if(str.alwaysNonEmpty) warn(treePosHolder, "This string will never be empty.")
               if(str.alwaysIsEmpty) warn(treePosHolder, "This string will always be empty.")
@@ -2125,6 +2117,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               //println((string, param))
               
               //TODO use reflection, dummy :)
+              //TODO: could do some prefix/suffix enhancements
               try f match {
                 case "charAt"|"apply" => 
                   if(str.exactValue.isDefined) { string.charAt(param); Left(empty) } else if(param < 0) throw new IndexOutOfBoundsException else Left(empty)
@@ -2165,19 +2158,17 @@ class LinterPlugin(val global: Global) extends Plugin {
               }
               
             //str.func(String)
-            case f @ ("contains"|"startsWith"|"endsWith") if str.exactValue.isDefined && stringParam.exactValue.isDefined =>
-              val (string, param) = (str.exactValue.get, stringParam.exactValue.get)
-              
-              //TODO: calculate with lengths - (maxLength == 5) will never contain (minLength == 7)
-              
-              f match {
-                case "contains"   => warn(params.head, "This contains will always return "+string.contains(param)+".")
-                case "startsWith" => warn(params.head, "This startsWith will always return "+string.startsWith(param)+".")
-                case "endsWith"   => warn(params.head, "This endsWith will always return "+string.endsWith(param)+".")
-                case "compare"    => warn(params.head, "This compare will always return "+string.compare(param)+".")
-                case "compareTo"  => warn(params.head, "This compareTo will always return "+string.compareTo(param)+".")
-                case _ =>
+            case f @ ("contains"|"startsWith"|"endsWith"|"compare"|"compareTo") =>
+              val res = f match {
+                case "contains" => (str contains stringParam)
+                case "startsWith" => (str startsWith stringParam)
+                case "endsWith"   => (str endsWith stringParam)
+                //case "compare"    => warn(params.head, "This compare will always return "+string.compare(param)+".")
+                //case "compareTo"  => warn(params.head, "This compareTo will always return "+string.compareTo(param)+".")
+                case _ => None
               }
+              if(res.isDefined) warn(params.head, "This "+f+" will always return "+res.get+".")
+              
               Left(empty)
               
             //str.func(Int, Int)
@@ -2355,11 +2346,106 @@ class LinterPlugin(val global: Global) extends Plugin {
           private val minLength: Int = 0,
           private val trimmedMinLength: Int = 0,
           private val maxLength: Int = Int.MaxValue,
-          private val trimmedMaxLength: Int = Int.MaxValue) {
+          private val trimmedMaxLength: Int = Int.MaxValue,
+          private var prefix: String = "",
+          private var suffix: String = "",
+          private var knownPieces: Set[String] = Set[String]()) {
         
-        def addName(name: String): StringAttrs = new StringAttrs(exactValue, Some(name), getMinLength, trimmedMinLength, getMaxLength, trimmedMaxLength)
+        //keep this in mind, make getters
+        if(exactValue.isDefined) {
+          prefix = exactValue.get
+          suffix = exactValue.get
+          knownPieces = Set[String]()
+        }
+
+        def contains(s: StringAttrs): Option[Boolean] = s.exactValue.map(contains).getOrElse(None)
+        def contains(s: String): Option[Boolean] = {
+          val alwaysContains = 
+            (if(exactValue.isDefined) 
+              (exactValue.get contains s)
+            else 
+              (prefix contains s) || (suffix contains s) ||
+              (knownPieces exists { a => a contains s }))
+          val neverContains = 
+            (if(exactValue.isDefined) 
+              !(exactValue.get contains s)
+            else 
+              !(prefix contains s) && !(suffix contains s) &&
+              (s.length == getMaxLength && (!s.startsWith(this.prefix) || !s.endsWith(this.suffix))))
+
+          if(alwaysContains) Some(true) else if(neverContains) Some(false) else None
+        }
+
+        def startsWith(s: StringAttrs): Option[Boolean] = s.exactValue.map(startsWith).getOrElse(None)
+        def startsWith(s: String): Option[Boolean] = if(prefix.isEmpty) None else Some(prefix startsWith s)
+
+        def endsWith(s: StringAttrs): Option[Boolean] = s.exactValue.map(endsWith).getOrElse(None)
+        def endsWith(s: String): Option[Boolean] = if(suffix.isEmpty) None else Some(suffix endsWith s)
+
+        def capitalize: StringAttrs = 
+          new StringAttrs(
+            exactValue = exactValue.map { _.capitalize },
+            minLength = getMinLength,
+            trimmedMinLength = getTrimmedMinLength,
+            maxLength = getMaxLength,
+            trimmedMaxLength = getTrimmedMaxLength,
+            prefix = prefix.capitalize,
+            suffix = suffix,
+            knownPieces = knownPieces filterNot { _ contains suffix })
+
+        def distinct: StringAttrs = 
+          new StringAttrs(
+            exactValue = exactValue.map { _.distinct },
+            minLength = math.min(getMinLength, 1),
+            maxLength = getMaxLength,
+            trimmedMaxLength = getTrimmedMaxLength)
+
+        def reverse: StringAttrs = 
+          new StringAttrs(
+            exactValue = exactValue.map { _.reverse },
+            minLength = getMinLength,
+            trimmedMinLength = getTrimmedMinLength,
+            maxLength = getMaxLength,
+            trimmedMaxLength = getTrimmedMaxLength,
+            prefix = suffix.reverse,
+            suffix = prefix.reverse,
+            knownPieces = knownPieces map { _.reverse })
+
+        def trim: StringAttrs = {
+          val newMinLength = exactValue.map(_.trim.size).getOrElse(getTrimmedMinLength)
+          val newMaxLength = exactValue.map(_.trim.size).getOrElse(getTrimmedMaxLength)
+          new StringAttrs(
+            exactValue = exactValue.map { _.trim },
+            minLength = newMinLength, 
+            trimmedMinLength = newMinLength,
+            maxLength = newMaxLength, 
+            trimmedMaxLength = newMaxLength)//TODO: prefix/suffix trimleft/right
+        }
+
+        def toUpperCase: StringAttrs = 
+          new StringAttrs(
+            exactValue = exactValue.map { _.toUpperCase },
+            minLength = getMinLength,
+            trimmedMinLength = getTrimmedMinLength,
+            maxLength = getMaxLength,
+            trimmedMaxLength = getTrimmedMaxLength,
+            prefix = prefix.toUpperCase,
+            suffix = suffix.toUpperCase,
+            knownPieces = knownPieces map { _.toUpperCase })
+        def toLowerCase: StringAttrs = 
+          new StringAttrs(
+            exactValue = exactValue.map { _.toLowerCase },
+            minLength = getMinLength,
+            trimmedMinLength = getTrimmedMinLength,
+            maxLength = getMaxLength,
+            trimmedMaxLength = getTrimmedMaxLength,
+            prefix = prefix.toLowerCase,
+            suffix = suffix.toLowerCase,
+            knownPieces = knownPieces map { _.toLowerCase })
+
+        def addName(name: String): StringAttrs = new StringAttrs(exactValue, Some(name), getMinLength, trimmedMinLength, getMaxLength, trimmedMaxLength, prefix, suffix, knownPieces)
         def removeExactValue: StringAttrs = new StringAttrs(None, name, getMinLength, trimmedMinLength, getMaxLength, trimmedMaxLength)
-        def zeroMinLengths: StringAttrs = new StringAttrs(exactValue, name, 0, 0, getMaxLength, trimmedMaxLength)
+        def zeroMinLengths: StringAttrs = new StringAttrs(exactValue, name, 0, 0, getMaxLength, trimmedMaxLength, prefix, suffix, knownPieces)
         
         def alwaysIsEmpty: Boolean = getMaxLength == 0
         def alwaysNonEmpty: Boolean = getMinLength > 0
@@ -2375,16 +2461,22 @@ class LinterPlugin(val global: Global) extends Plugin {
             minLength = this.getMinLength + s.length,
             trimmedMinLength = this.getTrimmedMinLength + s.trim.length, //ADD: can be made more exact
             maxLength = if(this.maxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength + s.length,
-            trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.trim.length 
-          )
+            trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.trim.length,
+            prefix = if(this.exactValue.isDefined) this.exactValue.get + s else this.prefix,
+            suffix = this.suffix + s,
+            knownPieces = this.knownPieces ++ Set(this.prefix, this.suffix, s, this.suffix+s))
+
         def +(s: StringAttrs): StringAttrs = 
           new StringAttrs(
             exactValue = if(this.exactValue.isDefined && s.exactValue.isDefined) Some(this.exactValue.get + s.exactValue.get) else None,
             minLength = this.getMinLength + s.getMinLength,
             trimmedMinLength = this.getTrimmedMinLength + s.getTrimmedMinLength, //ADD: can be made more exact
             maxLength = if(this.getMaxLength == Int.MaxValue || s.getMaxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength + s.getMaxLength,
-            trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue || s.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.getTrimmedMaxLength
-          )
+            trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue || s.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.getTrimmedMaxLength,
+            prefix = if(this.exactValue.isDefined) this.exactValue.get + s.prefix else this.prefix,
+            suffix = if(s.exactValue.isDefined) this.suffix + s.suffix else s.suffix,
+            knownPieces = this.knownPieces ++ s.knownPieces ++ Set(this.prefix, this.suffix, s.prefix, s.suffix, this.suffix+this.prefix))
+
         def *(n: Values): StringAttrs = {
           if(n.isValue) {
             this * n.getValue
@@ -2419,7 +2511,10 @@ class LinterPlugin(val global: Global) extends Plugin {
               minLength = this.getMinLength*n,
               trimmedMinLength = this.getTrimmedMinLength*n, //ADD: can be made more exact
               maxLength = if(this.getMaxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength*n,
-              trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength*n)
+              trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength*n,
+              prefix = this.prefix,
+              suffix = this.suffix,
+              knownPieces = this.knownPieces ++ (if(n >= 2) Set(this.suffix+this.prefix) else Nil))
           }
         
         override def hashCode: Int = exactValue.hashCode + name.hashCode + minLength + trimmedMinLength + maxLength + trimmedMaxLength
@@ -2429,7 +2524,8 @@ class LinterPlugin(val global: Global) extends Plugin {
           case _ => false
         }
         
-        override def toString: String = (exactValue, name, getMinLength, getTrimmedMinLength, getMaxLength, getTrimmedMaxLength).toString
+        override def toString: String = 
+         "StringAttrs" + (if(exactValue.isDefined) "("+exactValue.get+")" else (name, getMinLength, getTrimmedMinLength, getMaxLength, getTrimmedMaxLength, prefix, suffix, knownPieces))
       }
      
       def traverseBlock(tree: Tree) {
@@ -2504,12 +2600,13 @@ class LinterPlugin(val global: Global) extends Plugin {
             vals += valNameStr -> Values(a, valNameStr)
             //println(vals(valName.toString))
 
-          case v@ValDef(m: Modifiers, valName, _, expr) if(!m.hasDefault) => //if !m.hasFlag(MUTABLE) /*&& !m.hasFlag(LAZY)) && !computeExpr(expr).isEmpty*/ => //&& computeExpr(expr).isValue =>
+          case v@ValDef(m: Modifiers, valName, _, expr) if(!m.hasDefault) => 
+            //if !m.hasFlag(MUTABLE) /*&& !m.hasFlag(LAZY)) && !computeExpr(expr).isEmpty*/ => //&& computeExpr(expr).isValue =>
             //ADD: aliasing... val a = i, where i is an iterator, then 1/i-a is divbyzero
             //ADD: isSeq and actualSize
 
             if(expr.tpe.widen <:< StringClass.tpe) {
-              val str = StringAttrs.toStringAttrs(expr).addName(valName.toString)
+              val str = StringAttrs(expr).addName(valName.toString)//StringAttrs.toStringAttrs(expr)
               //println("str1: "+str)
               if(str.exactValue.isDefined || str.getMinLength > 0) {
                 stringVals += str
