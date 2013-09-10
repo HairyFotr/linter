@@ -263,7 +263,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
       override def traverse(tree: Tree) { 
         //TODO: the matchers are broken up for one reason only - Scala 2.9 pattern matcher :)
-        ///Workarounds:
+        // Workarounds for some cases
         tree match {
           /// Workaround: case class generated code triggers a lot of the checks...
           case ClassDef(mods, _, _, _) if mods.isCase => return
@@ -278,13 +278,13 @@ class LinterPlugin(val global: Global) extends Plugin {
           case _ =>
         }
         tree match {
-          /// Some numeric checks
+          //// Some numeric checks
           /*case Apply(Select(lhs, nme.EQ), List(rhs))
             if isSubtype(lhs, DoubleClass.tpe) || isSubtype(lhs, FloatClass.tpe) || isSubtype(rhs, DoubleClass.tpe) || isSubtype(rhs, FloatClass.tpe) =>
             
             warn(tree, "Exact comparison of floating point values is potentially unsafe.")*/
             
-          /// log1p and expm -- see http://www.johndcook.com/blog/2010/06/07/math-library-functions-that-seem-unnecessary/
+          /// Tip to use log1p(x) and expm1(x), instead of log(1+x) and exp(x)-1 -- see http://www.johndcook.com/blog/2010/06/07/math-library-functions-that-seem-unnecessary/
           //TODO: maybe make checks to protect against potentially wrong fixes, e.g. log1p(a + 1) or log1p(a - 1)
           // also, check 1-exp(x) and other negated versions
           case Apply(log, List(Apply(Select(Literal(Constant(1)), nme.ADD), _))) if log is "scala.math.`package`.log" => 
@@ -297,18 +297,18 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Apply(Select(Literal(Constant(-1)), nme.ADD), List(Apply(exp, _))) if exp is "scala.math.`package`.exp" =>
             warn(tree, "Use math.expm1(x) instead of -1 + math.exp(x) for added accuracy when x is near 0.")
 
-          /// Use abs instead of doing it manually
+          /// Use x.abs instead of doing it manually
           case Apply(sqrt, List(Apply(pow, List(expr, Literal(Constant(2))))))
             if (sqrt is "scala.math.`package`.sqrt") && (pow is "scala.math.`package`.pow") =>
             
-            warn(tree, "Use abs instead of sqrt(pow(_, 2)).")
+            warn(tree, "Use abs instead of sqrt(pow(x, 2)).")
 
           case Apply(math_sqrt, List(Apply(Select(expr1, nme.MUL), List(expr2))))
             if (expr1 equalsStructure expr2) && (math_sqrt is "scala.math.`package`.sqrt") =>
             
             warn(tree, "Use abs instead of sqrt(x*x).")
 
-          /// Use xxx.isNaN instead of (xxx != xxx)
+          /// Use x.isNaN instead of (x != x)
           case Apply(Select(left, func), List(right))
             if isFloatingType(left)
             && (func == nme.EQ || func == nme.NE)
@@ -319,7 +319,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             else
               warn(tree, "Use .isNan instead of comparing to NaN, which is wrong.")
 
-          /// Signum function checks
+          /// Use x.signum instead of doing it manually
           case pos @ Apply(Select(expr1, nme.DIV), List(expr2)) if ((expr1, expr2) match {
               case (expr1, Apply(abs, List(expr2))) if (abs is "scala.math.`package`.abs") && (expr1 equalsStructure expr2) => true
               case (Apply(abs, List(expr1)), expr2) if (abs is "scala.math.`package`.abs") && (expr1 equalsStructure expr2) => true
@@ -427,15 +427,16 @@ class LinterPlugin(val global: Global) extends Plugin {
             val warnMsg = "Comparing with == on instances of different types (%s, %s) will probably return false."
             warn(eqeq, warnMsg.format(lhs.tpe.widen, rhs.tpe.widen))
 
-          /// Some import checks
+          /// Warn agains importing from collection.JavaConversions
           case Import(pkg, selectors) if (pkg.symbol == JavaConversionsModule) && (selectors exists isGlobalImport) =>
-            warn(pkg, "Implicit conversions in collection.JavaConversions are dangerous. Consider using collection.JavaConverters")
+            warn(pkg, "Implicit conversions in collection.JavaConversions are dangerous. Consider using the explicit collection.JavaConverters")
           
-          //case Import(pkg, selectors) if selectors exists isGlobalImport =>
+          /// Warn about wildcard imports (disabled)
+          /*case Import(pkg, selectors) if selectors exists isGlobalImport =>
             //TODO: Too much noise - maybe it would be useful to non-IDE users if it printed 
             // a nice selector import replacement, e.g. import mutable._ => import mutable.{HashSet,ListBuffer}
             
-            //warn(pkg, "Wildcard imports should be avoided. Favor import selector clauses.")
+            warn(pkg, "Wildcard imports should be avoided. Favor import selector clauses.")*/
 
           /// Collection.contains on different types: List(1,2,3).contains("2")
           case Apply(contains @ Select(seq, _), List(target)) 
@@ -444,27 +445,27 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             warn(contains, "%s.contains(%s) will probably return false.".format(seq.tpe.widen, target.tpe.widen))
 
-          /// Warn about using .asInstanceOf[T]
+          /// Warn about using .asInstanceOf[T] (disabled)
           //TODO: false positives in case class A(), and in the interpreter init
-          //case aa @ Apply(a, List(b @ Apply(s @ Select(instanceOf,dd),ee))) if methodImplements(instanceOf.symbol, AsInstanceOf) =>
+          /*case aa @ Apply(a, List(b @ Apply(s @ Select(instanceOf,dd),ee))) if methodImplements(instanceOf.symbol, AsInstanceOf) =>
             //println((aa,instanceOf))
-          //case instanceOf @ Select(a, func) if methodImplements(instanceOf.symbol, AsInstanceOf) =>   
+          case instanceOf @ Select(a, func) if methodImplements(instanceOf.symbol, AsInstanceOf) =>   
             //TODO: too much noise, maybe detect when it's completely unnecessary
-            //warn(tree, "Avoid using asInstanceOf[T] (use pattern matching, type ascription, etc).")
+            warn(tree, "Avoid using asInstanceOf[T] (use pattern matching, type ascription, etc).")*/
 
-          /// Calling Option.get is potentially unsafe
+          /// Calling Option.get is potentially unsafe (disabled)
           //TODO: if(x.isDefined) func(x.get) / if(x.isEmpty) ... else func(x.get), etc. are false positives -- those could be detected in abs-interpreter
-          //case get @ Select(_, nme.get) if methodImplements(get.symbol, OptionGet) => 
-            //warn(tree, "Calling .get on Option will throw an exception if the Option is None.")
+          /*case get @ Select(_, nme.get) if methodImplements(get.symbol, OptionGet) => 
+            warn(tree, "Calling .get on Option will throw an exception if the Option is None.")*/
 
-          /// Nag about using null
+          /// Nag about using null (disabled)
           //TODO: Too much noise - limit in some way
-          //case Literal(Constant(null)) =>
-            //warn(tree, "Using null is considered dangerous.")
+          /*case Literal(Constant(null)) =>
+            warn(tree, "Using null is considered dangerous, use Option.")*/
 
-          /// String checks
+          //// String checks 
+          /// Repeated string literals (disabled)
           /*case Literal(Constant(str: String)) =>
-            /// Repeated string literals
             //TODO: String interpolation gets broken down into parts and causes false positives
             //TODO: a quick benchmark showed string literals are actually more optimized than almost anything else, even final vals
             val threshold = 4
@@ -475,29 +476,24 @@ class LinterPlugin(val global: Global) extends Plugin {
               warn(tree, """String literal """"+str+"""" appears multiple times.""")
             }*/
             
-          /// str.substring("sdfsdf".length) -> str.stripPrefix("sdfsdf")
-          //TODO: not an exact replacement, also performance questions
-          // maybe .drop("sdfsdf".length)
+          /// str.substring(len) -> str.drop(len) (disabled)
           /*case Apply(Select(str, substring), List(strLen))
             if str.tpe <:< definitions.StringClass.tpe            
             && substring.toString == "substring"
             && getStringFromLength(strLen).isDefined =>
             
-            warn(tree, "Use x.stripPrefix(y), instead of x.substring(y.length)")
-          */  
-          /// str.substring(0, str.length - "sdfsdf".length) -> str.stripPrefix("sdfsdf")
-          //TODO: not an exact replacement, also performance questions
-          // maybe .dropRight("sdfsdf".length)
-          /*
-          case Apply(Select(str1, substring), List(Literal(Constant(0)), Apply(Select(str1Len, nme.SUB), List(str2Len))))
+            warn(tree, "Use x.take(len), instead of x.substring(len)")*/
+            
+          /// str.substring(0, str.length - len) -> str.dropRight(len) (disabled)
+          /*case Apply(Select(str1, substring), List(Literal(Constant(0)), Apply(Select(str1Len, nme.SUB), List(str2Len))))
             if str1.tpe <:< definitions.StringClass.tpe
             && substring.toString == "substring"
             && getStringFromLength(str1Len).isDefined && getStringFromLength(str2Len).isDefined
             && (str1 equalsStructure getStringFromLength(str1Len).get) =>
           
-            warn(tree, "Use x.stripSuffix(y), instead of x.substring(x.length-y.length)")
-          */
-          /// Processing a constant string: "hello".size
+            warn(tree, "Use x.dropRight(len), instead of x.substring(x.length-len)")*/
+            
+          /// Processing a constant string: "hello".size (disabled)
           /*case Apply(Select(pos @ Literal(Constant(s: String)), func), params) =>
             func.toString match {
               case "$plus"|"equals"|"$eq$eq"|"toCharArray"|"matches"|"getBytes" => //ignore
@@ -506,9 +502,9 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
           case Select(Apply(Select(predef, augmentString), List(pos @ Literal(Constant(s: String)))), size)
             if predef is "scala.this.Predef" && augmentString.toString == "augmentString" && size.toString == "size" => 
-            warn(pos, "Taking the size of a constant string")
-          */
-          /// Pattern Matching checks
+            warn(pos, "Taking the size of a constant string")*/
+            
+          //// Pattern Matching checks
           case Match(pat, cases) if (pat match { case Typed(_, _) => false; case _ => true }) && pat.tpe.toString != "Any @unchecked" && cases.size >= 2 =>
             // Workaround: "Any @unchecked" seems to happen on the matching structures of actors - and all cases return true
             // Workaround: Typed (or Annotated) seems to happen in for loop pattern matching, which doesn't work right for at least for checkUsage
@@ -528,7 +524,6 @@ class LinterPlugin(val global: Global) extends Plugin {
               warn(tree, "Pattern matching on a constant value.")
             }
             
-            /// Checks if pattern matching on Option or Boolean
             var optionCase, booleanCase = false
             //TODO: Hacky hack hack -_-, sorry. use tpe <:< definitions.xxx.tpe
             val (optionCaseReg, booleanCaseReg) = ("(Some[\\[].*[\\]]|None[.]type)", "Boolean[(](true|false)[)]")
@@ -543,10 +538,11 @@ class LinterPlugin(val global: Global) extends Plugin {
             def printCaseWarning() {
               if(cases.size == 2) {
                 if(optionCase) {
-                  //see: http://blog.tmorris.net/posts/scalaoption-cheat-sheet/
+                  /// Checks if pattern matching on Option -- see: http://blog.tmorris.net/posts/scalaoption-cheat-sheet/ (disabled)
                   //TODO: too much noise, and some cases are perfectly fine - try detecting all the exact cases from link
                   //warn(tree, "There are probably better ways of handling an Option.")
                 } else if(booleanCase) {
+                  /// Checks if pattern matching on Boolean
                   //TODO: case something => ... case _ => ... is also an if in a lot of cases
                   warn(tree, "This is probably better written as an if statement.")
                 }
@@ -574,7 +570,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               }
             }
             
-            /// Checking for unused variables in pattern matching
+            /// Checking for unused variables in pattern matching (disabled)
             def checkUsage(c: CaseDef) {
               //TODO: use for self-testing from time to time - ~100 warnings currently :/
               /*val binds = for(b @ Bind(name, _) <- c.pat; if !name.toString.startsWith("_")) yield (b, name.toString)
@@ -584,7 +580,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               }*/
             }
 
-            /// Detect unreachable cases 
+            /// Detect some unreachable cases 
             //TODO: move to abs. interpreter to detect impossible guards
             //TODO: if there is a case (x,y) without a guard, it will make a latter case (x,y) with a guard unreachable
             val pastCases = mutable.ListBuffer[CaseDef]()
@@ -645,23 +641,24 @@ class LinterPlugin(val global: Global) extends Plugin {
             printStreakWarning()
             printCaseWarning()
 
-          /// If checks
-          case Apply(Select(left, func), List(right)) 
-            if (func == nme.ZAND || func == nme.ZOR) 
-            && (left.symbol == null || !left.symbol.isMethod)
-            && (left equalsStructure right) 
-            && tree.tpe.widen <:< BooleanClass.tpe =>
-            
-            warn(tree, "Same expression on both sides of boolean statement.")
-           
+          //// If checks
           /// Same expression on both sides of comparison.
           case Apply(Select(left, func), List(right)) 
             if (func.toString matches "[$](greater|less|eq|bang)([$]eq)?") && (left equalsStructure right) =>
             
             warn(tree, "Same expression on both sides of comparison.")
 
-          /// Yoda conditions (http://www.codinghorror.com/blog/2012/07/new-programming-jargon.html): if(6 == a) ...
-          //workaround for ranges, where it's acceptable - if(6 < a && a < 10) ...
+          /// Same expression on both sides of a boolean operation.
+          case Apply(Select(left, func), List(right)) 
+            if (func == nme.ZOR || func == nme.OR || func == nme.XOR || func == nme.ZAND || func == nme.AND/* || func == nme.EQ || func == nme.NE*/)
+            && (left.symbol == null || !left.symbol.isMethod)
+            && (left equalsStructure right) 
+            && tree.tpe.widen <:< BooleanClass.tpe =>
+            
+            warn(tree, "Same expression on both sides of a boolean operation.")
+           
+          /// Yoda conditions -- http://www.codinghorror.com/blog/2012/07/new-programming-jargon.html
+          // workaround for ranges, where it's acceptable - if(6 < a && a < 10) ...
           case Apply(Select(
             yoda @ Apply(Select(Literal(Constant(const1)), func1), List(notLiteral1)), opLogic), 
             List(Apply(Select(notLiteral2, func2), List(arg2))))
@@ -690,7 +687,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             warn(a, "If statement branches have the same structure.")
 
-          /// Find repeated (sub)conditions that will never hold
+          /// Find repeated (sub)conditions in if-else chains, that will never hold
           // caches conditions separated by OR, and checks all subconditions separated by either AND or OR
           case If(condition, _, e) if {
             def getSubConds(cond: Tree)(op: Name): List[Tree] =
@@ -721,28 +718,11 @@ class LinterPlugin(val global: Global) extends Plugin {
             false
           } => //Fallthrough
 
-          //Ignore: ignores while(true)... I mean, one can't accidentally use while(true), can they? :)
-          /*case LabelDef(whileName, List(), If(cond @ Literal(Constant(a: Boolean)), _, _)) =>
-            //TODO: doesn't actually ignore, but that test is trivial anyway, commenting both
-          case If(cond @ Literal(Constant(bool: Boolean)), _, _) => 
-            //TODO: there are people still doing breakable { while(true) {... don't warn on while(true)?
-            warn(cond, "This condition will always be "+bool+".")*/
-            
-          //TODO: Move to abstract interpreter once it handles booleans
-          /*case Apply(Select(Literal(Constant(false)), nme.ZAND), _) =>
-            warn(tree, "This part of boolean expression will always be false.")
-          case Apply(Select(_, nme.ZAND), List(lite @ Literal(Constant(false)))) =>
-            warn(lite, "This part of boolean expression will always be false.")
-          case Apply(Select(Literal(Constant(true)), nme.ZOR), _) =>
-            warn(tree, "This part of boolean expression will always be true.")
-          case Apply(Select(_, nme.ZOR), List(lite @ Literal(Constant(true)))) =>
-            warn(lite, "This part of boolean expression will always be true.")*/
-            
-          /// if(cond1) { if(cond2) ... } is the same as if(cond1 && cond2) ...
+          /// if(cond1) { if(cond2) { ... } } is the same as if(cond1 && cond2) { ... }
           case If(_, If(_, body, Literal(Constant(()))), Literal(Constant(()))) =>
             warn(tree, "These two nested ifs can be merged into one.")
           
-          /// Multiple-statement checks
+          //// Multiple-statement checks
           case blockElem @ Block(init, last) =>
             val block = init :+ last
 
@@ -792,21 +772,24 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
             
             block foreach { t => checkAssigns(t, onlySetUsed = false) }
-            /// Warnings when exiting a block - don't seem to work right
-            //val unused = (assigns filter { _._2 == Unused() } map { _._1.toString.trim } mkString ", ")
-            //if(!unused.isEmpty) warn(block.last, "Variable(s) "+unused+" have an unused value before here.")
+            /// Warning on exiting a block with unused values (broken/disabled)
+            /*val unused = (assigns filter { _._2 == Unused() } map { _._1.toString.trim } mkString ", ")
+            if(!unused.isEmpty) warn(block.last, "Variable(s) "+unused+" have an unused value before here.")*/
 
-            /// Checks on two subsequent statements
+            //// Checks on two subsequent statements
             val blockPairs = (block zip block.tail)
             blockPairs foreach {
+              /// Probably mistake in swaping two variables: a = b, b = b
               case (Assign(id1, id2), Assign(id2_, id1_)) if(id1 equalsStructure id1_) && (id2 equalsStructure id2_) =>
                 warn(id1_, "Did you mean to swap these two variables?")
 
-              /// "...; val x = value; x }" at the end of a method - usually I do this for debug outputs
-              // this could be generalized in the new unused value code above 
-              //case (v @ ValDef(_, id1, _, _), l @ Ident(id2)) if id1.toString == id2.toString && (l eq last) =>
-              //  warn(v, "You don't need that temp variable.")
+              /// "...; val x = value; x }" at the end of a method (disabled)
+              // TODO: disabled - I usually have commented debug outputs in between these
+              // TODO: this could be generalized in the new unused value code above 
+              /*case (v @ ValDef(_, id1, _, _), l @ Ident(id2)) if id1.toString == id2.toString && (l eq last) =>
+                warn(v, "You don't need that temp variable.")*/
 
+              /// Doing the same thing twice
               case (i1 @ If(cond1, _, _), i2 @ If(cond2, _, _)) if (cond1 equalsStructure cond2) && (i1 match {
                 case If(Ident(_), _, _) => //Ignore single booleans - probably debug/logging
                   false 
@@ -825,16 +808,18 @@ class LinterPlugin(val global: Global) extends Plugin {
                 warn(cond2, "Two subsequent ifs have the same condition")
 
               case (s1, s2) if (s1 equalsStructure s2) && !(s1 is "scala.this.Predef.println()") =>
-                warn(s2, "You're doing the exact same thing twice.")
+                nowarnPositions += s2.pos
+                warn(s1, "You're doing the exact same thing twice or more.")
 
               case _ =>
             }
 
-          //TODO: these two are probably superseded by abs-interpreter
+          /// Literal negative index for a collection (obsolete?)
           case pos @ Apply(Select(seq, apply), List(Literal(Constant(index: Int)))) 
             if methodImplements(pos.symbol, SeqLikeApply) && index < 0 =>
             warn(pos, "Using a negative index for a collection.")
 
+          /// Literal division by zero (obsolete?)
           // cannot check double/float, as typer will automatically translate it to Infinity
           case divByZero @ Apply(Select(rcvr, op), List(Literal(Constant(0))))
             if (op == nme.DIV || op == nme.MOD)
@@ -856,6 +841,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case ValDef(_, _, _, value) if isOptionOption(value) =>
             warn(tree, "Why would you need an Option of an Option?")
 
+          /// Inferred type Nothing, Any, M[Nothing], or M[Any] (idea by OlegYch)
           case ValDef(mods, name, tpe, body) 
             if !mods.isParameter 
             && !(name.toString.trim matches "res[0-9]+") //workaround for REPL
@@ -909,7 +895,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             warn(tree, "Use Option(...), which automatically wraps null to None")
           
-          /// Comparing to None
+          /// Comparing Option to None instead of useing isDefined (disabled)
           /*case Apply(Select(opt, op), List(scala_None)) if (op == nme.EQ || op == nme.NE) && (scala_None is "scala.None") =>
             warn(tree, "Use .isDefined instead of comparing to None")*/
 
@@ -919,65 +905,51 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             warn(scala_Some_apply, "Use getOrElse(...) instead of orElse(Some(...)).get")
 
-          /// if(opt.isDefined) opt.get else something is better written as getOrElse(something)
+          /// if(opt.isDefined) opt.get else something is better written as getOrElse(something) and similar warnings
           //TODO: improve the warning text, and curb the code duplication
           case If(Select(opt1, isDefined), getCase @ Select(opt2, get), elseCase) //duplication
             if (isDefined is "isDefined") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) {
-              warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(opt.isDefined) opt.get else null")
-            } else if(getCase.tpe.widen <:< elseCase.tpe.widen) {
-              warn(opt2, "Use opt.getOrElse(...) instead of if(opt.isDefined) opt.get else ...")
-            }
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(opt.isDefined) opt.get else null")
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, "Use opt.getOrElse(...) instead of if(opt.isDefined) opt.get else ...")
+
           case If(Select(Select(opt1, isDefined), nme.UNARY_!), elseCase, getCase @ Select(opt2, get)) //duplication
             if (isDefined is "isDefined") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) {
-              warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(!opt.isDefined) null else opt.get")
-            } else if(getCase.tpe.widen <:< elseCase.tpe.widen) {
-              warn(opt2, "Use opt.getOrElse(...) instead of if(!opt.isDefined) ... else opt.get")
-            }
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(!opt.isDefined) null else opt.get")
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, "Use opt.getOrElse(...) instead of if(!opt.isDefined) ... else opt.get")
+
           case If(Select(opt1, isEmpty), elseCase, getCase @ Select(opt2, get)) //duplication
             if (isEmpty is "isEmpty") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) {
-              warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(opt.isEmpty) null else opt.get")
-            } else if(getCase.tpe.widen <:< elseCase.tpe.widen) {
-              warn(opt2, "Use opt.getOrElse(...) instead of if(opt.isEmpty) ... else opt.get")
-            }
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(opt.isEmpty) null else opt.get")
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, "Use opt.getOrElse(...) instead of if(opt.isEmpty) ... else opt.get")
+
           case If(Select(Select(opt1, isEmpty), nme.UNARY_!), getCase @ Select(opt2, get), elseCase) //duplication
             if (isEmpty is "isEmpty") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) {
-              warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(!opt.isEmpty) opt.get else null")
-            } else if(getCase.tpe.widen <:< elseCase.tpe.widen) {
-              warn(opt2, "Use opt.getOrElse(...) instead of if(!opt.isEmpty) opt.get else ...")
-            }
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(!opt.isEmpty) opt.get else null")
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, "Use opt.getOrElse(...) instead of if(!opt.isEmpty) opt.get else ...")
+
           case If(Apply(Select(opt1, nme.NE), List(scala_None)), getCase @ Select(opt2, get), elseCase) //duplication
             if (scala_None is "scala.None") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) {
-              warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(opt != None) opt.get else null")
-            } else if(getCase.tpe.widen <:< elseCase.tpe.widen) {
-              warn(opt2, "Use opt.getOrElse(...) instead of if(opt != None) opt.get else ...")
-            }
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(opt != None) opt.get else null")
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, "Use opt.getOrElse(...) instead of if(opt != None) opt.get else ...")
+
           case If(Apply(Select(opt1, nme.EQ), List(scala_None)), elseCase, getCase @ Select(opt2, get)) //duplication
             if (scala_None is "scala.None") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) {
-              warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(opt == None) opt.get else null")
-            } else if(getCase.tpe.widen <:< elseCase.tpe.widen) {
-              warn(opt2, "Use opt.getOrElse(...) instead of if(opt == None) opt.get else ...")
-            }
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, "Use opt.orNull or opt.getOrElse(null) instead of if(opt == None) opt.get else null")
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, "Use opt.getOrElse(...) instead of if(opt == None) opt.get else ...")
           
           /// find(...).isDefined is better written as exists(...)
-          case Select(Apply(pos @ Select(collection, find), func), isDefined) 
-            if ((find isAny ("find", "filter")) && (isDefined isAny ("isEmpty", "isDefined")))
+          /// filter(...).isEmpty is better written as exists(...)
+          case Select(Apply(pos @ Select(collection, find_filter), func), isEmpty_isDefined) 
+            if ((find_filter isAny ("find", "filter")) && (isEmpty_isDefined isAny ("isEmpty", "isDefined")))
             && (collection startsWithAny ("scala.", "immutable.")) =>
             
-            warn(pos, "Use exists(...) instead of "+find+"(...)."+isDefined)
-
-          /// filter(...).isEmpty is better written as exists(...)
+            warn(pos, "Use exists(...) instead of "+find_filter+"(...)."+isEmpty_isDefined)
 
           /// flatMap(if(...) x else Nil/None) is better written as filter(...)
           case Apply(TypeApply(Select(collection, flatMap), _), List(Function(List(ValDef(flags, param, _, _)), If(cond, e1, e2))))
@@ -1005,7 +977,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 //println((showRaw(expr1), showRaw(expr2)))
             }
             
-            /// Checks for Option.size, which is probably a bug (use .isDefined instead)
+            /// Warnings about using Option.size, which is probably a bug (use .isDefined instead)
             case t @ Select(Apply(option2Iterable, List(opt)), size) if (option2Iterable.toString contains "Option.option2Iterable") && (size is "size") =>
               
               if(opt.tpe.widen.typeArgs.exists(tp => tp.widen <:< StringClass.tpe))
@@ -1050,7 +1022,8 @@ class LinterPlugin(val global: Global) extends Plugin {
               }
             )
             
-          /// Checks for inefficient use of .size
+          //// Inefficient use of .size, instead of is/nonEmpty (Idea by non)
+          /// Inefficient use of List.size, instead of is/nonEmpty
           case Apply(Select(pos @ Select(obj, size), op), List(Literal(Constant(x))))
             if (size isAny ("size", "length"))
             && (obj.tpe.widen.baseClasses.exists(_.tpe =:= ListClass.tpe) || obj.tpe.widen <:< StringClass.tpe)
@@ -1062,6 +1035,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             else
               warn(pos, "Use nonEmpty instead of comparing to size.")
 
+          /// Inefficient use of String.size, instead of is/nonEmpty (disabled)
           /*case Apply(Select(obj, op), List(Literal(Constant(""))))
             if (obj.tpe.widen <:< StringClass.tpe)
             && (op == nme.EQ || op == nme.NE) =>
@@ -1071,7 +1045,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             else
               warn(tree, "Use nonEmpty instead of comparing to empty string.")*/
               
-          /// Passing a block that returns a function to map - http://scalapuzzlers.com/#pzzlr-001
+          /// Passing a block that returns a function to map, instead of a function -- http://scalapuzzlers.com/#pzzlr-001
           case Apply(TypeApply(Select(collection, op), _), List(block @ Block(list, ret @ Function(List(ValDef(paramMods, _, _, _)), funcbody))))
             if paramMods.isSynthetic
             && op.toString.matches("map|foreach|filter(Not)?") //TODO: add more
@@ -1084,7 +1058,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             warn(block, "You're passing a block that returns a function - the statements in this block, except the last one, will only be executed once.")
 
-          /// Integer division assigned to a floating point variable
+          /// Integer division in an expression assigned to a floating point variable
           case Assign(varName, body) if isFloatingType(varName) && hasIntegerDivision(body) =>
             warn(body, "Integer division detected in an expression assigned to a floating point variable.")
           case Apply(Select(varName, varSetter), List(body)) if (varSetter endsWith "_$eq") && isFloatingType(body) && hasIntegerDivision(body) =>
@@ -1110,6 +1084,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     }
   }
 
+  //// Abstract Interpreter
   private object PostTyperInterpreterComponent extends PluginComponent {
     val global = LinterPlugin.this.global
     import global._
@@ -1152,6 +1127,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       //2. for Values: empty -> any, and add "nonValues" or "conditions" to cover
       //   if(a == 0) ..., if(a%2 == 0) ... even for huge collections
 
+      //// Integer/List value data structure
       object Values {
         lazy val empty = new Values()
         def apply(i: Int, name: String = ""): Values = new Values(name = name, values = Set(i))
@@ -1256,6 +1232,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               Values.empty
           }
         
+        //// Apply and check a condition, return a pair of possible values of this Integer/List if condition is true and if false
         def applyCond(condExpr: Tree): (Values, Values) = {
           //TODO: alwaysTrue and false cound be possible returns for error msgs
           //TODO: check out if you're using 'this' for things that aren't... this method shouldn't be here anyways
@@ -1273,7 +1250,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 left.conditions ++ right.conditions,
                 this.name)
 
-            /// String stuff
+            // Pass on String functions
             case strFun @ Apply(Select(string, func), params) if string.tpe != null && string.tpe.widen <:< StringClass.tpe =>
               computeExpr(strFun)
               
@@ -1417,6 +1394,8 @@ class LinterPlugin(val global: Global) extends Plugin {
               Values.empty.addActualSize(this.actualSize)
           }
           
+          
+          // Check if condition will always or never hold
           if(neverHold) warn(condExpr, "This condition will never hold.")
           if(alwaysHold) warn(condExpr, "This condition will always hold.")
           
@@ -1434,6 +1413,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           }
         }
         
+        //// Apply a unary operation on a Integer/List variable
         def applyUnary(op: Name): Values = op match { 
           case nme.UNARY_+ => this
           case nme.UNARY_- => this.map(a => -a)
@@ -1481,7 +1461,8 @@ class LinterPlugin(val global: Global) extends Plugin {
             //println("applyUnary: op:"+op+" thisval:"+this+" tree:"+treePosHolder.toString+"\n"+raw);
             Values.empty
         }
-        def apply(op: Name)(right: Values): Values = {
+        //// Apply a binary operation on a Integer/List variable
+        def applyBinary(op: Name, right: Values): Values = {
           val left = this
 
           type F = ((Int, Int) => Int, Boolean) // 2.9 typer fails at pattern matching :)
@@ -1675,11 +1656,12 @@ class LinterPlugin(val global: Global) extends Plugin {
       }
       
       //TODO: extend with more functions... and TEST TEST TEST TEST
+      //// Attempt to compute part of the AST, and return Integer/List value
       def computeExpr(tree: Tree): Values = {
         treePosHolder = tree
         val out: Values = tree match {
           case Literal(Constant(value: Int)) => Values(value)
-          //TODO: I don't think this ones work at all...
+          //TODO: I don't think .this. ones work at all...
           case Select(This(typeT), termName) =>
             val name = termName.toString
             val n = (if(name.contains(".this.")) name.substring(name.lastIndexOf(".")+1) else name).trim
@@ -1701,9 +1683,9 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Select(Apply(Select(predef, augmentString), List(Ident(id))), size)
             if stringVals.exists(_.name == Some(id.toString)) && predef.toString == "scala.this.Predef" && augmentString.toString == "augmentString" && size.toString == "size" => 
             val exactValue = stringVals.find(_.name == Some(id.toString)).map(_.exactValue)
-            exactValue.map(v => Values(v.size)).getOrElse(Values.empty)
-    */
-          /// String stuff (TODO: there's a copy up at applyCond)
+            exactValue.map(v => Values(v.size)).getOrElse(Values.empty)*/
+            
+          // String stuff (TODO: there's a copy up at applyCond)
           case strFun @ Apply(Select(string, func), params) if string.tpe.widen <:< StringClass.tpe =>
             StringAttrs.stringFunc(string, func, params).right.getOrElse(Values.empty)
             
@@ -1744,6 +1726,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             val high2 = if(to_until.toString == "to") high else high-1
             new Values(Set((low, high2)), Set(), Set(), "", isSeq = true, high2-low)
 
+          /// Use (low until high) instead of (low to high-1)
           case Apply(Select(Apply(scala_Predef_intWrapper, List(expr1)), to_until), List(expr2))
             if (scala_Predef_intWrapper.toString endsWith "Wrapper") => 
             
@@ -1788,10 +1771,11 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Apply(Select(scala_math_package, op), params) if scala_math_package.toString == "scala.math.`package`" =>
             op.toString match {
               case "abs"|"signum" if params.size == 1 => computeExpr(params.head).applyUnary(op)
-              case "max"|"min"    if params.size == 2 => computeExpr(params(0))(op)(computeExpr(params(1)))
+              case "max"|"min"    if params.size == 2 => computeExpr(params(0)).applyBinary(op, computeExpr(params(1)))
               case _ => Values.empty
             }
 
+          /// Parameter of Random.nextInt might be lower than 1 (runtime exception)
           case Apply(Select(scala_util_Random, nextInt), params) if nextInt.toString == "nextInt" && scala_util_Random.tpe <:< definitions.getClass(newTermName("scala.util.Random")).tpe =>
             if(params.size == 1) {
               val param = computeExpr(params.head)
@@ -1823,7 +1807,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           case Apply(Select(expr1, op), List(expr2)) =>
             //println("BinaryOp: "+(op, expr1, expr2, (computeExpr(expr1))(op)(computeExpr(expr2))))
-            (computeExpr(expr1))(op)(computeExpr(expr2))
+            (computeExpr(expr1)).applyBinary(op, computeExpr(expr2))
           
           case Apply(Apply(TypeApply(Select(valName, map), List(_, _)), List(Function(List(ValDef(mods, paramName, _, EmptyTree)), expr))), _) if(map.toString == "map") => 
             //List(TypeApply(Select(Select(This(newTypeName("immutable")), scala.collection.immutable.List), newTermName("canBuildFrom")), List(TypeTree()))))
@@ -1965,8 +1949,8 @@ class LinterPlugin(val global: Global) extends Plugin {
       
       val doNotTraverse = mutable.HashSet[Tree]()
       
-      // Just something quick I hacked together for an actual bug
       //implicit def String2StringAttrs(s: String) = new StringAttrs(exactValue = Some(s))
+      //// String abstract interpreter
       object StringAttrs {
         //TODO: when merging, save known chunks - .contains then partially works
         def empty: StringAttrs = new StringAttrs()
@@ -1991,6 +1975,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           else if(param.tpe.widen <:< FloatClass.tpe)   new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 154, trimmedMaxLength = 154)
           else if(param.tpe.widen <:< BooleanClass.tpe) new StringAttrs(minLength = 4, trimmedMinLength = 4, maxLength = 5, trimmedMaxLength = 5)
           else {
+            //TODO: prefix "Type(" and suffix ")" for collections
             //TODO: not sure if this is the right way, but <:< TraversableClass.tpe does not work directly
             // also, it's possible to have a Traversable, which has a shorter toString - check if you're in scala. or Predef
             if((param.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe)) && !(param.tpe.widen <:< StringClass.tpe)) {
@@ -2009,7 +1994,7 @@ class LinterPlugin(val global: Global) extends Plugin {
         }
         // scalastyle:on magic.number
         
-        /// Tries to execute string functions and return either a String or Int representation
+        //// Tries to execute string functions and returns either a String or Int representation
         def stringFunc(string: Tree, func: Name, params: List[Tree] = List[Tree]()): Either[StringAttrs, Values] = {
           val str = StringAttrs(string)
           lazy val intParam = if(params.size == 1 && params.head.tpe.widen <:< IntClass.tpe) computeExpr(params.head) else Values.empty
@@ -2094,6 +2079,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               Left(empty)
             case "hashCode" if str.exactValue.isDefined => 
               Right(Values(str.exactValue.get.hashCode))
+            /// String to(Int,Long,Float,Double) conversion will likely fail (runtime exception)
             case "toInt" if str.exactValue.isDefined =>
               try {
                 Right(Values(str.exactValue.get.toInt))
@@ -2102,15 +2088,6 @@ class LinterPlugin(val global: Global) extends Plugin {
                   warn(treePosHolder, "This String toInt conversion will likely fail.")
                   Left(empty)
               }
-            //str.func(Int)
-            case f @ ("toDouble"|"toFloat") if str.exactValue.isDefined =>
-              try {
-                str.exactValue.get.toDouble
-              } catch {
-                case e: Exception =>
-                  warn(treePosHolder, "This String "+f+" conversion will likely fail.")
-              }
-              Left(empty)
             case f @ ("toLong") if str.exactValue.isDefined =>
               try {
                 str.exactValue.get.toLong
@@ -2119,6 +2096,17 @@ class LinterPlugin(val global: Global) extends Plugin {
                   warn(treePosHolder, "This String "+f+" conversion will likely fail.")
               }
               Left(empty)
+            case f @ ("toDouble"|"toFloat") if str.exactValue.isDefined =>
+              try {
+                str.exactValue.get.toDouble
+              } catch {
+                case e: Exception =>
+                  /// String to floating point conversion will likely fail (runtime exception)
+                  warn(treePosHolder, "This String "+f+" conversion will likely fail.")
+              }
+              Left(empty)
+
+            // str.func(String)
             case f @ ("charAt"|"codePointAt"|"codePointBefore"|"substring"
                      |"apply"|"drop"|"take"|"dropRight"|"takeRight") if intParam.isValue =>
               val param = intParam.getValue
@@ -2161,25 +2149,12 @@ class LinterPlugin(val global: Global) extends Plugin {
                   Left(empty)
               } catch {
                 case e: IndexOutOfBoundsException =>
+                  /// String index will likely cause an IndexOutOfBoundsException (runtime exception)
                   warn(params.head, "This index will likely cause an IndexOutOfBoundsException.")
                   Left(empty)
                 case e: Exception =>
                   Left(empty)
               }
-              
-            //str.func(String)
-            case f @ ("contains"|"startsWith"|"endsWith"|"compare"|"compareTo") =>
-              val res = f match {
-                case "contains" => (str contains stringParam)
-                case "startsWith" => (str startsWith stringParam)
-                case "endsWith"   => (str endsWith stringParam)
-                //case "compare"    => warn(params.head, "This compare will always return "+string.compare(param)+".")
-                //case "compareTo"  => warn(params.head, "This compareTo will always return "+string.compareTo(param)+".")
-                case _ => None
-              }
-              if(res.isDefined) warn(params.head, "This "+f+" will always return "+res.get+".")
-              
-              Left(empty)
               
             //str.func(Int, Int)
             case f @ ("substring"|"codePointCount") if intParams.size == 2 && intParams.forall(_.isValue) =>
@@ -2212,7 +2187,23 @@ class LinterPlugin(val global: Global) extends Plugin {
                   Left(empty)
                 case e: Exception =>
                   Left(empty)
-              }        
+              }
+
+            // str.func(String)
+            /// Try to verify String contains, startsWith, endsWith
+            case func @ ("contains"|"startsWith"|"endsWith"|"compare"|"compareTo") =>
+              val result = func match {
+                case "contains" => (str contains stringParam)
+                case "startsWith" => (str startsWith stringParam)
+                case "endsWith"   => (str endsWith stringParam)
+                //case "compare"    => warn(params.head, "This compare will always return "+string.compare(param)+".")
+                //case "compareTo"  => warn(params.head, "This compareTo will always return "+string.compareTo(param)+".")
+                case _ => None
+              }
+              if(result.isDefined) warn(params.head, "This "+func+" will always return "+result.get+".")
+              
+              Left(empty)
+              
             
             //str.func(String, String)
             case f @ ("replaceAll") if stringParams.size == 2 && stringParams.forall(_.exactValue.isDefined) =>
@@ -2232,10 +2223,11 @@ class LinterPlugin(val global: Global) extends Plugin {
               } else {
                 Left(empty)
               }
+            /// String format checks (runtime exception)
             case f @ "format"
               if (params.nonEmpty) && !(params.head.tpe.widen <:< StringClass.tpe) && !(params.head.tpe.widen <:< definitions.getClass(newTermName("java.util.Locale")).tpe) => 
               //Ignore the default Java impl, just work with scala's format(Any*)
-              //TODO: scrap the whole thing, and tell people to use string interpolators :)
+              //TODO: scrap the whole thing, and tell people to use string interpolators ;)
               
               val parActual = params map {
                 case param if(param.tpe.widen <:< IntClass.tpe) => computeExpr(param)
@@ -2289,6 +2281,7 @@ class LinterPlugin(val global: Global) extends Plugin {
         }
 
         
+        //// Try to convert an AST into a String value
         def apply(tree: Tree): StringAttrs = {
           def traverseString(tree: Tree): StringAttrs = tree match {
             case Literal(Constant(null)) => new StringAttrs(exactValue = Some("null"))
@@ -2332,7 +2325,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             case Apply(Select(expr1, nme.ADD), List(expr2)) if (expr1.tpe.widen <:< StringClass.tpe ^ expr2.tpe.widen <:< StringClass.tpe) =>
               toStringAttrs(expr1) + toStringAttrs(expr2)
 
-            /// Pass on functions on strings
+            // Pass on functions on strings
             //TODO: maybe check if some return string and can be computed
             case Apply(Select(str, func), params) => 
               stringFunc(str, func, params).left.getOrElse(empty)
@@ -2387,10 +2380,10 @@ class LinterPlugin(val global: Global) extends Plugin {
         }
 
         def startsWith(s: StringAttrs): Option[Boolean] = s.exactValue.map(startsWith).getOrElse(None)
-        def startsWith(s: String): Option[Boolean] = if(prefix.isEmpty) None else Some(prefix startsWith s)
+        def startsWith(s: String): Option[Boolean] = if(prefix.isEmpty || s.size > prefix.size) None else Some(prefix startsWith s)
 
         def endsWith(s: StringAttrs): Option[Boolean] = s.exactValue.map(endsWith).getOrElse(None)
-        def endsWith(s: String): Option[Boolean] = if(suffix.isEmpty) None else Some(suffix endsWith s)
+        def endsWith(s: String): Option[Boolean] = if(suffix.isEmpty || s.size > suffix.size) None else Some(suffix endsWith s)
 
         def capitalize: StringAttrs = 
           new StringAttrs(
@@ -2487,6 +2480,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             suffix = if(s.exactValue.isDefined) this.suffix + s.suffix else s.suffix,
             knownPieces = this.knownPieces ++ s.knownPieces ++ Set(this.prefix, this.suffix, s.prefix, s.suffix, this.suffix+this.prefix))
 
+        /// String multiplication with value <= 0 warning
         def *(n: Values): StringAttrs = {
           if(n.isValue) {
             this * n.getValue
@@ -2581,7 +2575,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case forloop @ Apply(TypeApply(Select(collection, _), _), List(Function(List(ValDef(_, _, _, _)), _))) =>
             forLoop(forloop)
           
-          /// Assertions checks
+          /// Assertions checks (assert, assume, require)
           case Apply(Select(scala_Predef, assertion), List(condExpr)) 
             if (scala_Predef.tpe.widen <:< PredefModule.tpe) && (assertion.toString matches "assert|assume|require") => 
             
@@ -2677,6 +2671,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             popDefinitions()
             //println(vals)
 
+          /// Attempt to verify collection indices are correct
           //case pos @ Apply(Select(Ident(seq), apply), List(indexExpr)) 
           case pos @ Apply(Select(seq, apply), List(indexExpr)) if methodImplements(pos.symbol, SeqLikeApply) =>
             //println(seq.toString)
@@ -2711,6 +2706,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                   for(Return(ret) <- b) return true
                   false
                 }
+                /// Unnecessary use of return keyword
                 if(otherReturns) warn(last, "Scala has implicit return, you don't need a return statement at the end of a method")
                 ret
               case a => 
@@ -2719,6 +2715,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             //defModels = backupDefModels
 
+            /// Method always returns the same value
             if(returnCount(block) == 0 && throwsCount(block) == 0) {//ADD: can be made better - if sentences are easy to model
               val retVal = computeExpr(returnVal)
               if(retVal.isValue || (retVal.isSeq && retVal.size > 0)) {
@@ -2739,7 +2736,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               popDefinitions()
             }
 
-          /// Invalid regex
+          /// Invalid regex (runtime exception)
           case Apply(java_util_regex_Pattern_compile, List(regExpr)) if java_util_regex_Pattern_compile.toString == "java.util.regex.Pattern.compile" =>
             treePosHolder = regExpr
             StringAttrs(regExpr).exactValue.foreach(checkRegex)
@@ -2757,7 +2754,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             treePosHolder = regExpr
             StringAttrs(regExpr).exactValue.foreach(checkRegex)
             
-          ///Checking the .size (there's a separate warning about using .size)
+          /// Checks conditions that use Option.size (there is a separate check for all uses of Option.size)
           //ADD: Generalize... move to applyCond completely, make it less hacky
           case t @ Apply(Select(Select(Apply(option2Iterable, List(opt)), size), op), List(expr))
             if (option2Iterable.toString contains "Option.option2Iterable") && size.toString == "size" && t.tpe.widen <:< BooleanClass.tpe =>

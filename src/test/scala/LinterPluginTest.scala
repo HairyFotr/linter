@@ -569,11 +569,9 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     
     should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b startsWith "bc") "" """)("This startsWith will always return true")
     should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b startsWith "bcd") "" """)("This startsWith will always return true")
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b startsWith "bcdc") "" """)("This startsWith will always return false")
 
     should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b endsWith "de") "" """)("This endsWith will always return true")
     should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b endsWith "cde") "" """)("This endsWith will always return true")
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b endsWith "ecde") "" """)("This endsWith will always return false")
 
     should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b.reverse endsWith "cb") "" """)("This endsWith will always return true")
     should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b.toUpperCase endsWith "DE") "" """)("This endsWith will always return true")
@@ -1220,7 +1218,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   
   @Test
   def possibleBugs__sameThingTwice() {
-    implicit val msg = "You're doing the exact same thing twice."
+    implicit val msg = "You're doing the exact same thing twice"
     
     should("""
       val a = 5
@@ -1622,6 +1620,9 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should(defs+"""for(i <- 1 to 10) { 1/(i-1)  }""")("""You will likely divide by zero here.""")
     should(defs+"""{ val a = List(1,2,3); for(i <- 1 to 10) { println(a(i)) } }""")("""You will likely use a too large index for a collection here.""")
     should(defs+"""for(i <- 10 to 20) { if(i.toString.length == 3) "" }""")("""This condition will never hold.""")
+    should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s contains "world") ""; """)("""This contains will always return true.""")
+    should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s startsWith "hell") ""; """)("""This startsWith will always return true.""")
+    should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s endsWith "!") ""; """)("""This endsWith will always return true.""")
     should(defs+"""str.replaceAll("?", ".")""")("""Regex pattern syntax error: Dangling meta character '?'""")
     should(defs+"""math.log(1d + a)""")("""Use math.log1p(x) instead of math.log(1 + x) for added accuracy when x is near 0""")
     should(defs+"""BigDecimal(0.555555555555555555555555555)""")("""Possible loss of precision - use a string constant""")

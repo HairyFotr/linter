@@ -82,7 +82,7 @@ You can also check the [test code](https://github.com/HairyFotr/linter/blob/mast
                   a match { case true => 0 case false => 1 }
                     ^
 
-### Integer intepretation (mostly only on known values)
+### Integer checks (some abstract intepretation)
 #### Check conditions
     scala> for(i <- 10 to 20) { if(i > 20) "" }
     <console>:8: warning: This condition will never hold.
@@ -99,12 +99,20 @@ You can also check the [test code](https://github.com/HairyFotr/linter/blob/mast
                   { val a = List(1,2,3); for(i <- 1 to 10) { println(a(i)) } }
                                                                       ^
 
-### String checks
+### String checks (some abstract intepretation)
 #### Attempt to verify string length conditions
     scala> for(i <- 10 to 20) { if(i.toString.length == 3) "" }
     <console>:8: warning: This condition will never hold.
                   for(i <- 10 to 20) { if(i.toString.length == 3) "" }
                                                             ^
+#### Attempt to track the prefix, suffix, and pieces
+    scala> { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(a contains "world") ""; if(a startsWith "hell") "" }
+    <console>:8: warning: This contains will always return true.
+                  { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(a contains "world") ""; if(a startsWith "hell") "" }
+                                                                                                                     ^
+    <console>:8: warning: This startsWith will always return true.
+                  { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(a contains "world") ""; if(a startsWith "hell") "" }
+                                                                                                                                                  ^
 
 #### Regex syntax warnings
     scala> str.replaceAll("?", ".")
@@ -199,5 +207,5 @@ Rule lists from other static analysis tools for inspiration:
  
 ### Some resources
 * A quick overview of writing compiler plugins: http://www.scala-lang.org/node/140
-* Yuvi Masory's notes and compiler plugin from a while ago: https://github.com/ymasory/alacs/blob/master/dev/resources.md
+* Notes and a similar compiler plugin from a while ago: https://github.com/ymasory/alacs/blob/master/dev/resources.md
 
