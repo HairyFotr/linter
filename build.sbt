@@ -4,10 +4,10 @@ libraryDependencies <++= (scalaVersion) { (scalaVersion) =>
   Seq(
     "org.scala-lang"           % "scala-compiler"  % scalaVersion,
     if (scalaVersion startsWith "2.9")
-      "org.specs2"  % "specs2_2.9.2"     % "1.12.3"  % "test" else
-      "org.specs2"  % "specs2_2.10"     % "1.13"  % "test",
-    "junit"                    % "junit"           % "4.8.2"  % "test",
-    "com.novocode"             % "junit-interface" % "0.7"    % "test"
+      "org.specs2"  % "specs2_2.9.3"     % "1.12.4.1"  % "test" else
+      "org.specs2"  % "specs2_2.10"     % "2.2"  % "test",
+    "junit"                    % "junit"           % "4.11"  % "test",
+    "com.novocode"             % "junit-interface" % "0.10"    % "test"
   )
 }
 
