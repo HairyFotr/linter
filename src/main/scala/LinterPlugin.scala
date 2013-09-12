@@ -2360,21 +2360,23 @@ class LinterPlugin(val global: Global) extends Plugin {
           suffix = exactValue.get
           knownPieces = Set[String]()
         }
+        //println(this)
 
-        def contains(s: StringAttrs): Option[Boolean] = s.exactValue.map(contains).getOrElse(None)
+        def contains(s: StringAttrs): Option[Boolean] = s.exactValue.map(contains).getOrElse(if(s.getMinLength > this.getMaxLength) Some(false) else None)
         def contains(s: String): Option[Boolean] = {
           val alwaysContains = 
             (if(exactValue.isDefined) 
               (exactValue.get contains s)
             else 
               (prefix contains s) || (suffix contains s) ||
-              (knownPieces exists { a => a contains s }))
+              (knownPieces exists { _ contains s }))
           val neverContains = 
             (if(exactValue.isDefined) 
               !(exactValue.get contains s)
             else 
-              !(prefix contains s) && !(suffix contains s) &&
-              (s.length == getMaxLength && (!s.startsWith(this.prefix) || !s.endsWith(this.suffix))))
+              (s.length > getMaxLength) ||
+              (!(prefix contains s) && !(suffix contains s) &&
+              (s.length == getMaxLength && (!s.startsWith(this.prefix) || !s.endsWith(this.suffix)))))
 
           if(alwaysContains) Some(true) else if(neverContains) Some(false) else None
         }
@@ -2467,7 +2469,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.trim.length,
             prefix = if(this.exactValue.isDefined) this.exactValue.get + s else this.prefix,
             suffix = this.suffix + s,
-            knownPieces = this.knownPieces ++ Set(this.prefix, this.suffix, s, this.suffix+s))
+            knownPieces = this.knownPieces ++ Set(this.suffix+s))
 
         def +(s: StringAttrs): StringAttrs = 
           new StringAttrs(
@@ -2478,7 +2480,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue || s.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.getTrimmedMaxLength,
             prefix = if(this.exactValue.isDefined) this.exactValue.get + s.prefix else this.prefix,
             suffix = if(s.exactValue.isDefined) this.suffix + s.suffix else s.suffix,
-            knownPieces = this.knownPieces ++ s.knownPieces ++ Set(this.prefix, this.suffix, s.prefix, s.suffix, this.suffix+this.prefix))
+            knownPieces = this.knownPieces ++ s.knownPieces ++ Set(this.suffix+s.prefix))
 
         /// String multiplication with value <= 0 warning
         def *(n: Values): StringAttrs = {
@@ -2613,6 +2615,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               val str = StringAttrs(expr).addName(valName.toString)//StringAttrs.toStringAttrs(expr)
               //println("str1: "+str)
               if(str.exactValue.isDefined || str.getMinLength > 0) {
+                //println(str)
                 stringVals += str
               }
               //println("stringVals1: "+stringVals)
