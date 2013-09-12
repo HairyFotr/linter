@@ -22,18 +22,15 @@ import collection.mutable
 object Utils {
   val nowarnPositions = mutable.HashSet[Global#Position]()
   
-  def warn(pos: Global#Position, msg: String)(implicit unit: Global#CompilationUnit) {
-    val line = pos.lineContent
-    if((line matches ".*// *nolint *") || (nowarnPositions contains pos)) {
+  def warn(tree: Global#Tree, msg: String, filters: List[String] = Nil)(implicit unit: Global#CompilationUnit) {
+    val line = tree.pos.lineContent
+    if((line matches ".*// *nolint *") || (filters exists { line contains _ }) || (nowarnPositions contains tree.pos)) {
       // skip
     } else {
       // scalastyle:off regex
-      unit.warning(pos, msg)
+      unit.warning(tree.pos, msg)
       // scalastyle:on regex
     }
-  }
-  def warn(tree: Global#Tree, msg: String)(implicit unit: Global#CompilationUnit) {
-    warn(tree.pos, msg)
   }
 }
 

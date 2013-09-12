@@ -56,7 +56,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           //println((sealedTraits, usedTraits))
           for(unusedTrait <- sealedTraits.filterNot(st => usedTraits.exists(_.toString == st._1.toString))) {
             //TODO: It might still be used in some type-signature somewhere... see scalaz
-            warn(unusedTrait._2.pos, "This sealed trait is never extended.")(unit)
+            warn(unusedTrait._2, "This sealed trait is never extended.")(unit)
           }
         }
       }
@@ -626,7 +626,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               }
 
               if(pastCases exists { p => correspondsWildcardStructure(p, c) })
-                warn(c.pos, "Identical case detected above - this will never match.")
+                warn(c, "Identical case detected above - this will never match.")
               else
                 pastCases += c
             }
@@ -1074,6 +1074,16 @@ class LinterPlugin(val global: Global) extends Plugin {
               (filter is "filter") && (isDefined is "isDefined") && (map is "map") && (get is "get")) =>
 
             warn(tree, "Use col.flatten instead of col.filter(_.isDefined).map(_.get)")
+
+          /// use partial function directly - temporary variable is unnecessary (idea by yzgw)
+          case Apply(_, List(Function(List(ValDef(mods, x_1, TypeTree(), EmptyTree)), Match(x_1_, _))))
+            if ((x_1 is "x$1") && (x_1_ is "x$1") && (mods.isSynthetic) && (mods.isParameter))   // _ match { ... }
+            || ((x_1.toString == x_1_.toString) && !(mods.isSynthetic) && (mods.isParameter)) => // x match { ... }
+            
+            val param = if(x_1 is "x$1") "_" else x_1.toString
+            
+            //TODO: also detects for(x <- col) x match { ... } ... current workaround with filter has false negatives
+            warn(tree, "You can pass the partial function in directly. (Remove \""+param+" match {\")", filters = List("for", "<-"))
 
           case _ => 
             //if(tree.toString contains "...") println(showRaw(tree))

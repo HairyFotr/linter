@@ -1663,6 +1663,15 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should("""val a = List[Option[String]](Some("a"), None, Some("b")); a.filter(_.isDefined).map(_.get)""")("Use col.flatten instead of col.filter(_.isDefined).map(_.get)")
   }
 
+  @Test
+  def style__partialfunction() {
+    implicit val msg = "You can pass the partial function in directly"
+    should("""List(Some(1), None) map { _ match { case Some(x) => x; case None => 10 }}""")
+    should("""List(Some(1), None) map { item => item match { case Some(x) => x; case None => 10 }}""")
+    shouldnt("""List(Some(1), None) map { case Some(x) => x; case None => 10 }""")
+    shouldnt("""for(a <- List(Some(1), None)) a match { case Some(x) => x; case None => 10 }""")
+  }
+
   //stuff that doesn't work and I don't know why
   @Test 
   def broken() {
