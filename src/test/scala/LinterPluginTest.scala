@@ -585,6 +585,16 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b contains "dcde") "" """)("This contains will always return true")
     shouldnt("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b contains "cdef") "" """)("This contains will always return true")
     shouldnt("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b endsWith "cdefgh") "" """)("This endsWith will always return true")
+
+    should("""val b = "bcd"; if(b == "bcd") "" """)("This equals will always return true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b == "bcdcdefg") "" """)("This equals will always return false")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b == "cdcdefgh") "" """)("This equals will always return false")
+    should("""val b = "bcd"+util.Random.nextInt; if(b == "bcd") "" """)("This equals will always return false")
+    shouldnt("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b == "bcdcdefgh") "" """)("This equals will always return true")
+
+    should("""val b = "bcd"; if(b != "bcd") "" """)("This not equals will always return false")
+    should("""val b = "bcd"; if(b != "bcde") "" """)("This not equals will always return true")
+    should("""val b = "bcd"+util.Random.nextInt; if(b != "bcd") "" """)("This not equals will always return true")
   }
   
   def abs_interpretation__Option() {

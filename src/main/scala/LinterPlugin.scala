@@ -1080,7 +1080,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             if ((x_1 is "x$1") && (x_1_ is "x$1") && (mods.isSynthetic) && (mods.isParameter))   // _ match { ... }
             || ((x_1.toString == x_1_.toString) && !(mods.isSynthetic) && (mods.isParameter)) => // x match { ... }
             
-            val param = if(x_1 is "x$1") "_" else x_1.toString
+            val param = if(x_1 is "x$1") "_" else x_1.toString + " => " + x_1.toString
             
             //TODO: also detects for(x <- col) x match { ... } ... current workaround with filter has false negatives
             warn(tree, "You can pass the partial function in directly. (Remove \""+param+" match {\")", filters = List("for", "<-"))
@@ -2201,20 +2201,20 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             // str.func(String)
             /// Try to verify String contains, startsWith, endsWith
-            case func @ ("contains"|"startsWith"|"endsWith"|"compare"|"compareTo") =>
+            case func @ ("contains"|"startsWith"|"endsWith"|"equals"|"$eq$eq"|"$bang$eq") =>
               val result = func match {
-                case "contains" => (str contains stringParam)
+                case "contains"   => (str contains stringParam)
                 case "startsWith" => (str startsWith stringParam)
                 case "endsWith"   => (str endsWith stringParam)
-                //case "compare"    => warn(params.head, "This compare will always return "+string.compare(param)+".")
-                //case "compareTo"  => warn(params.head, "This compareTo will always return "+string.compareTo(param)+".")
+                case "equals"|"$eq$eq" => (str equals stringParam)
+                case "$bang$eq" => (str nequals stringParam)
                 case _ => None
               }
-              if(result.isDefined) warn(params.head, "This "+func+" will always return "+result.get+".")
+              val function = if(func == "$eq$eq") "equals" else if(func == "$bang$eq") "not equals" else func
+              if(result.isDefined) warn(params.head, "This "+function+" will always return "+result.get+".")
               
               Left(empty)
               
-            
             //str.func(String, String)
             case f @ ("replaceAll") if stringParams.size == 2 && stringParams.forall(_.exactValue.isDefined) =>
               val (p0,p1) = (stringParams(0).exactValue.get, stringParams(1).exactValue.get)
@@ -2372,30 +2372,56 @@ class LinterPlugin(val global: Global) extends Plugin {
         }
         //println(this)
 
-        def contains(s: StringAttrs): Option[Boolean] = s.exactValue.map(contains).getOrElse(if(s.getMinLength > this.getMaxLength) Some(false) else None)
-        def contains(s: String): Option[Boolean] = {
-          val alwaysContains = 
-            (if(exactValue.isDefined) 
-              (exactValue.get contains s)
-            else 
-              (prefix contains s) || (suffix contains s) ||
-              (knownPieces exists { _ contains s }))
-          val neverContains = 
-            (if(exactValue.isDefined) 
-              !(exactValue.get contains s)
-            else 
-              (s.length > getMaxLength) ||
-              (!(prefix contains s) && !(suffix contains s) &&
-              (s.length == getMaxLength && (!s.startsWith(this.prefix) || !s.endsWith(this.suffix)))))
-
-          if(alwaysContains) Some(true) else if(neverContains) Some(false) else None
+        def equals(s: StringAttrs): Option[Boolean] = 
+          if(s.getMinLength > this.getMaxLength || this.getMinLength > s.getMaxLength) Some(false)
+          else if(s.exactValue.isDefined) this.equals(s.exactValue.get)
+          else if(this.exactValue.isDefined) s.equals(this.exactValue.get)
+          else None
+        def equals(s: String): Option[Boolean] = {
+          if(exactValue.isDefined) {
+            Some(exactValue.get == s)
+          } else {
+            if((s.length < getMinLength)
+            || (s.length > getMaxLength)
+            || !(s startsWith prefix)
+            || !(s endsWith suffix)
+            || !(knownPieces forall { s contains _ }))
+              Some(false)
+            else
+              None
+          }
         }
 
-        def startsWith(s: StringAttrs): Option[Boolean] = s.exactValue.map(startsWith).getOrElse(None)
-        def startsWith(s: String): Option[Boolean] = if(prefix.isEmpty || s.size > prefix.size) None else Some(prefix startsWith s)
+        def nequals(s: StringAttrs): Option[Boolean] = equals(s).map(equal => !equal)
+        def nequals(s: String): Option[Boolean] = equals(s).map(equal => !equal)
 
-        def endsWith(s: StringAttrs): Option[Boolean] = s.exactValue.map(endsWith).getOrElse(None)
-        def endsWith(s: String): Option[Boolean] = if(suffix.isEmpty || s.size > suffix.size) None else Some(suffix endsWith s)
+        def contains(s: StringAttrs): Option[Boolean] =
+          if(s.getMinLength > getMaxLength) Some(false)
+          else if(s.exactValue.isDefined) this.contains(s.exactValue.get)
+          else None
+        def contains(s: String): Option[Boolean] =
+          if(exactValue.isDefined) Some(exactValue.get contains s)
+          else if((prefix contains s) || (suffix contains s) || (knownPieces exists { _ contains s })) Some(true)
+          else if(s.length > getMaxLength) Some(false)
+          else None
+
+        def startsWith(s: StringAttrs): Option[Boolean] = 
+          if(s.getMinLength > getMaxLength) Some(false)
+          else if(s.exactValue.isDefined) this.startsWith(s.exactValue.get)
+          else None
+        def startsWith(s: String): Option[Boolean] = 
+          if(s.length > getMaxLength) Some(false)
+          else if(prefix.isEmpty || s.length > prefix.length) None 
+          else Some(prefix startsWith s)
+
+        def endsWith(s: StringAttrs): Option[Boolean] = 
+          if(s.getMinLength > getMaxLength) Some(false)
+          else if(s.exactValue.isDefined) this.endsWith(s.exactValue.get)
+          else None
+        def endsWith(s: String): Option[Boolean] = 
+          if(s.length > getMaxLength) Some(false)
+          else if(suffix.isEmpty || s.length > suffix.length) None
+          else Some(suffix endsWith s)
 
         def capitalize: StringAttrs = 
           new StringAttrs(
@@ -2474,23 +2500,29 @@ class LinterPlugin(val global: Global) extends Plugin {
           new StringAttrs(
             exactValue = if(this.exactValue.isDefined) Some(this.exactValue.get + s) else None,
             minLength = this.getMinLength + s.length,
-            trimmedMinLength = this.getTrimmedMinLength + s.trim.length, //ADD: can be made more exact
+            trimmedMinLength = this.getTrimmedMinLength + s.trim.length, //TODO: can be made more exact
             maxLength = if(this.maxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength + s.length,
-            trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.trim.length,
+            trimmedMaxLength = 
+              if(this.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue 
+              //else if(this.exactValue.isDefined) (this.exactValue.get + s).trim.size // This case is covered in getTrimmedMaxLength if exactValue is known
+              else this.getMaxLength + s.length,
             prefix = if(this.exactValue.isDefined) this.exactValue.get + s else this.prefix,
             suffix = this.suffix + s,
-            knownPieces = this.knownPieces ++ Set(this.suffix+s))
+            knownPieces = this.knownPieces)
 
         def +(s: StringAttrs): StringAttrs = 
           new StringAttrs(
             exactValue = if(this.exactValue.isDefined && s.exactValue.isDefined) Some(this.exactValue.get + s.exactValue.get) else None,
             minLength = this.getMinLength + s.getMinLength,
-            trimmedMinLength = this.getTrimmedMinLength + s.getTrimmedMinLength, //ADD: can be made more exact
+            trimmedMinLength = this.getTrimmedMinLength + s.getTrimmedMinLength, //TODO: can be made more exact
             maxLength = if(this.getMaxLength == Int.MaxValue || s.getMaxLength == Int.MaxValue) Int.MaxValue else this.getMaxLength + s.getMaxLength,
-            trimmedMaxLength = if(this.getTrimmedMaxLength == Int.MaxValue || s.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue else this.getTrimmedMaxLength + s.getTrimmedMaxLength,
+            trimmedMaxLength = 
+              if(this.getTrimmedMaxLength == Int.MaxValue || s.getTrimmedMaxLength == Int.MaxValue) Int.MaxValue 
+              //else if(this.isDefined && s.isDefined) (this.exactValue.get + s.exactValue.get).trim.size // This case is covered in getTrimmedMaxLength if exactValue is known
+              else this.getMaxLength + s.getMaxLength,
             prefix = if(this.exactValue.isDefined) this.exactValue.get + s.prefix else this.prefix,
             suffix = if(s.exactValue.isDefined) this.suffix + s.suffix else s.suffix,
-            knownPieces = this.knownPieces ++ s.knownPieces ++ Set(this.suffix+s.prefix))
+            knownPieces = this.knownPieces ++ s.knownPieces + (this.suffix + s.prefix))
 
         /// String multiplication with value <= 0 warning
         def *(n: Values): StringAttrs = {
