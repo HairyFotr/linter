@@ -20,11 +20,21 @@ import scala.tools.nsc.Global
 import collection.mutable
 
 object Utils {
+  var disabledWarningNames: Seq[String] = Nil
   val nowarnPositions = mutable.HashSet[Global#Position]()
   
-  def warn(tree: Global#Tree, msg: String, filters: List[String] = Nil)(implicit unit: Global#CompilationUnit) {
+  def warn(tree: Global#Tree, warning: Warning)(implicit unit: Global#CompilationUnit) { 
+    if (!disabledWarningNames.contains(warning.name)) warn(tree, warning.message)(unit)
+  }
+
+  def warn(tree: Global#Tree, msg: String, filters: List[String])(implicit unit: Global#CompilationUnit) { 
     val line = tree.pos.lineContent
-    if((line matches ".*// *nolint *") || (filters exists { line contains _ }) || (nowarnPositions contains tree.pos)) {
+    if (filters forall(!line.contains(_))) warn(tree, msg)(unit)
+  }
+
+  def warn(tree: Global#Tree, msg: String)(implicit unit: Global#CompilationUnit) { 
+    val line = tree.pos.lineContent
+    if((line matches ".*// *nolint *") || (nowarnPositions contains tree.pos)) {
       // skip
     } else {
       // scalastyle:off regex
