@@ -204,8 +204,12 @@ Rule lists from other static analysis tools for inspiration:
 * CodeNarc(Groovy) - http://codenarc.sourceforge.net/codenarc-rule-index.html
 * PVS-Studio(C++) - http://www.viva64.com/en/d/
 * Coverity(C++) - http://www.slideshare.net/Coverity/static-analysis-primer-22874326 (6,7)
+* CppCheck(C++) - http://sourceforge.net/apps/mediawiki/cppcheck/index.php?title=Main_Page#Checks
  
 ### Some resources
 * A quick overview of writing compiler plugins: http://www.scala-lang.org/node/140
+* Basic tree example, and list of AST elements: http://stackoverflow.com/q/10419101/293115
+* Notes on compiler plugins from ScalaCL: http://code.google.com/p/scalacl/wiki/WritingScalaCompilerPlugins
 * Notes and a similar compiler plugin from a while ago: https://github.com/ymasory/alacs/blob/master/dev/resources.md
+* Great article about practical static analysis from Coverity authors: http://cacm.acm.org/magazines/2010/2/69354-a-few-billion-lines-of-code-later/fulltext
 

@@ -895,7 +895,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             warn(tree, "Use Option(...), which automatically wraps null to None")
           
-          /// Comparing Option to None instead of useing isDefined (disabled)
+          /// Comparing Option to None instead of using isDefined (disabled)
           /*case Apply(Select(opt, op), List(scala_None)) if (op == nme.EQ || op == nme.NE) && (scala_None is "scala.None") =>
             warn(tree, "Use .isDefined instead of comparing to None")*/
 
