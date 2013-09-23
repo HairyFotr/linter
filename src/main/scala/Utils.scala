@@ -24,21 +24,11 @@ object Utils {
   val nowarnPositions = mutable.HashSet[Global#Position]()
   
   def warn(tree: Global#Tree, warning: Warning)(implicit unit: Global#CompilationUnit) { 
-    if (!disabledWarningNames.contains(warning.name)) warn(tree, warning.message)(unit)
-  }
-
-  def warn(tree: Global#Tree, msg: String, filters: List[String])(implicit unit: Global#CompilationUnit) { 
-    val line = tree.pos.lineContent
-    if (filters forall(!line.contains(_))) warn(tree, msg)(unit)
-  }
-
-  def warn(tree: Global#Tree, msg: String)(implicit unit: Global#CompilationUnit) { 
-    val line = tree.pos.lineContent
-    if((line matches ".*// *nolint *") || (nowarnPositions contains tree.pos)) {
+    if (disabledWarningNames.contains(warning.name) || (tree.pos.lineContent matches ".*// *nolint *") || (nowarnPositions contains tree.pos)) {
       // skip
     } else {
       // scalastyle:off regex
-      unit.warning(tree.pos, msg)
+      unit.warning(tree.pos, warning.message)
       // scalastyle:on regex
     }
   }

@@ -71,17 +71,17 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   // A few hacks to scrap the boilerplate and better pinpoint the failing test
   def should(code: String, nt: Boolean = false)(implicit expectedMsg: String) {
-    (expectedMsg, compiler.compileAndLint(code)) must beLike {
+    val nonUnitResult = (expectedMsg, compiler.compileAndLint(code)) must beLike {
       case (expected, actual) if (nt ^ actual.contains(expected)) => ok
       case _ => ko("in "+(if(nt) "negative case" else "positive case")+":\n" + code + "\n ")
     }
   }
   def shouldnt(code: String)(implicit expectedMsg: String) { should(code, nt = true)(expectedMsg) }
-  def noWarnings(code: String) { compiler.compileAndLint(code) must be ("") }
+  def noWarnings(code: String) { val nonUnitResult = compiler.compileAndLint(code) must be ("") }
 
   @Before
   def forceCompilerInit() {
-    compiler.compileAndLint("1 + 1")
+    val nonUnitResult = compiler.compileAndLint("1 + 1")
   }
   
   @Test
