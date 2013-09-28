@@ -26,6 +26,7 @@ import collection.mutable
 // * have longer tests, that maybe trigger several checks
 // * if it's worth it, error msgs could come from outside
 // * handle/test plugin settings (when settings are done)
+// * detect the non-compiling tests (they currently pass)
 
 class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   class Compiler {
@@ -521,7 +522,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should(""" val r = "a a".init.tail.trim; if(r.nonEmpty) "foo" """)
     should(""" val r = "a a".capitalize.reverse.init.tail.trim; if(r.nonEmpty) "foo" """)
     should(""" val r = "    ".distinct.tail; if(r.nonEmpty) "foo" """)
-    shouldnt(""" val r =should "a    b".distinct.tail; if(r.nonEmpty) "foo" """)
+    shouldnt(""" val r = "a    b".distinct.tail; if(r.nonEmpty) "foo" """)
     should(""" val a = " ".trim; if(a.isEmpty) "foo" """)
     shouldnt(""" val a = " "; if(a.isEmpty) "foo" """)
     should(""" val a = "   ".substring(2,2); if(a.isEmpty) "foo" """)
