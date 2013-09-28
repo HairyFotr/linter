@@ -104,7 +104,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def contains__types() {
-    implicit val msg = ") will probably return false."
+    implicit val msg = "will probably return false"
 
     should("""val x = List(4); x.contains("foo")""")
 
@@ -264,7 +264,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   
   @Test
   def case__unreachable() {
-    implicit val msg = "Identical case detected above - this will never match."
+    implicit val msg = "Identical case condition detected above. This case will never match."
     
     should("""val a = 5; a match { case a if a == 5 => "f" case a if a == 5 => "d" }""")
     shouldnt("""val a = 5; a match { case a if a == 6 => "f" case a if a == 5 => "d" }""")
@@ -521,12 +521,12 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should(""" val r = "a a".init.tail.trim; if(r.nonEmpty) "foo" """)
     should(""" val r = "a a".capitalize.reverse.init.tail.trim; if(r.nonEmpty) "foo" """)
     should(""" val r = "    ".distinct.tail; if(r.nonEmpty) "foo" """)
-    shouldnt(""" val r = "a    b".distinct.tail; if(r.nonEmpty) "foo" """)
+    shouldnt(""" val r =should "a    b".distinct.tail; if(r.nonEmpty) "foo" """)
     should(""" val a = " ".trim; if(a.isEmpty) "foo" """)
     shouldnt(""" val a = " "; if(a.isEmpty) "foo" """)
     should(""" val a = "   ".substring(2,2); if(a.isEmpty) "foo" """)
     
-    msg = "return true"
+    msg = "always returns the same value: true"
     should(""""fszd".startsWith("f")""")
     shouldnt(""""fszd".startsWith("a")""")
     should(""""fszd".endsWith("zd")""")
@@ -534,14 +534,14 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should(""""fszd".reverse.endsWith("sf")""")
     should(""""abcd".substring(2,4).endsWith("cd")""")
 
-    msg = "return false"
+    msg = "always returns the same value: false"
     shouldnt(""""fszd".startsWith("f")""")
     should(""""fszd".startsWith("a")""")
     shouldnt(""""fszd".endsWith("zd")""")
     should(""""fszd".endsWith("a")""")
     shouldnt(""""fszd".reverse.endsWith("sf")""")
 
-    msg = "IndexOutOfBoundsException"
+    msg = "You will likely use a out of bounds index."
     should(""""abcd".substring(2,77).endsWith("cd")""")
     should(""""abcd".substring(2,1).endsWith("cd")""")
     should(""" val a = "abcd"; val b = a.substring(2,2).tail """)("Taking the tail of an empty string.")
@@ -562,39 +562,39 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     //shouldnt(""" val a = 3; "dfd"*(a) """)
     
     // prefix/suffix tests
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b contains "bcd") """"")("This contains will always return true")
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b contains "cde") """"")("This contains will always return true")
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b contains "cde") """"")("This contains will always return true")
-    should("""val b = "abc"; if(b contains "abcd") """"")("This contains will always return false")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b contains "bcd") """"")("This contains always returns the same value: true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b contains "cde") """"")("This contains always returns the same value: true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b contains "cde") """"")("This contains always returns the same value: true")
+    should("""val b = "abc"; if(b contains "abcd") """"")("This contains always returns the same value: false")
     
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b startsWith "bc") "" """)("This startsWith will always return true")
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b startsWith "bcd") "" """)("This startsWith will always return true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b startsWith "bc") "" """)("This startsWith always returns the same value: true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b startsWith "bcd") "" """)("This startsWith always returns the same value: true")
 
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b endsWith "de") "" """)("This endsWith will always return true")
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b endsWith "cde") "" """)("This endsWith will always return true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b endsWith "de") "" """)("This endsWith always returns the same value: true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b endsWith "cde") "" """)("This endsWith always returns the same value: true")
 
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b.reverse endsWith "cb") "" """)("This endsWith will always return true")
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b.toUpperCase endsWith "DE") "" """)("This endsWith will always return true")
-    should("""val b = "bcd"+util.Random.nextString(6)+"CDE"; if(b.toLowerCase endsWith "de") "" """)("This endsWith will always return true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b.reverse endsWith "cb") "" """)("This endsWith always returns the same value: true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b.toUpperCase endsWith "DE") "" """)("This endsWith always returns the same value: true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"CDE"; if(b.toLowerCase endsWith "de") "" """)("This endsWith always returns the same value: true")
 
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b startsWith "bcd") "" """)("This startsWith will always return true")
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b contains "cde") "" """)("This contains will always return true")
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b endsWith "fgh") "" """)("This endsWith will always return true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b startsWith "bcd") "" """)("This startsWith always returns the same value: true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b contains "cde") "" """)("This contains always returns the same value: true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b endsWith "fgh") "" """)("This endsWith always returns the same value: true")
 
-    shouldnt("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b startsWith "bcdcde") "" """)("This startsWith will always return true")
-    shouldnt("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b contains "dcde") "" """)("This contains will always return true")
-    shouldnt("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b contains "cdef") "" """)("This contains will always return true")
-    shouldnt("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b endsWith "cdefgh") "" """)("This endsWith will always return true")
+    shouldnt("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b startsWith "bcdcde") "" """)("This startsWith always returns the same value: true")
+    shouldnt("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b contains "dcde") "" """)("This contains always returns the same value: true")
+    shouldnt("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b contains "cdef") "" """)("This contains always returns the same value: true")
+    shouldnt("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b endsWith "cdefgh") "" """)("This endsWith always returns the same value: true")
 
-    should("""val b = "bcd"; if(b == "bcd") "" """)("This equals will always return true")
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b == "bcdcdefg") "" """)("This equals will always return false")
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b == "cdcdefgh") "" """)("This equals will always return false")
-    should("""val b = "bcd"+util.Random.nextInt; if(b == "bcd") "" """)("This equals will always return false")
-    shouldnt("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b == "bcdcdefgh") "" """)("This equals will always return true")
+    should("""val b = "bcd"; if(b == "bcd") "" """)("This equals always returns the same value: true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b == "bcdcdefg") "" """)("This equals always returns the same value: false")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b == "cdcdefgh") "" """)("This equals always returns the same value: false")
+    should("""val b = "bcd"+util.Random.nextInt; if(b == "bcd") "" """)("This equals always returns the same value: false")
+    shouldnt("""val b = "bcd"+util.Random.nextString(6)+"cde"+util.Random.nextString(6)+"fgh"; if(b == "bcdcdefgh") "" """)("This equals always returns the same value: true")
 
-    should("""val b = "bcd"; if(b != "bcd") "" """)("This not equals will always return false")
-    should("""val b = "bcd"; if(b != "bcde") "" """)("This not equals will always return true")
-    should("""val b = "bcd"+util.Random.nextInt; if(b != "bcd") "" """)("This not equals will always return true")
+    should("""val b = "bcd"; if(b != "bcd") "" """)("This not equals always returns the same value: false")
+    should("""val b = "bcd"; if(b != "bcde") "" """)("This not equals always returns the same value: true")
+    should("""val b = "bcd"+util.Random.nextInt; if(b != "bcd") "" """)("This not equals always returns the same value: true")
   }
   
   def abs_interpretation__Option() {
@@ -888,7 +888,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def probableBugs__sameElseIfCondition() {
-    implicit val msg = "This condition has appeared earlier in the if-else chain, and will never hold here."
+    implicit val msg = "This condition has appeared earlier in the if-else chain and will never hold here."
 
     should("""
       var a = "b"+util.Random.nextInt
@@ -1583,7 +1583,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def list__isEmpty() {
-    implicit val msg = "instead of comparing to size"//slow for lists, etc
+    implicit val msg = "instead of comparing to list.size"//slow for lists, etc
     
     should(""" val a = List(1,2,3); if(a.size > 0) "" """)
     should(""" val a = List(1,2,3); if(a.size == 0) "" """)
@@ -1629,31 +1629,29 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       
     """
   
-    should(defs+"""if(a == 10 || b == 10) 0 else if(a == 20 && b == 10) 1 else 2""")("""This condition has appeared earlier in the if-else chain, and will never hold here.""")
+    should(defs+"""if(a == 10 || b == 10) 0 else if(a == 20 && b == 10) 1 else 2""")("""This condition has appeared earlier in the if-else chain and will never hold here.""")
     should(defs+"""if(b > 4) (2,a) else (2,a)""")("""If statement branches have the same structure.""")
     should(defs+"""if(a == b) true else false""")("""Remove the if and just use the condition.""")
-    should(defs+"""(x,y) match { case (a,5) if a > 5 => 0 case (c,5) if c > 5 => 1 }""")("""Identical case detected above - this will never match.""")
-    should(defs+"""a match { case 3 => "hello" case 4 => "hello" case 5 => "hello" case _ => "how low" }""")("""3 neighbouring cases are identical, and could be merged.""")
+    should(defs+"""(x,y) match { case (a,5) if a > 5 => 0 case (c,5) if c > 5 => 1 }""")("""Identical case condition detected above. This case will never match.""")
+    should(defs+"""a match { case 3 => "hello" case 4 => "hello" case 5 => "hello" case _ => "how low" }""")("""Bodies of 3 neighbouring cases are identical and could be merged.""")
     should(defs+"""bool match { case true => 0 case false => 1 }""")("""This is probably better written as an if statement.""")
     should(defs+"""for(i <- 10 to 20) { if(i > 20) "" }""")("""This condition will never hold.""")
     should(defs+"""for(i <- 1 to 10) { 1/(i-1)  }""")("""You will likely divide by zero here.""")
-    should(defs+"""{ val a = List(1,2,3); for(i <- 1 to 10) { println(a(i)) } }""")("""You will likely use a too large index for a collection here.""")
+    should(defs+"""{ val a = List(1,2,3); for(i <- 1 to 10) { println(a(i)) } }""")("""You will likely use a too large index.""")
     should(defs+"""for(i <- 10 to 20) { if(i.toString.length == 3) "" }""")("""This condition will never hold.""")
-    should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s contains "world") ""; """)("""This contains will always return true.""")
-    should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s startsWith "hell") ""; """)("""This startsWith will always return true.""")
-    should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s endsWith "!") ""; """)("""This endsWith will always return true.""")
+    should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s contains "world") ""; """)("""This contains always returns the same value: true""")
+    should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s startsWith "hell") ""; """)("""This startsWith always returns the same value: true""")
+    should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s endsWith "!") ""; """)("""This endsWith always returns the same value: true""")
     should(defs+"""str.replaceAll("?", ".")""")("""Regex pattern syntax error: Dangling meta character '?'""")
     should(defs+"""math.log(1d + a)""")("""Use math.log1p(x) instead of math.log(1 + x) for added accuracy when x is near 0""")
-    should(defs+"""BigDecimal(0.555555555555555555555555555)""")("""Possible loss of precision - use a string constant""")
+    should(defs+"""BigDecimal(0.555555555555555555555555555)""")("""Possible loss of precision. Use a string constant.""")
     should(defs+"""{val a = Some(List(1,2,3)); if(a.size > 3) ""}""")("""Did you mean to take the size of the collection inside the Option?""")
     should(defs+"""if(strOption.isDefined) strOption.get else """"")("""Use opt.getOrElse(...) instead of if(opt.isDefined) opt.get else ...""")
     should(defs+"""List(1,2,3,4).find(x => x % 2 == 0).isDefined""")("""Use exists(...) instead of find(...).isDefined""")
     should(defs+"""List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)""")("""Use filter(x => condition) instead of flatMap(x => if(condition) ... else ...)""")
     should(defs+"""def func(b: Int, c: String, d: String) = { println(b); b+c }""")("""Parameter d is not used in method func""")
-    //should(defs+"""List(1, 2, 3).contains("4")""")("""List[Int].contains(String) will probably return false.""")
-    //should(defs+"""Nil == None""")("""Comparing with == on instances of different types (object Nil, object None) will probably return false.""")
-    should(defs+"""List(1, 2, 3).contains("4")""")(""" will probably return false.""")
-    should(defs+"""Nil == None""")(""" will probably return false.""")
+    should(defs+"""List(1, 2, 3).contains("4")""")("""List[Int].contains(String) will probably return false because the collection and target element are of different types.""")
+    should(defs+"""Nil == None""")("""Comparing with == on instances of different types (scala.collection.immutable.Nil.type, None.type) will probably return false.""")
   }
   
   @Test
@@ -1701,7 +1699,7 @@ src/main/scala/AbstractInterpretation.scala:        if(this.actualSize == 0) uni
 src/main/scala/AbstractInterpretation.scala:          unit.warning(treePosHolder.pos, "Taking the "+tail_init.toString+" of an empty collection.")
 src/main/scala/AbstractInterpretation.scala:        unit.warning(treePosHolder.pos, "This condition will " + (if(this.actualSize == 0) "always" else "never") + " hold.")
 src/main/scala/AbstractInterpretation.scala:        unit.warning(treePosHolder.pos, "This condition will " + (if(this.actualSize > 0) "always" else "never") + " hold.")
-src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This contains will always return true")
+src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This contains always returns the same value: true")
 src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This contains will never return true")
 src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This max will always return the first value")
 src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This max will always return the second value")

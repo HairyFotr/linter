@@ -117,7 +117,7 @@ case object ReflexiveAssignment extends NoArgMessageWarning("Assigning a variabl
 case object CloseSourceFile extends NoArgMessageWarning("You should close the file stream after use.")
 case object JavaConverters extends NoArgMessageWarning("Implicit conversions in collection.JavaConversions are dangerous. Consider using the explicit collection.JavaConverters")
 case class ContainsTypeMismatch(seqType: String, targetType: String) extends
-  TwoArgMessageWarning("%s.contains(%s) will probably return false because the collection and target element are different types.", seqType, targetType) {
+  TwoArgMessageWarning("%s.contains(%s) will probably return false because the collection and target element are of different types.", seqType, targetType) {
   def name = "ContainsTypeMatch"
 }
 case object PatternMatchConstant extends NoArgMessageWarning("Pattern matching on a constant value.")
@@ -163,7 +163,7 @@ case object AvoidOptionStringSize extends NoArgMessageWarning("Did you mean to t
 case object AvoidOptionCollectionSize extends NoArgMessageWarning("Did you mean to take the size of the collection inside the Option?")
 case object AvoidOptionSize extends NoArgMessageWarning("Using Option.size is not recommended; use Option.isDefined instead.")
 case object DuplicateKeyInMap extends NoArgMessageWarning("This key has already been defined, and will override the previous mapping.")
-case class InefficientUseOfListSize(replacement: String) extends OneArgMessageWarning("Use %s insteaad of comparing to list.size.", replacement) {
+case class InefficientUseOfListSize(replacement: String) extends OneArgMessageWarning("Use %s instead of comparing to list.size.", replacement) {
   def name = "InefficientUseOfListSize"
 }
 case object OnceEvaluatedStatementsInBlockReturningFunction extends NoArgMessageWarning("You're passing a block that returns a function. The statements in this block, except the last one, will only be executed once.")

@@ -2769,7 +2769,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             if(returnCount(block) == 0 && throwsCount(block) == 0) {//ADD: can be made better - if sentences are easy to model
               val retVal = computeExpr(returnVal)
               if(retVal.isValue || (retVal.isSeq && retVal.size > 0)) {
-                warn(last, new InvariantReturn("emthod", retVal.getValue.toString))
+                warn(last, new InvariantReturn("method", retVal.getValue.toString))
               }
               popDefinitions()
               if(retVal.nonEmpty || retVal.conditions.nonEmpty || (retVal.isSeq && retVal.actualSize != -1)) {
