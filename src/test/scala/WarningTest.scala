@@ -96,7 +96,7 @@ class WarningTest extends JUnitMustMatchers {
 
   @Test
   def warningNamesAreUnique() {
-    val warningsWithDuplicateNames = Warning.All.toVector.groupBy(_.name).collect { case (_, warnings) if (warnings.length > 1) => warnings }
+    val warningsWithDuplicateNames = Warning.All.toList.groupBy(_.name).collect { case (_, warnings) if (warnings.length > 1) => warnings }
     warningsWithDuplicateNames.foreach(warnings => warnings.toString must beEqualTo("have duplicate names: " + warnings.head.name))
   }
 }

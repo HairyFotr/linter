@@ -1650,8 +1650,10 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should(defs+"""List(1,2,3,4).find(x => x % 2 == 0).isDefined""")("""Use exists(...) instead of find(...).isDefined""")
     should(defs+"""List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)""")("""Use filter(x => condition) instead of flatMap(x => if(condition) ... else ...)""")
     should(defs+"""def func(b: Int, c: String, d: String) = { println(b); b+c }""")("""Parameter d is not used in method func""")
-    should(defs+"""List(1, 2, 3).contains("4")""")("""List[Int].contains(String) will probably return false because the collection and target element are of different types.""")
-    should(defs+"""Nil == None""")("""Comparing with == on instances of different types (scala.collection.immutable.Nil.type, None.type) will probably return false.""")
+    //should(defs+"""List(1, 2, 3).contains("4")""")("""List[Int].contains(String) will probably return false because the collection and target element are of different types.""")
+    //should(defs+"""Nil == None""")("""Comparing with == on instances of different types (scala.collection.immutable.Nil.type, None.type) will probably return false.""")
+    should(defs+"""List(1, 2, 3).contains("4")""")("""will probably return false because the collection and target element are of different types.""")
+    should(defs+"""Nil == None""")("""Comparing with == on instances of different types""")
   }
   
   @Test
