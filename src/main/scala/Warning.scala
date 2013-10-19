@@ -151,6 +151,7 @@ case class UseConditionDirectly(negated: Boolean = false) extends OneArgMessageW
 case class UseIfExpression(varName: String) extends OneArgMessageWarning("Assign the result of the if expression to variable %s directly.", varName) {
   def name = "UseIfExpression"
 }
+case object UnnecessaryElseBranch extends NoArgMessageWarning("This else branch is unnecessary, as the then branch always returns.")
 case object DuplicateIfBranches extends NoArgMessageWarning("If statement branches have the same structure.")
 case object IdenticalIfElseCondition extends NoArgMessageWarning("This condition has appeared earlier in the if-else chain and will never hold here.")
 case object MergeNestedIfs extends NoArgMessageWarning("These two nested ifs can be merged into one.")

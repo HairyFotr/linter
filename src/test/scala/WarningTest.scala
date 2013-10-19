@@ -65,6 +65,7 @@ class WarningTest extends JUnitMustMatchers {
       case UseAbsNotSqrtSquare => 1
       case UseConditionDirectly(_) => 1
       case UseIfExpression(_) => 1
+      case UnnecessaryElseBranch => 1
       case UseExistsOnOption(_,_) => 1
       case UseExpm1 => 1
       case UseFilterNotFlatMap => 1

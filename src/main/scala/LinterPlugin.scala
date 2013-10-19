@@ -271,6 +271,11 @@ class LinterPlugin(val global: Global) extends Plugin {
         case _ =>
           None
       }
+      
+      def isReturnStatement(t: Tree): Boolean = t match {
+        case Return(_) => true
+        case _ => false
+      }
 
       override def traverse(tree: Tree) { 
         //TODO: the matchers are broken up for one reason only - Scala 2.9 pattern matcher :)
@@ -686,6 +691,8 @@ class LinterPlugin(val global: Global) extends Plugin {
           case If(cond, Assign(id1, bool1), Assign(id2, bool2))
             if (id1.toString == id2.toString) =>
             warn(cond, new UseIfExpression(id1.toString))
+          case If(cond, Block(block, ret), b @ Block(_, _)) if (block :+ ret) exists isReturnStatement => // Idea from oclint
+            warn(cond, UnnecessaryElseBranch)
           case If(cond, a, b) if (a equalsStructure b) && (a.children.nonEmpty) => 
             //TODO: empty if statement (if(...) { }) triggers this - issue warning for that case?
             //TODO: test if a single statement counts as children.nonEmpty

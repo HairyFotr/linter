@@ -95,6 +95,38 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     shouldnt("""var a = 5; if(util.Random.nextBoolean) println("foo") else a = 4""")
   }
   
+  @Test
+  def UnnecessaryElseBranch() {
+    implicit val msg = "This else branch is unnecessary, as the then branch always returns"
+    
+    should("""
+      def test(): Any = {         
+        if(util.Random.nextBoolean) { 
+          println("foo"); return 5; println("foo2"); 
+        } else {
+          println("foo3"); println("foo4"); 
+        } 
+     }""")
+    shouldnt("""
+      def test(): Any = {         
+        if(util.Random.nextBoolean) { 
+          println("foo"); println("foo2"); 
+        } else {
+          println("foo3"); return 3; println("foo4"); 
+        } 
+     }""")
+    shouldnt("""
+      def test(): Any = {         
+        if(util.Random.nextBoolean) { 
+          println("foo"); 
+          if(util.Random.nextBoolean) return 5 else println("fds")
+          println("foo2"); 
+        } else {
+          println("foo3"); println("foo4"); 
+        }
+     }""")
+  }
+  
   // ^ New tests named after their Warning.scala name ^
   // ----------------- OLD TESTS ----------------------
 
