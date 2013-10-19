@@ -23,7 +23,7 @@ Add it as a compiler plugin to your project by editing your build.sbt file:
 You can download the latest jars here:
 [Scala 2.10.2](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar?raw=true), 
 [Scala 2.9.3](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.9.3/0.1-SNAPSHOT/linter_2.9.3-0.1-SNAPSHOT.jar?raw=true),
-[Scala 2.11.0-M4](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar?raw=true) (experimental), 
+[Scala 2.11.0-M5](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar?raw=true) (experimental), 
 
     terminal:
       scalac -Xplugin:<path-to-linter-jar>.jar ...
@@ -205,6 +205,7 @@ Rule lists from other static analysis tools for inspiration:
 * PVS-Studio(C++) - http://www.viva64.com/en/d/
 * Coverity(C++) - http://www.slideshare.net/Coverity/static-analysis-primer-22874326 (6,7)
 * CppCheck(C++) - http://sourceforge.net/apps/mediawiki/cppcheck/index.php?title=Main_Page#Checks
+* OCLint (C++/ObjC) - http://docs.oclint.org/en/dev/rules/index.html
  
 ### Some resources
 * A quick overview of writing compiler plugins: http://www.scala-lang.org/node/140

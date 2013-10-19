@@ -497,6 +497,9 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should(""" val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b-1) """)("You will likely divide by zero here.")
     should(""" val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b-0) """)("You will likely divide by zero here.")
     shouldnt(""" val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b+1) """)("You will likely divide by zero here.")
+    
+    should("""for(i <- (1 to 10).map(a => a+1)) 1/(i-2)""")("You will likely divide by zero here.")
+    shouldnt("""for(i <- (1 to 10).map(a => a+2)) 1/(i-2)""")("You will likely divide by zero here.")
   }
   
   @Test
@@ -1151,15 +1154,24 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     implicit val msg = "unused value before"
     
     should("""
+      var a = BigDecimal(6)
+      a = BigDecimal(16)
+    """)
+    should("""
+      var a = BigDecimal(6)
+      println("foo")
+      a = BigDecimal(16)
+    """)
+
+    shouldnt("""
       var a = 6L
       a = 3
     """)
-    should("""
+    shouldnt("""
       var a = 6L
       println("foo")
       a = 3
     """)
-
     shouldnt("""
       var a = "A6"
       a = a.toLowerCase

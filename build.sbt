@@ -1,11 +1,11 @@
-scalaVersion := "2.10.2"
+scalaVersion := "2.10.3"
 
 libraryDependencies <++= (scalaVersion) { (scalaVersion) =>
   Seq(
     "org.scala-lang"           % "scala-compiler"  % scalaVersion,
     if (scalaVersion startsWith "2.9")
       "org.specs2"  % "specs2_2.9.3"     % "1.12.4.1"  % "test" else
-      "org.specs2"  % "specs2_2.10"     % "2.2"  % "test",
+      "org.specs2"  % "specs2_2.10"     % "2.2.3"  % "test",
     "junit"                    % "junit"           % "4.11"  % "test",
     "com.novocode"             % "junit-interface" % "0.10"    % "test"
   )
@@ -19,7 +19,7 @@ name := "linter"
 
 organization := "com.foursquare.lint"
 
-crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.9.2", "2.9.3", "2.10.2", "2.11.0-M4") }
+crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.9.2", "2.9.3", "2.10.3", "2.11.0-M5") }
 
 publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
 
