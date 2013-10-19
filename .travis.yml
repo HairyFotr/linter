@@ -3,10 +3,10 @@
    - 2.10.2
    - 2.9.2
    - 2.9.3
-   - 2.11.0-M4
+   - 2.11.0-M5
  matrix:
    allow_failures:
-     - scala: 2.11.0-M4
+     - scala: 2.11.0-M5
  jdk:
    - oraclejdk7
    - openjdk6

@@ -736,6 +736,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             /// Check for unused variable values
             sealed trait AssignStatus
             case class Unknown() extends AssignStatus
+            case class Defined() extends AssignStatus
             case class Unused() extends AssignStatus
             case class Used() extends AssignStatus
             
@@ -752,21 +753,23 @@ class LinterPlugin(val global: Global) extends Plugin {
                   //TODO: shadowing warning doesn't work, even if I make sure each tree is visited once, and even if I don't traverse inner Blocks
                   //if(assigns contains id) warn(tree, "Variable "+id.toString+" is being shadowed here.")
                   checkAssigns(right, onlySetUsed)
-                  //Two exceptions: null and None are sometimes legit init values without use:
-                  if(right isAny ("null", "scala.None"))
-                    assigns(id) = Used()
-                  else if(!onlySetUsed)
-                    assigns(id) = Unused()
+                    
+                  assigns(id) = 
+                    if((right.tpe.widen weak_<:< DoubleClass.tpe) 
+                    || (right.tpe.widen <:< BooleanClass.tpe) 
+                    || (right.tpe.widen <:< StringClass.tpe)
+                    || (right isAny ("null", "scala.None")))
+                      Defined() //Ignore these initial values
+                    else
+                      Unused()
                     
                 case Assign(ident @ Ident(id), right) =>
                   checkAssigns(right, onlySetUsed)
                   if(!onlySetUsed) assigns(id) match {
-                    case Unused() =>
-                      if(!(ident.tpe <:< BooleanClass.tpe || ident.tpe <:< IntClass.tpe)) //Ignore Boolean and Int
-                        warn(tree, new VariableAssignedUnusedValue(id.toString))
-                    case Used() =>
-                      assigns(id) = Unused()
                     case Unknown() =>
+                    case Defined() => assigns(id) = Unused()
+                    case Used()    => assigns(id) = Unused()
+                    case Unused()  =>  warn(tree, new VariableAssignedUnusedValue(id.toString))
                   }
                   
                 case Ident(id) =>
@@ -1973,10 +1976,13 @@ class LinterPlugin(val global: Global) extends Plugin {
         // scalastyle:off magic.number
         def toStringAttrs(param: Tree): StringAttrs = {
           val intParam = computeExpr(param)
-          if(intParam.isValue) new StringAttrs(exactValue = Some(intParam.getValue.toString))
-          if(intParam.size > 1) {
-            val maxLen = math.max(intParam.max.toString.length, intParam.min.toString.length)
-            new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = maxLen, trimmedMaxLength = maxLen)
+          if(param.tpe.widen <:< IntClass.tpe && intParam.size >= 1) {
+            if(intParam.isValue) {
+              new StringAttrs(exactValue = Some(intParam.getValue.toString))
+            } else {
+              val maxLen = math.max(intParam.max.toString.length, intParam.min.toString.length)
+              new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = maxLen, trimmedMaxLength = maxLen)
+            }
           } else if(param match { case Literal(Constant(a)) => true case _  => false }) param match { //groan.
             case Literal(Constant(null)) => new StringAttrs(exactValue = Some("null"))
             case Literal(Constant(a))    => new StringAttrs(Some(a.toString))
@@ -1990,15 +1996,28 @@ class LinterPlugin(val global: Global) extends Plugin {
           else if(param.tpe.widen <:< FloatClass.tpe)   new StringAttrs(minLength = 1, trimmedMinLength = 1, maxLength = 154, trimmedMaxLength = 154)
           else if(param.tpe.widen <:< BooleanClass.tpe) new StringAttrs(minLength = 4, trimmedMinLength = 4, maxLength = 5, trimmedMaxLength = 5)
           else {
-            //TODO: prefix "Type(" and suffix ")" for collections
-            //TODO: not sure if this is the right way, but <:< TraversableClass.tpe does not work directly
-            // also, it's possible to have a Traversable, which has a shorter toString - check if you're in scala. or Predef
-            if((param.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe)) && !(param.tpe.widen <:< StringClass.tpe)) {
+            if(param.tpe.widen <:< StringClass.tpe) {
+              StringAttrs(param)
+            } else if(param.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe)) {
               // collections: minimal is Nil or Type()
-              //TODO: Surely I can do moar... intParam.isSeq, etc
-              val minLen = 3
-              //println(Left(str + new StringAttrs(minLength = minLen, trimmedMinLength = minLen)))
-              new StringAttrs(minLength = minLen, trimmedMinLength = minLen)
+              
+              // Adapted from src/library/scala/collection/TraversableLike.scala
+              val stringPrefix = {
+                var string = param.tpe.toString
+                val idx1 = string.lastIndexOf('.' : Int)
+                if (idx1 != -1) string = string.substring(idx1 + 1)
+                val idx2 = string.indexOf('$')
+                if (idx2 != -1) string = string.substring(0, idx2)
+                val idx3 = string.indexOf('[')
+                if (idx3 != -1) string = string.substring(0, idx3)
+                
+                //Workaround for Nil and for Seq which goes to List or ArrayBuffer
+                if(string == "type" || string == "Seq") "" else string + "("
+              }
+
+              val minLen = stringPrefix.length+2
+              val out = new StringAttrs(minLength = minLen, trimmedMinLength = minLen, prefix = stringPrefix, suffix = ")")
+              out
             } else {
               //TODO:discover moar
               //if(!(param.tpe.widen <:< StringClass.tpe) && !(param.tpe.widen <:< AnyClass.tpe))println(((str, param), (param.tpe, param.tpe.widen)))
@@ -2048,6 +2067,13 @@ class LinterPlugin(val global: Global) extends Plugin {
             case "$times" =>
               Left(str * intParam)
 
+            case f @ ("head"|"last") =>
+              if(str.maxLength == 0) {
+                warn(treePosHolder, new DecomposingEmptyCollection(f, "string"))
+              }
+              
+              Left(empty)
+              
             case f @ ("init"|"tail") => 
               if(str.exactValue.isDefined) {
                 if(str.exactValue.get.isEmpty) {
@@ -2056,8 +2082,13 @@ class LinterPlugin(val global: Global) extends Plugin {
                 } else {
                   Left(new StringAttrs(str.exactValue.map(a => if(f=="init") a.init else a.tail)))
                 }
-              } else
+              } else {
+                if(str.maxLength == 0) {
+                  warn(treePosHolder, new DecomposingEmptyCollection(f, "string"))
+                }
+
                 Left(new StringAttrs(minLength = math.max(str.minLength-1, 0), maxLength = if(str.maxLength != Int.MaxValue) math.max(str.maxLength-1, 0) else Int.MaxValue))
+              }
 
             case "capitalize" if params.size == 0 => Left(str.capitalize)
             case "distinct"   if params.size == 0 => Left(str.distinct)
