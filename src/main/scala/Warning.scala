@@ -80,6 +80,7 @@ object Warning {
     UseAbsNotSqrtPow,
     UseAbsNotSqrtSquare,
     new UseConditionDirectly(negated = false),
+    new UseIfExpression(""),
     new UseExistsOnOption("",""),
     UseExpm1,
     UseFilterNotFlatMap,
@@ -146,6 +147,9 @@ case object ReflexiveComparison extends NoArgMessageWarning("Same expression on 
 case object YodaConditions extends NoArgMessageWarning("You are using Yoda conditions")
 case class UseConditionDirectly(negated: Boolean = false) extends OneArgMessageWarning("Remove the if and just use the %scondition.", if (negated) "negated " else "") {
   def name = "UseConditionDirectly"
+}
+case class UseIfExpression(varName: String) extends OneArgMessageWarning("Assign the result of the if expression to variable %s directly.", varName) {
+  def name = "UseIfExpression"
 }
 case object DuplicateIfBranches extends NoArgMessageWarning("If statement branches have the same structure.")
 case object IdenticalIfElseCondition extends NoArgMessageWarning("This condition has appeared earlier in the if-else chain and will never hold here.")

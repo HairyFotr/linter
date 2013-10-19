@@ -683,6 +683,9 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(cond, new UseConditionDirectly())
           case If(cond, Literal(Constant(false)), Literal(Constant(true))) =>
             warn(cond, new UseConditionDirectly(negated = true))
+          case If(cond, Assign(id1, bool1), Assign(id2, bool2))
+            if (id1.toString == id2.toString) =>
+            warn(cond, new UseIfExpression(id1.toString))
           case If(cond, a, b) if (a equalsStructure b) && (a.children.nonEmpty) => 
             //TODO: empty if statement (if(...) { }) triggers this - issue warning for that case?
             //TODO: test if a single statement counts as children.nonEmpty

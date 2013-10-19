@@ -86,6 +86,19 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   }
   
   @Test
+  def UseIfExpression() {
+    implicit val msg = "Assign the result of the if expression"
+    
+    should("""var a = 5; if(util.Random.nextBoolean) a = 4 else a = 2""")
+    should("""var a = "a"; if(util.Random.nextBoolean) a = "b" else a = "c" """)
+    shouldnt("""var a = 5; if(util.Random.nextBoolean) a = 4 else println("foo")""")
+    shouldnt("""var a = 5; if(util.Random.nextBoolean) println("foo") else a = 4""")
+  }
+  
+  // ^ New tests named after their Warning.scala name ^
+  // ----------------- OLD TESTS ----------------------
+
+  @Test
   def caseClass__NoWarn() {
     noWarnings("""case class A()""")
     noWarnings("""case class A(a: Float)""")
@@ -567,7 +580,6 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     
     // prefix/suffix tests
     should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b contains "bcd") """"")("This contains always returns the same value: true")
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b contains "cde") """"")("This contains always returns the same value: true")
     should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b contains "cde") """"")("This contains always returns the same value: true")
     should("""val b = "abc"; if(b contains "abcd") """"")("This contains always returns the same value: false")
     
