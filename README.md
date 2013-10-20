@@ -198,7 +198,8 @@ Feel free to add your own ideas, or implement these. Pull requests welcome!
 * Detect vars, that could easily be vals (done in scala 2.11 -Xlint)
 
 Rule lists from other static analysis tools for inspiration:
-* ScalaStyle - https://github.com/scalastyle/scalastyle/wiki
+* ScalaStyle(Scala) - https://github.com/scalastyle/scalastyle/wiki
+* Findbugs(JVM) - http://findbugs.sourceforge.net/bugDescriptions.html
 * CheckStyle(Java) - http://checkstyle.sourceforge.net/availablechecks.html
 * PMD(Java) - http://pmd.sourceforge.net/pmd-5.0.3/rules/index.html
 * CodeNarc(Groovy) - http://codenarc.sourceforge.net/codenarc-rule-index.html
