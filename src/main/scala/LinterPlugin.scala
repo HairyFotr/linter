@@ -434,7 +434,8 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Apply(eqeq @ Select(lhs, nme.EQ), List(rhs))
             if methodImplements(eqeq.symbol, Object_==)
             && !isSubtype(lhs, rhs) && !isSubtype(rhs, lhs)
-            && lhs.tpe.widen.toString != "Null" && rhs.tpe.widen.toString != "Null" =>
+            && lhs.tpe.widen.toString != "Null" && rhs.tpe.widen.toString != "Null" 
+            && !lhs.tpe.widen.toString.matches(""".*\[(_\$|\?)[0-9]+\].*""") && !rhs.tpe.widen.toString.matches(""".*\[(_\$|\?)[0-9]+\].*""") => //Workaround for runtime Class[_$1] == Class[Int] stuff
             
             warn(eqeq, new UnlikelyEquality(lhs.tpe.widen.toString, rhs.tpe.widen.toString))
 
