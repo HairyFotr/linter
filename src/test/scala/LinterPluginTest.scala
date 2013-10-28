@@ -136,6 +136,17 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should("""val a = 4; a.asInstanceOf[Double]""")
   }
   
+  @Test
+  def incompleteTest_InvariantCondition() {
+    implicit val msg = "This condition will"
+    
+    should("""val (a,b) = (1,2); if(a != b) a else b""")
+    should("""val (a,b) = (1,2); if(a == b) a else b""")
+    should("""val (a,b) = (1,2); if(a == b) b else a""")
+    should("""val (a,b) = (1,2); if(a == b && util.Random.nextInt == 5) a else b""")
+    should("""val (a,b) = (1,2); if(a == b || util.Random.nextInt == 5) a else b""")
+    should("""val (a,b) = (1,2); if(util.Random.nextInt == 3) 4 else if(a == b) a else b""")
+  }
   // ^ New tests named after their Warning.scala name ^
   // ----------------- OLD TESTS ----------------------
 

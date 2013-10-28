@@ -345,7 +345,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             }) =>
             
             warn(pos, UseSigNum)
-            
+
           case _ => 
         }
         
@@ -723,7 +723,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           /// Find repeated (sub)conditions in if-else chains, that will never hold
           // caches conditions separated by OR, and checks all subconditions separated by either AND or OR
-          case If(condition, _, e) if {
+          case If(condition, t, e) if {
             def getSubConds(cond: Tree)(op: Name): List[Tree] =
               List(cond) ++ (cond match {
                 case Apply(Select(left, opp), List(right)) if op == opp =>
@@ -731,24 +731,35 @@ class LinterPlugin(val global: Global) extends Plugin {
                 case _ =>
                   Nil
               })
-            lazy val conds = mutable.ListBuffer(getSubConds(condition)(nme.ZOR):_*)
+            val conds = mutable.ListBuffer[Tree]()
             def elseIf(tree: Tree) {
               tree match {
-                case If(cond, _, e) => 
+                case If(cond, t, e) => 
                   val subCondsOr = getSubConds(cond)(nme.ZOR)
                   val subCondsAnd = getSubConds(cond)(nme.ZAND)
-
+                  
                   for(newCond <- (subCondsOr ++ subCondsAnd); 
                       oldCond <- conds; if newCond equalsStructure oldCond)
                     warn(newCond, IdenticalIfElseCondition)
-
+                  
                   conds ++= subCondsOr
 
                   elseIf(e)
-                case _ =>
+                  
+                  /// Detects some nonsensical if expressions of the type: if(a == b || ...) a else b 
+                  (subCondsOr ++ subCondsAnd) filter {
+                    case Apply(Select(a, op), List(b))
+                      if (op == nme.EQ || op == nme.NE)
+                      && (((a equalsStructure t) && (b equalsStructure e)) || ((a equalsStructure e) && (b equalsStructure t))) => true
+                    case _ => false
+                  } foreach { subCond =>
+                    warn(subCond, new InvariantCondition(always = true, "cause the same return value"))
+                  }
+                case _ => //
               }
             }
-            elseIf(e)
+            elseIf(tree)
+            
             false
           } => //Fallthrough
 
