@@ -31,6 +31,7 @@ object Warning {
     BigDecimalPrecisionLoss,
     CloseSourceFile,
     new ContainsTypeMismatch("",""),
+    new NumberInstanceOf(""),
     new DecomposingEmptyCollection("",""),
     DivideByOne,
     DivisionByLiteralZero,
@@ -136,6 +137,9 @@ case object JavaConverters extends NoArgMessageWarning("Implicit conversions in 
 case class ContainsTypeMismatch(seqType: String, targetType: String) extends
   TwoArgMessageWarning("%s.contains(%s) will probably return false because the collection and target element are of different types.", seqType, targetType) {
   def name = "ContainsTypeMatch"
+}
+case class NumberInstanceOf(tpe: String) extends TwoArgMessageWarning("Use to%s instead of asInstanceOf[%s].", tpe, tpe) {
+  def name = "NumberInstanceOf"
 }
 case object PatternMatchConstant extends NoArgMessageWarning("Pattern matching on a constant value.")
 case object PreferIfToBooleanMatch extends NoArgMessageWarning("This is probably better written as an if statement.")

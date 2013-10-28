@@ -464,6 +464,22 @@ class LinterPlugin(val global: Global) extends Plugin {
           case instanceOf @ Select(a, func) if methodImplements(instanceOf.symbol, AsInstanceOf) =>   
             //TODO: too much noise, maybe detect when it's completely unnecessary
             warn(tree, "Avoid using asInstanceOf[T] (use pattern matching, type ascription, etc).")*/
+          /// Warn about using .asInstanceOf[Number]
+          case TypeApply(instanceOf @ Select(a, funcName), t) 
+            if methodImplements(instanceOf.symbol, AsInstanceOf) 
+            && !(a.tpe.widen <:< tree.tpe.widen || tree.tpe.widen <:< a.tpe.widen)
+            && ((a.tpe.widen weak_<:< tree.tpe.widen) || (tree.tpe.widen weak_<:< a.tpe.widen)) =>
+              warn(tree, new NumberInstanceOf(tree.tpe.widen.toString))
+
+          /*case TypeApply(instanceOf @ Select(a, funcName), t) 
+            if methodImplements(instanceOf.symbol, AsInstanceOf) 
+            && !(a.tpe.widen <:< tree.tpe.widen || tree.tpe.widen <:< a.tpe.widen) 
+            && !(a.tpe.typeSymbol.isAbstractType || tree.tpe.typeSymbol.isAbstractType)
+            && !(a.tpe.widen.toString.matches(""".*\[((_\$?|\?)[0-9]+|[A-Z])\].*""") || tree.tpe.widen.toString.matches(""".*\[((_\$?|\?)[0-9]+|[A-Z])\].*"""))
+            && !(a.tpe.widen.toString == "Object" || tree.tpe.widen.toString == "Object")
+            && !(a.tpe.widen.toString == "Null") =>
+
+            unit.warning(tree.pos, pref+"The cast "+a.tpe.widen+".asInstanceOf["+tree.tpe.widen+"] is likely invalid.")*/
 
           /// Calling Option.get is potentially unsafe (disabled)
           //TODO: if(x.isDefined) func(x.get) / if(x.isEmpty) ... else func(x.get), etc. are false positives -- those could be detected in abs-interpreter

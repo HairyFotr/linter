@@ -127,6 +127,15 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
      }""")
   }
   
+  @Test
+  def NumberInstanceOf() {
+    implicit val msg = "asInstanceOf"
+    
+    should("""4.asInstanceOf[Double]""")
+    should("""3.4.asInstanceOf[Byte]""")
+    should("""val a = 4; a.asInstanceOf[Double]""")
+  }
+  
   // ^ New tests named after their Warning.scala name ^
   // ----------------- OLD TESTS ----------------------
 

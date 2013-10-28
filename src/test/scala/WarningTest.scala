@@ -15,6 +15,7 @@ class WarningTest extends JUnitMustMatchers {
       case BigDecimalPrecisionLoss => 1
       case CloseSourceFile => 1
       case ContainsTypeMismatch(_,_) => 1
+      case NumberInstanceOf(_) => 1
       case DecomposingEmptyCollection(_,_) => 1
       case DivideByOne => 1
       case DivisionByLiteralZero => 1
