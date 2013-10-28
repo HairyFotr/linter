@@ -42,3 +42,7 @@ org.scalastyle.sbt.ScalastylePlugin.Settings
 //import de.johoop.findbugs4sbt.FindBugs._
 
 seq(findbugsSettings : _*)
+
+//import de.johoop.cpd4sbt.CopyPasteDetector._
+
+cpdSettings
