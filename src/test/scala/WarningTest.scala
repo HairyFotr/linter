@@ -62,7 +62,9 @@ class WarningTest extends JUnitMustMatchers {
       case UnnecessaryStringNonEmpty => 1
       case UnusedForLoopIteratorValue => 1
       case UnusedParameter(_,_) => 1
-      case UseAbsNotSqrtPow => 1
+      case UseHypot => 1
+      case UseCbrt => 1
+      case UseLog10 => 1
       case UseAbsNotSqrtSquare => 1
       case UseConditionDirectly(_) => 1
       case UseIfExpression(_) => 1
@@ -77,7 +79,7 @@ class WarningTest extends JUnitMustMatchers {
       case UseLog1p => 1
       case UseOptionGetOrElse(_) => 1
       case UseOptionOrNull(_) => 1
-      case UseSigNum => 1
+      case UseSignum => 1
       case UseUntilNotToMinusOne => 1
       case VariableAssignedUnusedValue(_) => 1
       case WrapNullWithOption => 1

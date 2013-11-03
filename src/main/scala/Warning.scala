@@ -78,7 +78,9 @@ object Warning {
     UnnecessaryStringNonEmpty,
     UnusedForLoopIteratorValue,
     new UnusedParameter(Seq("unusedParameter"), "methodName"),
-    UseAbsNotSqrtPow,
+    UseHypot,
+    UseLog10,
+    UseCbrt,
     UseAbsNotSqrtSquare,
     new UseConditionDirectly(negated = false),
     new UseIfExpression(""),
@@ -92,7 +94,7 @@ object Warning {
     UseLog1p,
     new UseOptionGetOrElse(""),
     new UseOptionOrNull(""),
-    UseSigNum,
+    UseSignum,
     UseUntilNotToMinusOne,
     new VariableAssignedUnusedValue(""),
     WrapNullWithOption,
@@ -124,11 +126,13 @@ case class UnlikelyEquality(lhs: String, rhs: String) extends
   TwoArgMessageWarning("Comparing with == on instances of different types (%s, %s) will probably return false.", lhs, rhs) {
   def name = "UnlikelyEquality"
 }
-case object UseAbsNotSqrtPow extends NoArgMessageWarning("Use abs instead of sqrt(pow(x, 2)).")
-case object UseAbsNotSqrtSquare extends NoArgMessageWarning("Use abs instead of sqrt(x*x).")
+case object UseHypot extends NoArgMessageWarning("Use math.hypot(x, y), instead of sqrt(x^2, y^2) for improved accuracy.")
+case object UseCbrt extends NoArgMessageWarning("Use math.cbrt(x), instead of pow(x, 1/3) for improved accuracy.")
+case object UseLog10 extends NoArgMessageWarning("Use math.log10(x), instead of log(x)/log(10) for improved accuracy.")
+case object UseAbsNotSqrtSquare extends NoArgMessageWarning("Use abs instead of sqrt(x^2).")
 case object UseIsNanNotSelfComparison extends NoArgMessageWarning("Use .isNan instead of comparing to itself.")
 case object UseIsNanNotNanComparison extends NoArgMessageWarning("Use .isNan instead of comparing to NaN, which is wrong.")
-case object UseSigNum extends NoArgMessageWarning("Did you mean to use the signum function here? (signum also avoids division by zero errors)")
+case object UseSignum extends NoArgMessageWarning("Did you mean to use the signum function here? (signum also avoids division by zero exceptions)")
 case object BigDecimalNumberFormat extends NoArgMessageWarning("This BigDecimal constructor will likely throw a NumberFormatException.")
 case object BigDecimalPrecisionLoss extends NoArgMessageWarning("Possible loss of precision - use a string constant")
 case object ReflexiveAssignment extends NoArgMessageWarning("Assigning a variable to itself?")
@@ -231,8 +235,8 @@ case class InvariantReturn(structure: String, returnValue: String) extends TwoAr
   def name = "InvariantReturn"
 }
 case class UnusedParameter(parameters: Seq[String], method: String) extends
-  TwoArgMessageWarning("Parameter %s not used in method %s.",
-    parameters match { case Seq(p) => p + " is" case _ => "s (%s) are".format(parameters.mkString(", ")) },
+  TwoArgMessageWarning("Parameter%s not used in method %s.",
+    parameters match { case Seq(p) => " " + p + " is" case _ => "s (%s) are".format(parameters.mkString(", ")) },
     method) {
   def name = "UnusedParameter"
 }

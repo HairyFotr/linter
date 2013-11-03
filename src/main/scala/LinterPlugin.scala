@@ -33,7 +33,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     "%s:comma,separated,warning,names".format(name, LinterOptions.DisableOnlyArgument)
   ).map("  -P:" + name + ":" + _).mkString("\n"))
 
-	override def processOptions(options: List[String], error: String => Unit) {
+  override def processOptions(options: List[String], error: String => Unit) {
     LinterOptions.parse(options) match {
      case Left(errorMessage) => error(errorMessage)
      case Right(LinterOptions(disabledWarnings)) => 
@@ -172,7 +172,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       val AsInstanceOf = AnyClass.info.member(nme.asInstanceOf_)
       val ToString: Symbol = AnyClass.info.member(nme.toString_)
 
-      def SeqMemberType(seenFrom: Type): Type = {
+      def seqMemberType(seenFrom: Type): Type = {
         SeqLikeClass.tpe.typeArgs.head.asSeenFrom(seenFrom, SeqLikeClass)
       }
 
@@ -272,6 +272,14 @@ class LinterPlugin(val global: Global) extends Plugin {
           None
       }
       
+      def isMathPow2(pow: Tree, allowSquares: Boolean = false): Boolean = pow match { 
+        case Apply(pow, List(_, Literal(Constant(2.0)))) if (pow is "scala.math.`package`.pow") => true   // math.pow(x, 2)
+        case Apply(Select(id1, nme.MUL), List(id2)) if (id1 equalsStructure id2) => true                  // x*x
+        case Literal(Constant(x: Int))                                                                      
+          if (allowSquares) && (x > 1) && (math.sqrt(x.toDouble) == math.sqrt(x.toDouble).toInt) => true  // square numbers
+        case _ => false
+      }
+      
       def isReturnStatement(t: Tree): Boolean = t match {
         case Return(_) => true
         case _ => false
@@ -282,7 +290,7 @@ class LinterPlugin(val global: Global) extends Plugin {
         // Workarounds for some cases
         tree match {
           /// Workaround: case class generated code triggers a lot of the checks...
-          case ClassDef(mods, _, _, _) if mods.isCase => return
+          case ClassDef(mods, _, _, body) if mods.isCase => traverse(body); return
           /// Workaround: suppresse a null warning and a "remove the if" check for """case class A()""" - see case class unapply's AST)
           case If(Apply(Select(_, nme.EQ), List(Literal(Constant(null)))), Literal(Constant(false)), Literal(Constant(true))) => return
           /// WorkAround: ignores "Assignment right after declaration..." in case class hashcode
@@ -312,15 +320,29 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, UseExpm1)
           case Apply(Select(Literal(Constant(-1)), nme.ADD), List(Apply(exp, _))) if exp is "scala.math.`package`.exp" =>
             warn(tree, UseExpm1)
-
-          /// Use x.abs instead of doing it manually
-          case Apply(sqrt, List(Apply(pow, List(expr, Literal(Constant(2))))))
-            if (sqrt is "scala.math.`package`.sqrt") && (pow is "scala.math.`package`.pow") =>
             
-            warn(tree, UseAbsNotSqrtPow)
+          /// Suggest using hypot instead of sqrt(a*a, b*b)
+          case Apply(sqrt, List(Apply(Select(pow1, nme.ADD), List(pow2))))
+            if (sqrt is "scala.math.`package`.sqrt") && isMathPow2(pow1, allowSquares = true) && isMathPow2(pow2, allowSquares = true) =>
+            
+            warn(tree, UseHypot)
 
-          case Apply(math_sqrt, List(Apply(Select(expr1, nme.MUL), List(expr2))))
-            if (expr1 equalsStructure expr2) && (math_sqrt is "scala.math.`package`.sqrt") =>
+          /// Suggest using cbrt instead of pow(a, 1/3)
+          case Apply(pow, List(x, Literal(Constant(third)))) 
+            if (pow is "scala.math.`package`.pow")
+            && (third == 0.33333334 || third == 0.3333333432674408 || third == 0.3333333333333333) => // The second seems to happen on float.toDouble implicit widening o_O
+
+            warn(tree, UseCbrt)
+          
+          /// Suggest using log10(x) instead of log(x)/log(10)
+          case Apply(Select(Apply(log1, List(x)), nme.DIV), List(Apply(log2, List(Literal(Constant(10.0)))))) 
+            if (log1 is "scala.math.`package`.log") && (log2 is "scala.math.`package`.log") =>
+
+            warn(tree, UseLog10)
+
+          /// Suggest using x.abs instead of doing it manually with sqrt(x^2)
+          case Apply(sqrt, List(pow2))
+            if (sqrt is "scala.math.`package`.sqrt") && isMathPow2(pow2) =>
             
             warn(tree, UseAbsNotSqrtSquare)
 
@@ -344,7 +366,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               case _ => false
             }) =>
             
-            warn(pos, UseSigNum)
+            warn(pos, UseSignum)
 
           case _ => 
         }
@@ -413,6 +435,45 @@ class LinterPlugin(val global: Global) extends Plugin {
           
           case _ =>
         }
+        tree match {
+          //Loss of precision on literals
+          case treeLiteral @ Literal(Constant(literal)) if literal != null && literal != (()) &&  isFloatingType(tree) =>
+
+            val (strLiteral, actualLiteral) = {
+                // Get the actual token from code
+                val floatRegex = "[-+]?[0-9.]+([eE][-+]?[0-9]+)?[dfDF]?".r
+                var token = ""
+                try {
+                  val pos = treeLiteral.pos
+                  token = floatRegex.findPrefixMatchOf(pos.lineContent.substring(pos.column - 1)).get.toString
+                  token.toDouble.toString // trigger NumberFormatException
+                } catch {
+                  case e: java.lang.UnsupportedOperationException => // Happens if tree doesn't have a position
+                  case e: java.lang.NumberFormatException => // Could warn here, but I don't trust the above code enough
+                  case e: MatchError =>
+                  case e: Exception =>  
+                    //println(treeLiteral.pos.lineContent)
+                    //e.printStackTrace
+                }
+                (literal.toString, token)
+              }
+
+            try {
+              // Ugly hack to get around a few different representations: 0.005, 5E-3, ...
+              def cleanString(s: String): String = s.replaceAll("^[-+]|[.]|[Ee].*$|[fdFD-]*$|(0[.])?0*", "")
+              
+              if(!strLiteral.isEmpty && !actualLiteral.isEmpty 
+              && (strLiteral matches ".*[0-9].*") && (actualLiteral matches ".*[0-9].*") //contains number
+              && cleanString(strLiteral) != cleanString(actualLiteral)
+              && ((if(strLiteral.toDouble < 0) "-" else "") + actualLiteral) != strLiteral)
+                warn(tree, new PossibleLossOfPrecision("Literal cannot be represented exactly by "+tree.tpe.widen+". ("+(if(strLiteral.toDouble < 0) "-" else "") + actualLiteral+" != "+strLiteral+")"))
+                
+            } catch {
+              case e: java.lang.NumberFormatException => //
+            }
+          
+          case _ =>
+        }
         
         tree match {
           /// Checks for self-assignments: a = a
@@ -435,7 +496,8 @@ class LinterPlugin(val global: Global) extends Plugin {
             if methodImplements(eqeq.symbol, Object_==)
             && !isSubtype(lhs, rhs) && !isSubtype(rhs, lhs)
             && lhs.tpe.widen.toString != "Null" && rhs.tpe.widen.toString != "Null" 
-            && !lhs.tpe.widen.toString.matches(""".*\[(_\$|\?)[0-9]+\].*""") && !rhs.tpe.widen.toString.matches(""".*\[(_\$|\?)[0-9]+\].*""") => //Workaround for runtime Class[_$1] == Class[Int] stuff
+            && !lhs.tpe.widen.toString.matches(""".*\[(_\$|\?)[0-9]+\].*""") //Workaround for runtime Class[_$1] == Class[Int] stuff
+            && !rhs.tpe.widen.toString.matches(""".*\[(_\$|\?)[0-9]+\].*""") => 
             
             warn(eqeq, new UnlikelyEquality(lhs.tpe.widen.toString, rhs.tpe.widen.toString))
 
@@ -453,7 +515,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// Collection.contains on different types: List(1,2,3).contains("2")
           case Apply(contains @ Select(seq, _), List(target)) 
             if methodImplements(contains.symbol, SeqLikeContains) 
-            && !(target.tpe <:< SeqMemberType(seq.tpe)) =>
+            && !(target.tpe <:< seqMemberType(seq.tpe)) =>
             
             warn(contains, new ContainsTypeMismatch(seq.tpe.widen.toString, target.tpe.widen.toString))
 
@@ -479,7 +541,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             && !(a.tpe.widen.toString == "Object" || tree.tpe.widen.toString == "Object")
             && !(a.tpe.widen.toString == "Null") =>
 
-            unit.warning(tree.pos, pref+"The cast "+a.tpe.widen+".asInstanceOf["+tree.tpe.widen+"] is likely invalid.")*/
+            unit.war ning(tree.pos, pref+"The cast "+a.tpe.widen+".asInstanceOf["+tree.tpe.widen+"] is likely invalid.")*/
 
           /// Calling Option.get is potentially unsafe (disabled)
           //TODO: if(x.isDefined) func(x.get) / if(x.isEmpty) ... else func(x.get), etc. are false positives -- those could be detected in abs-interpreter
@@ -705,8 +767,11 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(cond, new UseConditionDirectly())
           case If(cond, Literal(Constant(false)), Literal(Constant(true))) =>
             warn(cond, new UseConditionDirectly(negated = true))
-          case If(cond, Assign(id1, bool1), Assign(id2, bool2))
+          case If(cond, Assign(id1, _), Assign(id2, _))
             if (id1.toString == id2.toString) =>
+            warn(cond, new UseIfExpression(id1.toString))
+          case If(cond, Apply(Select(id1, setter1), List(_)), Apply(Select(id2, setter2), List(_)))
+            if (setter1 endsWith "_$eq") && (setter2 endsWith "_$eq") && (id1.toString == id2.toString) =>
             warn(cond, new UseIfExpression(id1.toString))
           case If(cond, Block(block, ret), b @ Block(_, _)) if (block :+ ret) exists isReturnStatement => // Idea from oclint
             warn(cond, UnnecessaryElseBranch)

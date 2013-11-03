@@ -147,6 +147,61 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should("""val (a,b) = (1,2); if(a == b || util.Random.nextInt == 5) a else b""")
     should("""val (a,b) = (1,2); if(util.Random.nextInt == 3) 4 else if(a == b) a else b""")
   }
+  
+  @Test
+  def UseHypot() {
+    implicit val msg = "Use math.hypot"
+    
+    should("""val x,y = util.Random.nextDouble; math.sqrt(x*x + y*y)""")
+    should("""val x,y = util.Random.nextDouble; math.sqrt(x*x + math.pow(y, 2))""")
+    should("""val x,y = util.Random.nextDouble; math.sqrt(x*x + math.pow(5, 2))""")
+    shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + y)""")
+    shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + y)""")
+
+    should("""val x,y = util.Random.nextDouble; math.sqrt(25 + x*x)""")
+    should("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 25)""")
+    should("""val x,y = util.Random.nextDouble; math.sqrt(2147395600 + x*x)""")
+    shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 24)""")
+    shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 26)""")
+    shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 26)""")
+    shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 2147395601)""")
+    shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 2147395599)""")
+    
+  }
+
+  @Test
+  def UseCbrt() {
+    implicit val msg = "Use math.cbrt"
+    
+    should("""val x = util.Random.nextDouble; math.pow(x, 1/3d)""")
+    should("""val x = util.Random.nextDouble; math.pow(x, 1/3f)""")
+    should("""val x = util.Random.nextDouble; math.pow(20*x+1, 1/3f)""")
+  }
+
+  @Test
+  def UseLog10() {
+    implicit val msg = "Use math.log10"
+    
+    should("""val x = util.Random.nextDouble; math.log(x)/math.log(10)""")
+    should("""val x = util.Random.nextDouble; math.log(x+2)/math.log(10)""")
+    shouldnt("""val x = util.Random.nextDouble; math.log(x)/math.log(11)""")
+    shouldnt("""val x = util.Random.nextDouble; math.log(x)/math.log(9)""")
+  }
+  
+  @Test
+  def PossibleLossOfPrecision() {
+    {
+      implicit val msg = "Literal cannot be represented exactly"
+     
+      should("""val x = 0.5555555555555555555555555555""")
+      shouldnt("""val x = 0.5""")
+
+      should("""val x = 0.555555555f""")
+      shouldnt("""val x = 0.555555555d""")
+    }      
+  }
+  
+  
   // ^ New tests named after their Warning.scala name ^
   // ----------------- OLD TESTS ----------------------
 
