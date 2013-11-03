@@ -496,8 +496,10 @@ class LinterPlugin(val global: Global) extends Plugin {
             if methodImplements(eqeq.symbol, Object_==)
             && !isSubtype(lhs, rhs) && !isSubtype(rhs, lhs)
             && lhs.tpe.widen.toString != "Null" && rhs.tpe.widen.toString != "Null" 
-            && !lhs.tpe.widen.toString.matches(""".*\[(_\$|\?)[0-9]+\].*""") //Workaround for runtime Class[_$1] == Class[Int] stuff
-            && !rhs.tpe.widen.toString.matches(""".*\[(_\$|\?)[0-9]+\].*""") => 
+            && !lhs.tpe.widen.toString.matches(""".*(\[|\()(((_\$?|\?)[0-9]+)(, )?)+(\]|\)).*""") //Workaround for runtime Class[_$1] == Class[Int] stuff
+            && !rhs.tpe.widen.toString.matches(""".*(\[|\()(((_\$?|\?)[0-9]+)(, )?)+(\]|\)).*""") => 
+            //&& !lhs.tpe.widen.toString.matches(""".*\[(_\$|\?)[0-9]+\].*""") //Workaround for runtime Class[_$1] == Class[Int] stuff
+            //&& !rhs.tpe.widen.toString.matches(""".*\[(_\$|\?)[0-9]+\].*""") => 
             
             warn(eqeq, new UnlikelyEquality(lhs.tpe.widen.toString, rhs.tpe.widen.toString))
 
@@ -767,11 +769,11 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(cond, new UseConditionDirectly())
           case If(cond, Literal(Constant(false)), Literal(Constant(true))) =>
             warn(cond, new UseConditionDirectly(negated = true))
-          case If(cond, Assign(id1, _), Assign(id2, _))
-            if (id1.toString == id2.toString) =>
+          case If(cond, Assign(id1, _), Assign(id2, _)) //TODO: .this workaround for object-local variables sucks... false negatives
+            if (id1.toString == id2.toString) && !(id1.toString contains ".this") =>
             warn(cond, new UseIfExpression(id1.toString))
           case If(cond, Apply(Select(id1, setter1), List(_)), Apply(Select(id2, setter2), List(_)))
-            if (setter1 endsWith "_$eq") && (setter2 endsWith "_$eq") && (id1.toString == id2.toString) =>
+            if (setter1 endsWith "_$eq") && (setter2 endsWith "_$eq") && (id1.toString == id2.toString) && !(id1.toString contains ".this") =>
             warn(cond, new UseIfExpression(id1.toString))
           case If(cond, Block(block, ret), b @ Block(_, _)) if (block :+ ret) exists isReturnStatement => // Idea from oclint
             warn(cond, UnnecessaryElseBranch)
@@ -2059,8 +2061,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           vals += param -> values.notSeq
           
           val exceptions =
-            (func == "foreach" ||
-            collection.tpe.toString.startsWith("scala.collection.immutable.Range"))
+            (func == "foreach" || param.contains("$") || collection.tpe.toString.startsWith("scala.collection.immutable.Range"))
           
           if(!isUsed(body, param) && !exceptions) warn(tree, UnusedForLoopIteratorValue)
 

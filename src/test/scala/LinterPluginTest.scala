@@ -237,7 +237,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def import__JavaConversions() {
-    implicit val msg = "Implicit conversions in collection.JavaConversions are dangerous"
+    implicit val msg = "Consider using the explicit collection.JavaConverters"
     should("import scala.collection.JavaConversions._;")
   }
 
@@ -1716,7 +1716,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def list__isEmpty() {
-    implicit val msg = "instead of comparing to list.size"//slow for lists, etc
+    implicit val msg = "instead of comparing to List.size"//slow for lists, etc
     
     should(""" val a = List(1,2,3); if(a.size > 0) "" """)
     should(""" val a = List(1,2,3); if(a.size == 0) "" """)
