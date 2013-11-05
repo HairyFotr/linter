@@ -45,6 +45,7 @@ class WarningTest extends JUnitMustMatchers {
       case OperationAlwaysProducesZero(_) => 1
       case OptionOfOption => 1
       case PassPartialFunctionDirectly(_) => 1
+      case UnitImplicitOrdering(_) => 1
       case PatternMatchConstant => 1
       case PossibleLossOfPrecision(_) => 1
       case PreferIfToBooleanMatch => 1

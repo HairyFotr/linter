@@ -1202,6 +1202,14 @@ class LinterPlugin(val global: Global) extends Plugin {
             if (!List("for", "<-").exists(line.contains(_))) 
               warn(tree, new PassPartialFunctionDirectly(param))
 
+          /// Using the implicit ordering for Unit is probably wrong
+          case Apply(Apply(TypeApply(Select(_, minMaxBy), _), List(Function(_, Block(_, u @ Literal(Constant(())))))), List(Select(scala_math_Ordering, _unit)))
+            if ((minMaxBy is "minBy") || (minMaxBy is "maxBy")) 
+            && (scala_math_Ordering is "math.this.Ordering") 
+            && (_unit is "Unit") =>
+
+            warn(u, new UnitImplicitOrdering(minMaxBy.toString))
+            
           case _ => 
             //if(tree.toString contains "...") println(showRaw(tree))
         }

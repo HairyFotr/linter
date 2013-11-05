@@ -200,7 +200,19 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       shouldnt("""val x = 0.555555555d""")
     }      
   }
-  
+
+  @Test
+  def UnitImplicitOrdering() {
+    implicit val msg = "Unit is returned here"
+   
+    should("""List(1,2,3) maxBy { x => val res = x }""")
+    should("""List(1,2,3) minBy { x => println("hello"); val res = x }""")
+    should("""(1 to 3) maxBy { x => println("hello"); () }""")
+    should("""Array(1,2,3) maxBy { x => println("hello"); () }""")
+
+    shouldnt("""List(1,2,3) maxBy { x => println("hello"); x }""")
+  }
+    
   
   // ^ New tests named after their Warning.scala name ^
   // ----------------- OLD TESTS ----------------------

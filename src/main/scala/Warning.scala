@@ -61,6 +61,7 @@ object Warning {
     new OperationAlwaysProducesZero(""),
     OptionOfOption,
     new PassPartialFunctionDirectly(""),
+    new UnitImplicitOrdering(""),
     PatternMatchConstant,
     new PossibleLossOfPrecision(""),
     PreferIfToBooleanMatch,
@@ -200,6 +201,9 @@ case object IntDivisionAssignedToFloat extends NoArgMessageWarning("Integer divi
 case object UseFlattenNotFilterOption extends NoArgMessageWarning("Use col.flatten instead of col.filter(_.isDefined).map(_.get).")
 case class PassPartialFunctionDirectly(matchVar: String) extends OneArgMessageWarning("You can pass the partial function in directly. (Remove \"%s match {\").", matchVar) {
   def name = "PassPartialFunctionDirectly"
+}
+case class UnitImplicitOrdering(function: String) extends OneArgMessageWarning("Unit is returned here, so this %s will always return the first element.", function) {
+  def name = "UnitImplicitOrdering"
 }
 case class RegexSyntaxError(errorMessage: String) extends OneArgMessageWarning("Regex pattern syntax error: %s", errorMessage) {
   def name = "RegexSyntaxError"
