@@ -5,7 +5,7 @@ libraryDependencies <++= (scalaVersion) { (scalaVersion) =>
     "org.scala-lang"           % "scala-compiler"  % scalaVersion,
     if (scalaVersion startsWith "2.9")
       "org.specs2"  % "specs2_2.9.3"     % "1.12.4.1"  % "test" else
-      "org.specs2"  % "specs2_2.10"     % "2.2.3"  % "test",
+      "org.specs2"  % "specs2_2.10"     % "2.3.4"  % "test",
     "junit"                    % "junit"           % "4.11"  % "test",
     "com.novocode"             % "junit-interface" % "0.10"    % "test"
   )
@@ -19,13 +19,13 @@ name := "linter"
 
 organization := "com.foursquare.lint"
 
-crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.9.2", "2.9.3", "2.10.3", "2.11.0-M5") }
+crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.3", "2.11.0-M7") }
 
 publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
 
 // Well, if we're gonna do static analysis, why not see what the compiler already does ;)
 
-scalacOptions ++= Seq("-unchecked", "-Xlint", "-Ywarn-all")
+scalacOptions ++= Seq("-deprecation", "-unchecked", "-Xlint", "-Ywarn-all")
 
 // Scala 2.9 and 2.10 -Ywarn-all doesn't work...
 

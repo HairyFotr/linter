@@ -161,8 +161,8 @@ class LinterPlugin(val global: Global) extends Plugin {
       import definitions.{OptionClass, SeqClass, TraversableClass, ListClass, StringClass}
       import definitions.{DoubleClass, FloatClass, CharClass, ByteClass, ShortClass, IntClass, LongClass, BooleanClass}
       
-      val JavaConversionsModule: Symbol = definitions.getModule(newTermName("scala.collection.JavaConversions"))
-      val SeqLikeClass: Symbol = definitions.getClass(newTermName("scala.collection.SeqLike"))
+      val JavaConversionsModule: Symbol = rootMirror.getModuleByName(newTermName("scala.collection.JavaConversions"))
+      val SeqLikeClass: Symbol = rootMirror.getClassByName(newTermName("scala.collection.SeqLike"))
       val SeqLikeContains: Symbol = SeqLikeClass.info.member(newTermName("contains"))
       val SeqLikeApply: Symbol = SeqLikeClass.info.member(newTermName("apply"))
 
@@ -264,7 +264,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       }
       
       import java.math.MathContext
-      val java_math_MathContext = definitions.getClass(newTermName("java.math.MathContext"))
+      val java_math_MathContext = rootMirror.getClassByName(newTermName("java.math.MathContext"))
       def getMathContext(t: Tree): Option[MathContext] = t match {
         case Apply(Select(New(mc), nme.CONSTRUCTOR), (Literal(Constant(precision: Int)) :: roundingMode)) =>
           Some(new MathContext(precision)) // I think roundingMode is irrelevant, because the check will warn if there is any rounding
@@ -1105,7 +1105,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case _ =>
         }
         
-        val MapFactoryClass = definitions.getClass(newTermName("scala.collection.generic.MapFactory"))
+        val MapFactoryClass = rootMirror.getClassByName(newTermName("scala.collection.generic.MapFactory"))
         tree match {
           /// Checks for duplicate mappings in a Map
           case Apply(TypeApply(Select(map, apply), _), args)
@@ -1777,8 +1777,8 @@ class LinterPlugin(val global: Global) extends Plugin {
           "Values("+(if(name.size > 0) name+")(" else "")+(values.map(_.toString) ++ ranges.map(a => a._1+"-"+a._2)).mkString(",")+", "+isSeq+", "+actualSize+")"
       }
       
-      val SeqLikeObject: Symbol = definitions.getModule(newTermName("scala.collection.GenSeq"))
-      val SeqLikeClass: Symbol = definitions.getClass(newTermName("scala.collection.SeqLike"))
+      val SeqLikeObject: Symbol = rootMirror.getModuleByName(newTermName("scala.collection.GenSeq"))
+      val SeqLikeClass: Symbol = rootMirror.getClassByName(newTermName("scala.collection.SeqLike"))
       val SeqLikeContains: Symbol = SeqLikeClass.info.member(newTermName("contains"))
       val SeqLikeApply: Symbol = SeqLikeClass.info.member(newTermName("apply"))
       val SeqLikeGenApply: Symbol = SeqLikeObject.info.member(newTermName("apply"))
@@ -1907,7 +1907,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
 
           /// Parameter of Random.nextInt might be lower than 1 (runtime exception)
-          case Apply(Select(scala_util_Random, nextInt), params) if nextInt.toString == "nextInt" && scala_util_Random.tpe <:< definitions.getClass(newTermName("scala.util.Random")).tpe =>
+          case Apply(Select(scala_util_Random, nextInt), params) if nextInt.toString == "nextInt" && scala_util_Random.tpe <:< rootMirror.getClassByName(newTermName("scala.util.Random")).tpe =>
             if(params.size == 1) {
               val param = computeExpr(params.head)
               if(param.nonEmpty) {
@@ -2383,7 +2383,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               }
             /// String format checks (runtime exception)
             case f @ "format"
-              if (params.nonEmpty) && !(params.head.tpe.widen <:< StringClass.tpe) && !(params.head.tpe.widen <:< definitions.getClass(newTermName("java.util.Locale")).tpe) => 
+              if (params.nonEmpty) && !(params.head.tpe.widen <:< StringClass.tpe) && !(params.head.tpe.widen <:< rootMirror.getClassByName(newTermName("java.util.Locale")).tpe) => 
               //Ignore the default Java impl, just work with scala's format(Any*)
               //TODO: scrap the whole thing, and tell people to use string interpolators ;)
               
