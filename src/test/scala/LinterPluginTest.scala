@@ -217,6 +217,9 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   def if__directBooleanUse() {
     should("""if(true) 7 else 8""")("This condition will always be true and redundant.")
     should("""if(false) 7 else 8""")("This condition will always be false and redundant.")
+
+    should("""while(false) { println("hello") } """)("This condition will always be false and redundant.")
+    shouldnt("""while(true) { println("hello") } """)("This condition will always be true.")
   }
   
   @Test
