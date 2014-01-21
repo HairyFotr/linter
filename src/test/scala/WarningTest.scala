@@ -17,6 +17,7 @@ class WarningTest extends JUnitMustMatchers {
       case ContainsTypeMismatch(_,_) => 1
       case NumberInstanceOf(_) => 1
       case DecomposingEmptyCollection(_,_) => 1
+      case DirectBooleanUse => 1
       case DivideByOne => 1
       case DivisionByLiteralZero => 1
       case DuplicateIfBranches => 1
