@@ -788,6 +788,12 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             warn(a, DuplicateIfBranches)
 
+          // direct use of Booleans
+          case If(cond, _, _) if (cond.equalsStructure(Literal(Constant(false))))=>
+            warn(cond, DirectBooleanUse)
+          case If(cond, _, _) if (cond.equalsStructure(Literal(Constant(true))) && !tree.toString.contains("while") ) =>
+            warn(cond, DirectBooleanUse)
+
           /// Find repeated (sub)conditions in if-else chains, that will never hold
           // caches conditions separated by OR, and checks all subconditions separated by either AND or OR
           case If(condition, t, e) if {
@@ -2133,7 +2139,6 @@ class LinterPlugin(val global: Global) extends Plugin {
             } else {
               //TODO:discover moar
               //if(!(param.tpe.widen <:< StringClass.tpe) && !(param.tpe.widen <:< AnyClass.tpe))println(((str, param), (param.tpe, param.tpe.widen)))
-            
               StringAttrs(param)
             }
           }

@@ -167,6 +167,7 @@ case object MergeNestedIfs extends NoArgMessageWarning("These two nested ifs can
 case class VariableAssignedUnusedValue(variableName: String) extends OneArgMessageWarning("Variable %s has an unused value before this reassign.", variableName) {
   def name = "VariableAssignedUnusedValue"
 }
+case object DirectBooleanUse extends NoArgMessageWarning("This condition will always be true and redundant.")
 case object MalformedSwap extends NoArgMessageWarning("Did you mean to swap these two variables?")
 case object IdenticalIfCondition extends NoArgMessageWarning("Two subsequent ifs have the same condition")
 case object IdenticalStatements extends NoArgMessageWarning("You're doing the exact same thing twice or more.")

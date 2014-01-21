@@ -345,6 +345,16 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       else if(b > 7)
         (2,a)""")      
   }
+
+  @Test
+  def if__directBooleanUse() {
+    implicit val msg = "This condition will always be true and redundant."
+    should("""if(true) 7 else 8""")
+    should("""if(false) 7 else 8""")
+
+    should("""while(false) { println("hello") } """)
+    shouldnt("""while(true) { println("hello") } """)
+  }
   
   @Test
   @Ignore
@@ -1304,7 +1314,6 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       println("foo")
       a = 3
     """)
-
     shouldnt("""
       var a = "A6"
       a = a.toLowerCase
