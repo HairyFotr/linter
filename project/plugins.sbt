@@ -8,5 +8,3 @@ addSbtPlugin("de.johoop" % "cpd4sbt" % "1.1.2")
 
 addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.1.2")
 
-addSbtPlugin("com.github.mpeltonen" % "sbt-idea" % "1.5.2")
-
