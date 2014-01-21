@@ -688,10 +688,10 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(a, "If statement branches have the same structure.")
 
           // direct use of Booleans
-          case If(Literal(Constant(false)), _, _) =>
-            warn(Literal(Constant(false)), "This condition will always be false and redundant.")
-          case If(Literal(Constant(true)), _, _) =>
-            warn(Literal(Constant(true)), "This condition will always be true and redundant.")
+          case If(cond, _, _) if (cond equalsStructure Literal(Constant(false)))=>
+            warn(cond, "This condition will always be false and redundant.")
+          case If(cond, _, _) if (cond equalsStructure Literal(Constant(true))) =>
+            warn(cond, "This condition will always be true and redundant.")
 
           /// Find repeated (sub)conditions in if-else chains, that will never hold
           // caches conditions separated by OR, and checks all subconditions separated by either AND or OR
