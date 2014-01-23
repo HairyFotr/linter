@@ -348,21 +348,19 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
 
   @Test
   def if__directBooleanUse() {
-    implicit val msg = "This condition will always be true and redundant."
-    should("""if(true) 7 else 8""")
-    should("""if(false) 7 else 8""")
+    should("""if(true) 7 else 8""")("This condition will always be true.")
+    should("""if(false) 7 else 8""")("This condition will always be false.")
 
-    should("""while(false) { println("hello") } """)
-    shouldnt("""while(true) { println("hello") } """)
+    should("""while(false) { println("hello") } """)("This condition will always be false.")
+    shouldnt("""while(true) { println("hello") } """)("This condition will always be true.")
   }
   
   @Test
-  @Ignore
   def if__condition() {
     should("""if(1 > 5) 7 else 8""")("This condition will always be false.")
     should("""if(1 < 5) 7 else 8""")("This condition will always be true.")
 
-    shouldnt("""while(1 < 5) { 7; 8 """)("This condition will always be true.")
+    shouldnt("""while(1 < 5) { 7 } else 8 """)("This condition will always be true.")
   }
 
   @Test

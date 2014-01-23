@@ -790,9 +790,9 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           // direct use of Booleans
           case If(cond, _, _) if (cond.equalsStructure(Literal(Constant(false))))=>
-            warn(cond, DirectBooleanUse)
+            warn(cond, DirectBooleanUse(cond.toString()))
           case If(cond, _, _) if (cond.equalsStructure(Literal(Constant(true))) && !tree.toString.contains("while") ) =>
-            warn(cond, DirectBooleanUse)
+            warn(cond, DirectBooleanUse(cond.toString()))
 
           /// Find repeated (sub)conditions in if-else chains, that will never hold
           // caches conditions separated by OR, and checks all subconditions separated by either AND or OR
