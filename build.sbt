@@ -1,13 +1,17 @@
+name := "linter"
+
+organization := "com.foursquare.lint"
+
+version := "0.1.0"
+
 scalaVersion := "2.10.3"
 
 libraryDependencies <++= (scalaVersion) { (scalaVersion) =>
   Seq(
     "org.scala-lang"           % "scala-compiler"  % scalaVersion,
-    if (scalaVersion startsWith "2.9")
-      "org.specs2"  % "specs2_2.9.3"     % "1.12.4.1"  % "test" else
-      "org.specs2"  % "specs2_2.10"     % "2.3.4"  % "test",
-    "junit"                    % "junit"           % "4.11"  % "test",
-    "com.novocode"             % "junit-interface" % "0.10"    % "test"
+    "org.specs2"               % "specs2_2.10"     % "2.2.3"     % "test",
+    "junit"                    % "junit"           % "4.11"      % "test",
+    "com.novocode"             % "junit-interface" % "0.10"      % "test"
   )
 }
 
@@ -15,11 +19,8 @@ scalacOptions in console in Compile <+= (packageBin in Compile) map { pluginJar 
   "-Xplugin:"+pluginJar
 }
 
-name := "linter"
-
-organization := "com.foursquare.lint"
-
 crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.3", "2.11.0-M7") }
+
 
 publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
 
@@ -27,7 +28,7 @@ publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
 
 scalacOptions ++= Seq("-deprecation", "-unchecked", "-Xlint", "-Ywarn-all")
 
-// Scala 2.9 and 2.10 -Ywarn-all doesn't work...
+// Scala 2.9 and 2.10 -Ywarn-all doesn't work actually warn-all
 
 scalacOptions ++= Seq("-Ywarn-dead-code", "-Ywarn-inaccessible", "-Ywarn-nullary-override", "-Ywarn-nullary-unit", "-Ywarn-numeric-widen", "-Ywarn-value-discard")
 

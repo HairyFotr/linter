@@ -37,7 +37,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     import scala.tools.nsc.reporters.Reporter
 
     private val settings = new Settings
-    val loader = manifest[LinterPlugin].erasure.getClassLoader
+    val loader = manifest[LinterPlugin].runtimeClass.getClassLoader
     settings.classpath.value = Source.fromURL(loader.getResource("app.class.path")).mkString
     settings.bootclasspath.append(Source.fromURL(loader.getResource("boot.class.path")).mkString)
     //settings.deprecation.value = true // enable detailed deprecation warnings
@@ -345,14 +345,22 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       else if(b > 7)
         (2,a)""")      
   }
+
+  @Test
+  def if__directBooleanUse() {
+    should("""if(true) 7 else 8""")("This condition will always be true.")
+    should("""if(false) 7 else 8""")("This condition will always be false.")
+
+    should("""while(false) { println("hello") } """)("This condition will always be false.")
+    shouldnt("""while(true) { println("hello") } """)("This condition will always be true.")
+  }
   
   @Test
-  @Ignore
   def if__condition() {
     should("""if(1 > 5) 7 else 8""")("This condition will always be false.")
     should("""if(1 < 5) 7 else 8""")("This condition will always be true.")
 
-    shouldnt("""while(1 < 5) { 7; 8 """)("This condition will always be true.")
+    shouldnt("""while(1 < 5) { 7 } else 8 """)("This condition will always be true.")
   }
 
   @Test
@@ -1304,7 +1312,6 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       println("foo")
       a = 3
     """)
-
     shouldnt("""
       var a = "A6"
       a = a.toLowerCase

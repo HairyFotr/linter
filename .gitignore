@@ -1,4 +1,7 @@
 .DS_Store
 /target/
 /project/target/
+/project/project/target
 *~
+*.iml
+.idea
