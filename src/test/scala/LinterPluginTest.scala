@@ -37,7 +37,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     import scala.tools.nsc.reporters.Reporter
 
     private val settings = new Settings
-    val loader = manifest[LinterPlugin].erasure.getClassLoader
+    val loader = manifest[LinterPlugin].runtimeClass.getClassLoader
     settings.classpath.value = Source.fromURL(loader.getResource("app.class.path")).mkString
     settings.bootclasspath.append(Source.fromURL(loader.getResource("boot.class.path")).mkString)
     //settings.deprecation.value = true // enable detailed deprecation warnings
