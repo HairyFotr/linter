@@ -27,9 +27,7 @@ publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
 
 // Well, if we're gonna do static analysis, why not see what the compiler already does ;)
 
-scalacOptions ++= Seq("-unchecked", "-Xlint", "-Ywarn-all")
-
-// Scala 2.9 and 2.10 -Ywarn-all doesn't work actually warn-all
+scalacOptions ++= Seq("-unchecked", "-Xlint")
 
 scalacOptions ++= Seq("-Ywarn-dead-code", "-Ywarn-inaccessible", "-Ywarn-nullary-override", "-Ywarn-nullary-unit", "-Ywarn-numeric-widen", "-Ywarn-value-discard")
 
