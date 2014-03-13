@@ -21,7 +21,7 @@ scalacOptions in console in Compile <+= (packageBin in Compile) map { pluginJar 
   "-Xplugin:"+pluginJar
 }
 
-crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.9.2", "2.9.3", "2.10.3", "2.11.0-M5") }
+crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.9.2", "2.9.3", "2.10.3", "2.11.0-RC1") }
 
 publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
 
