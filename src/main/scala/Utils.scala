@@ -57,8 +57,8 @@ class Utils[G <: Global](val global: G) {
   }
 
   import definitions.{AnyClass, NothingClass, ObjectClass, Object_==, OptionClass, SeqClass}
-  val JavaConversionsModule: Symbol = definitions.getModule(newTermName("scala.collection.JavaConversions"))
-  val SeqLikeClass: Symbol = definitions.getClass(newTermName("scala.collection.SeqLike"))
+  val JavaConversionsModule: Symbol = rootMirror.getModuleByName(newTermName("scala.collection.JavaConversions"))
+  val SeqLikeClass: Symbol = rootMirror.getClassByName(newTermName("scala.collection.SeqLike"))
   val SeqLikeContains: Symbol = SeqLikeClass.info.member(newTermName("contains"))
   val SeqLikeApply: Symbol = SeqLikeClass.info.member(newTermName("apply"))
 

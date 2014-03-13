@@ -21,15 +21,13 @@ scalacOptions in console in Compile <+= (packageBin in Compile) map { pluginJar 
   "-Xplugin:"+pluginJar
 }
 
-crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.9.2", "2.9.3", "2.10.3", "2.11.0-M5") }
+crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.9.2", "2.9.3", "2.10.3", "2.11.0-RC1") }
 
 publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
 
 // Well, if we're gonna do static analysis, why not see what the compiler already does ;)
 
-scalacOptions ++= Seq("-unchecked", "-Xlint", "-Ywarn-all")
-
-// Scala 2.9 and 2.10 -Ywarn-all doesn't work actually warn-all
+scalacOptions ++= Seq("-unchecked", "-Xlint")
 
 scalacOptions ++= Seq("-Ywarn-dead-code", "-Ywarn-inaccessible", "-Ywarn-nullary-override", "-Ywarn-nullary-unit", "-Ywarn-numeric-widen", "-Ywarn-value-discard")
 
