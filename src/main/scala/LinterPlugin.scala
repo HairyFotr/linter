@@ -80,6 +80,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       def catcher(): PartialFunction[Throwable, Unit] = { 
         case e: NullPointerException => //
         case e: NoSuchMethodError => //
+        case e: StackOverflowError => //
         //TODO: Print details and ask user to report it
       }
       def finalizer(tree: Tree): Unit = { 
@@ -337,6 +338,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       def catcher(): PartialFunction[Throwable, Unit] = { 
         case e: NullPointerException => //
         case e: NoSuchMethodError => //
+        case e: StackOverflowError => //
         //TODO: Print details and ask user to report it
       }
       def finalizer(tree: Tree): Unit = { 
@@ -2749,6 +2751,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       def catcher(): PartialFunction[Throwable, Unit] = { 
         case e: NullPointerException => //
         case e: NoSuchMethodError => //
+        case e: StackOverflowError => //
         //TODO: Print details and ask user to report it
       }
       def finalizer(tree: Tree): Unit = { 
@@ -3054,6 +3057,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       def catcher(): PartialFunction[Throwable, Unit] = { 
         case e: NullPointerException => //
         case e: NoSuchMethodError => //
+        case e: StackOverflowError => //
         //TODO: Print details and ask user to report it
       }
       def finalizer(tree: Tree): Unit = { 

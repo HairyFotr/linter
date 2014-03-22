@@ -19,6 +19,10 @@ Add it as a compiler plugin to your project by editing your build.sbt file:
 
     addCompilerPlugin("com.foursquare.lint" %% "linter" % "0.1-SNAPSHOT")
 
+If you have problems with the snapshot version when going offline, there are also 0.1.x versions being published - you can check build.sbt, or use the [sbt-updates plugin](https://github.com/rtimush/sbt-updates) to find the lastest version.
+
+You can also use the snapshot with [sbt offline mode](http://www.scala-sbt.org/0.12.4/docs/Detailed-Topics/Dependency-Management-Flow.html).
+
 ### Manually
 You can download the latest jars here:
 [Scala 2.10.2](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar?raw=true), 
@@ -128,7 +132,7 @@ You can also check the [test code](https://github.com/HairyFotr/linter/blob/mast
 
 #### Loss of precision on BigDecimal
     scala> BigDecimal(0.555555555555555555555555555)
-    <console>:8: warning: Possible loss of precision. Use a string constant.
+    <console>:8: warning: Possible loss of precision. Literal cannot be represented exactly by Double. (0.555555555555555555555555555 != 0.5555555555555556)
                   BigDecimal(0.555555555555555555555555555)
                             ^
 

@@ -1,4 +1,12 @@
+name := "linter"
+
+organization := "com.foursquare.lint"
+
+version := "0.1.1"
+
 scalaVersion := "2.10.4"
+
+crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.4", "2.11.0-RC3") }
 
 resolvers ++= Seq("snapshots", "releases").map(Resolver.sonatypeRepo)
 
@@ -15,12 +23,6 @@ libraryDependencies <++= (scalaVersion) { (scalaVersion) =>
 }
 
 scalacOptions in console in Compile <+= (packageBin in Compile) map { pluginJar => "-Xplugin:"+pluginJar }
-
-name := "linter"
-
-organization := "com.foursquare.lint"
-
-crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.4", "2.11.0-RC3") }
 
 publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
 
