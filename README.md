@@ -51,7 +51,7 @@ You can also check the [test code](https://github.com/HairyFotr/linter/blob/mast
 ### If checks
 #### Repeated condition in an else-if chain
     scala> if(a == 10 || b == 10) 0 else if(a == 20 && b == 10) 1 else 2
-    <console>:10: warning: This condition has appeared earlier in the if-else chain, and will never hold here.
+    <console>:10: warning: This condition has appeared earlier in the if-else chain and will never hold here.
                   if(a == 10 || b == 10) 0 else if(a == 20 && b == 10) 1 else 2
                                                                 ^
 
@@ -70,13 +70,13 @@ You can also check the [test code](https://github.com/HairyFotr/linter/blob/mast
 ### Pattern matching checks
 #### Detect some unreachable cases
     scala> (x,y) match { case (a,5) if a > 5 => 0 case (c,5) if c > 5 => 1 }
-    <console>:10: warning: Identical case detected above - this will never match.
+    <console>:10: warning: Identical case condition detected above. This case will never match.
                   (x,y) match { case (a,5) if a > 5 => 0 case (c,5) if c > 5 => 1 }
                                                               ^
 
 #### Identical neighbouring cases
     scala> a match { case 3 => "hello" case 4 => "hello" case 5 => "hello" case _ => "how low" }
-    <console>:9: warning: 3 neighbouring cases are identical, and could be merged.
+    <console>:9: warning: Bodies of 3 neighbouring cases are identical and could be merged.
                   a match { case 3 => "hello" case 4 => "hello" case 5 => "hello" case _ => "how low" }
                                                                           ^
 
@@ -99,7 +99,7 @@ You can also check the [test code](https://github.com/HairyFotr/linter/blob/mast
                                        ^
 #### Detect too large, or negative indices
     scala> { val a = List(1,2,3); for(i <- 1 to 10) { println(a(i)) } }
-    <console>:8: warning: You will likely use a too large index for a collection here.
+    <console>:8: warning: You will likely use a too large index.
                   { val a = List(1,2,3); for(i <- 1 to 10) { println(a(i)) } }
                                                                       ^
 
@@ -111,10 +111,10 @@ You can also check the [test code](https://github.com/HairyFotr/linter/blob/mast
                                                             ^
 #### Attempt to track the prefix, suffix, and pieces
     scala> { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(a contains "world") ""; if(a startsWith "hell") "" }
-    <console>:8: warning: This contains will always return true.
+    <console>:8: warning: This contains will always returns the same value: true
                   { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(a contains "world") ""; if(a startsWith "hell") "" }
                                                                                                                      ^
-    <console>:8: warning: This startsWith will always return true.
+    <console>:8: warning: This startsWith always returns the same value: true
                   { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(a contains "world") ""; if(a startsWith "hell") "" }
                                                                                                                                                   ^
 
@@ -132,7 +132,7 @@ You can also check the [test code](https://github.com/HairyFotr/linter/blob/mast
 
 #### Loss of precision on BigDecimal
     scala> BigDecimal(0.555555555555555555555555555)
-    <console>:8: warning: Possible loss of precision - use a string constant
+    <console>:8: warning: Possible loss of precision. Literal cannot be represented exactly by Double. (0.555555555555555555555555555 != 0.5555555555555556)
                   BigDecimal(0.555555555555555555555555555)
                             ^
 
@@ -171,12 +171,12 @@ You can also check the [test code](https://github.com/HairyFotr/linter/blob/mast
 
 #### Unsafe `contains`
     scala> List(1, 2, 3).contains("4")
-    <console>:29: warning: List[Int].contains(String) will probably return false.
+    <console>:29: warning: List[Int].contains(String) will probably return false because the collection and target element are of different types.
                   List(1, 2, 3).contains("4")
                                 ^
 #### Unsafe `==`
     scala> Nil == None
-    <console>:29: warning: Comparing with == on instances of different types (object Nil, object None) will probably return false.
+    <console>:29: warning: Comparing with == on instances of different types (scala.collection.immutable.Nil.type, None.type) will probably return false.
                   Nil == None
                       ^
 
@@ -202,7 +202,8 @@ Feel free to add your own ideas, or implement these. Pull requests welcome!
 * Detect vars, that could easily be vals (done in scala 2.11 -Xlint)
 
 Rule lists from other static analysis tools for inspiration:
-* ScalaStyle - https://github.com/scalastyle/scalastyle/wiki
+* ScalaStyle(Scala) - https://github.com/scalastyle/scalastyle/wiki
+* Findbugs(JVM) - http://findbugs.sourceforge.net/bugDescriptions.html
 * CheckStyle(Java) - http://checkstyle.sourceforge.net/availablechecks.html
 * PMD(Java) - http://pmd.sourceforge.net/pmd-5.0.3/rules/index.html
 * CodeNarc(Groovy) - http://codenarc.sourceforge.net/codenarc-rule-index.html

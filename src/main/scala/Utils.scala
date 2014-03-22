@@ -20,15 +20,15 @@ import scala.tools.nsc.Global
 import collection.mutable
 
 object Utils {
+  var disabledWarningNames: Seq[String] = Nil
   val nowarnPositions = mutable.HashSet[Global#Position]()
   
-  def warn(tree: Global#Tree, msg: String, filters: List[String] = Nil)(implicit unit: Global#CompilationUnit) {
-    val line = tree.pos.lineContent
-    if((line matches ".*// *nolint *") || (filters exists { line contains _ }) || (nowarnPositions contains tree.pos)) {
+  def warn(tree: Global#Tree, warning: Warning)(implicit unit: Global#CompilationUnit) { 
+    if (disabledWarningNames.contains(warning.name) || (tree.pos.lineContent matches ".*// *nolint *") || (nowarnPositions contains tree.pos)) {
       // skip
     } else {
       // scalastyle:off regex
-      unit.warning(tree.pos, msg)
+      unit.warning(tree.pos, warning.message)
       // scalastyle:on regex
     }
   }
@@ -57,8 +57,8 @@ class Utils[G <: Global](val global: G) {
   }
 
   import definitions.{AnyClass, NothingClass, ObjectClass, Object_==, OptionClass, SeqClass}
-  val JavaConversionsModule: Symbol = definitions.getModule(newTermName("scala.collection.JavaConversions"))
-  val SeqLikeClass: Symbol = definitions.getClass(newTermName("scala.collection.SeqLike"))
+  val JavaConversionsModule: Symbol = rootMirror.getModuleByName(newTermName("scala.collection.JavaConversions"))
+  val SeqLikeClass: Symbol = rootMirror.getClassByName(newTermName("scala.collection.SeqLike"))
   val SeqLikeContains: Symbol = SeqLikeClass.info.member(newTermName("contains"))
   val SeqLikeApply: Symbol = SeqLikeClass.info.member(newTermName("apply"))
 
@@ -75,9 +75,8 @@ class Utils[G <: Global](val global: G) {
   def isSubtype(x: Tree, y: Tree): Boolean = { x.tpe.widen <:< y.tpe.widen }
   def isSubtype(x: Tree, y: Type): Boolean = { x.tpe.widen <:< y.widen }
 
-  def methodImplements(method: Symbol, target: Symbol): Boolean = {
-    method == target || method.allOverriddenSymbols.contains(target)
-  }
+  def methodImplements(method: Symbol, target: Symbol): Boolean = 
+    try { method == target || method.allOverriddenSymbols.contains(target) } catch { case e: NullPointerException => false }
 
   def isGlobalImport(selector: ImportSelector): Boolean = {
     selector.name == nme.WILDCARD && selector.renamePos == -1
