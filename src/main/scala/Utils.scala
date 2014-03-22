@@ -75,9 +75,8 @@ class Utils[G <: Global](val global: G) {
   def isSubtype(x: Tree, y: Tree): Boolean = { x.tpe.widen <:< y.tpe.widen }
   def isSubtype(x: Tree, y: Type): Boolean = { x.tpe.widen <:< y.widen }
 
-  def methodImplements(method: Symbol, target: Symbol): Boolean = {
-    method == target || method.allOverriddenSymbols.contains(target)
-  }
+  def methodImplements(method: Symbol, target: Symbol): Boolean = 
+    try { method == target || method.allOverriddenSymbols.contains(target) } catch { case e: NullPointerException => false }
 
   def isGlobalImport(selector: ImportSelector): Boolean = {
     selector.name == nme.WILDCARD && selector.renamePos == -1

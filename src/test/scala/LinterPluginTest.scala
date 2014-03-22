@@ -194,7 +194,9 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
       implicit val msg = "Literal cannot be represented exactly"
      
       should("""val x = 0.5555555555555555555555555555""")
+      should("""val x = 0.5555555555555555555555555555+0.5""")
       shouldnt("""val x = 0.5""")
+      shouldnt("""val x = 0.5+0.5""")
 
       should("""val x = 0.555555555f""")
       shouldnt("""val x = 0.555555555d""")
@@ -221,6 +223,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   def caseClass__NoWarn() {
     noWarnings("""case class A()""")
     noWarnings("""case class A(a: Float)""")
+    noWarnings("""case class A(a: Float*)""")
     noWarnings("""class A(a: Float, b: String)""")
   }
 
@@ -1789,7 +1792,7 @@ class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
     should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s endsWith "!") ""; """)("""This endsWith always returns the same value: true""")
     should(defs+"""str.replaceAll("?", ".")""")("""Regex pattern syntax error: Dangling meta character '?'""")
     should(defs+"""math.log(1d + a)""")("""Use math.log1p(x) instead of math.log(1 + x) for added accuracy when x is near 0""")
-    should(defs+"""BigDecimal(0.555555555555555555555555555)""")("""Possible loss of precision. Use a string constant.""")
+    should(defs+"""BigDecimal(0.555555555555555555555555555)""")("""Possible loss of precision.""")
     should(defs+"""{val a = Some(List(1,2,3)); if(a.size > 3) ""}""")("""Did you mean to take the size of the collection inside the Option?""")
     should(defs+"""if(strOption.isDefined) strOption.get else """"")("""Use opt.getOrElse(...) instead of if(opt.isDefined) opt.get else ...""")
     should(defs+"""List(1,2,3,4).find(x => x % 2 == 0).isDefined""")("""Use exists(...) instead of find(...).isDefined""")

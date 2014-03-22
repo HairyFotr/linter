@@ -76,7 +76,17 @@ class LinterPlugin(val global: Global) extends Plugin {
     class PreTyperTraverser(unit: CompilationUnit) extends Traverser {
       implicit val unitt = unit
 
-      override def traverse(tree: Tree) {
+      var superTraverse = true
+      def catcher(): PartialFunction[Throwable, Unit] = { 
+        case e: NullPointerException => //
+        case e: NoSuchMethodError => //
+        //TODO: Print details and ask user to report it
+      }
+      def finalizer(tree: Tree): Unit = { 
+        if(superTraverse) try { super.traverse(tree) } catch catcher
+      }
+      override def traverse(tree: Tree): Unit = try {
+        superTraverse = true
         //if(showRaw(tree).contains("Hello"))println(showRaw(tree))
         tree match {
           /// Unused sealed traits (Idea by edofic)
@@ -85,24 +95,24 @@ class LinterPlugin(val global: Global) extends Plugin {
             inTrait = true
             for(stmt <- body) traverse(stmt)
             inTrait = false
-            return
+            superTraverse = false; return
 
           // typeparams (3rd param) are sometimes used for type-checking hacks
           case ClassDef(mods, name, List(), Template(extendsList, _, body)) if mods.isSealed && mods.isTrait && !inTrait =>
             sealedTraits += name -> tree
             for(Ident(traitName) <- extendsList if traitName.toString != name.toString) usedTraits += traitName
             for(stmt <- body) traverse(stmt)
-            return
+            superTraverse = false; return
             
           case ClassDef(mods, _, _, Template(extendsList, _, body)) => //if mods.hasFlag(CASE) => 
             for(Ident(traitName) <- extendsList) usedTraits += traitName
             for(stmt <- body) traverse(stmt)
-            return
+            superTraverse = false; return
             
           case ModuleDef(mods, name, Template(extendsList, _, body)) =>
             for(Ident(traitName) <- extendsList) usedTraits += traitName
             for(stmt <- body) traverse(stmt)
-            return
+            superTraverse = false; return
 
           
           /// Warn on Nothing/Any or M[Nothing/Any] (idea by OlegYch)
@@ -132,10 +142,49 @@ class LinterPlugin(val global: Global) extends Plugin {
             /*if(mods.isImplicit && typeTree.isEmpty && !(name.toString matches "((i?)to).+|.*(To|2)[A-Z].*")) {
               warn(tree, "Implicit method %s needs explicit return type" format name)
             }*/
+
+          //Loss of precision on literals
+          //Moved here because ConstantFolder in typechecker messes it up
+          case treeLiteral @ Literal(Constant(literal)) if literal != null && literal != (()) && (literal match { case a: Double => true; case a: Float => true; case _ => false; }) => //&& isFloatingType(tree) =>
+            
+            val tpe = (literal match { case a: Double => "Double"; case a: Float => "Float"; case _ => "floating point type"; })
+            
+            val (strLiteral, actualLiteral) = {
+                // Get the actual token from code
+                val floatRegex = "[-+]?[0-9.]+([eE][-+]?[0-9]+)?[dfDF]?".r
+                var token = ""
+                try {
+                  val pos = treeLiteral.pos
+                  token = floatRegex.findPrefixMatchOf(pos.lineContent.substring(pos.column - 1)).get.toString
+                  token.toDouble.toString // trigger NumberFormatException
+                } catch {
+                  case e: java.lang.UnsupportedOperationException => // Happens if tree doesn't have a position
+                  case e: java.lang.NumberFormatException => // Could warn here, but I don't trust the above code enough
+                  case e: MatchError =>
+                  case e: Exception =>  
+                    //println(treeLiteral.pos.lineContent)
+                    //e.printStackTrace
+                }
+                (literal.toString, token)
+              }
+
+            try {
+              // Ugly hack to get around a few different representations: 0.005, 5E-3, ...
+              def cleanString(s: String): String = s.replaceAll("^[-+]|[.]|[Ee].*$|[fdFD-]*$|(0[.])?0*", "")
+              
+              if(!strLiteral.isEmpty && !actualLiteral.isEmpty 
+              && (strLiteral matches ".*[0-9].*") && (actualLiteral matches ".*[0-9].*") //contains number
+              && cleanString(strLiteral) != cleanString(actualLiteral)
+              && ((if(strLiteral.toDouble < 0) "-" else "") + actualLiteral) != strLiteral)
+                warn(treeLiteral, new PossibleLossOfPrecision("Literal cannot be represented exactly by "+tpe+". ("+(if(strLiteral.toDouble < 0) "-" else "") + actualLiteral+" != "+strLiteral+")"))
+                
+            } catch {
+              case e: java.lang.NumberFormatException => //
+            }
+          
           case _ => 
         }
-        super.traverse(tree)
-      }
+      } catch catcher finally finalizer(tree)
     }
   }
 
@@ -191,9 +240,8 @@ class LinterPlugin(val global: Global) extends Plugin {
         || tpe <:< DoubleClass.tpe)
       def isFloatingType(x: Tree): Boolean = isFloatingType(x.tpe.widen)
         
-      def methodImplements(method: Symbol, target: Symbol): Boolean = {
-        method == target || method.allOverriddenSymbols.contains(target)
-      }
+      def methodImplements(method: Symbol, target: Symbol): Boolean = 
+        try { method == target || method.allOverriddenSymbols.contains(target) } catch { case e: NullPointerException => false }
 
       def isGlobalImport(selector: ImportSelector): Boolean = {
         selector.name == nme.WILDCARD && selector.renamePos == -1
@@ -285,20 +333,30 @@ class LinterPlugin(val global: Global) extends Plugin {
         case _ => false
       }
 
-      override def traverse(tree: Tree) { 
+      var superTraverse = true
+      def catcher(): PartialFunction[Throwable, Unit] = { 
+        case e: NullPointerException => //
+        case e: NoSuchMethodError => //
+        //TODO: Print details and ask user to report it
+      }
+      def finalizer(tree: Tree): Unit = { 
+        if(superTraverse) try { super.traverse(tree) } catch catcher
+      }
+      override def traverse(tree: Tree): Unit = try {
+        superTraverse = true
         //TODO: the matchers are broken up for one reason only - Scala 2.9 pattern matcher :)
         // Workarounds for some cases
         tree match {
           /// Workaround: case class generated code triggers a lot of the checks...
-          case ClassDef(mods, _, _, body) if mods.isCase => traverse(body); return
+          case ClassDef(mods, _, _, body) if mods.isCase => traverse(body); superTraverse = false; return
           /// Workaround: suppresse a null warning and a "remove the if" check for """case class A()""" - see case class unapply's AST)
-          case If(Apply(Select(_, nme.EQ), List(Literal(Constant(null)))), Literal(Constant(false)), Literal(Constant(true))) => return
+          case If(Apply(Select(_, nme.EQ), List(Literal(Constant(null)))), Literal(Constant(false)), Literal(Constant(true))) => superTraverse = false; return
           /// WorkAround: ignores "Assignment right after declaration..." in case class hashcode
           case DefDef(mods, name, _, _, _, Block(block, last)) if (name is "hashCode") && {
             (block :+ last) match { 
               case ValDef(modifiers, id1, _, _) :: Assign(id2, _) :: _ => true
               case _ => false
-            }} => return
+            }} => superTraverse = false; return
           case _ =>
         }
         tree match {
@@ -408,23 +466,23 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             val improvement: String =
               if(isFloat) {
-                if(strLiteral == actualLiteral && mathContext.isDefined) "Use a larger MathContext."
-                else if(apply_valueOf is "apply") "Use a string constant." 
-                else "Use a constructor with a string constant."
+                if(strLiteral == actualLiteral && mathContext.isDefined) "Use a larger MathContext." else ""
+                //else if(apply_valueOf is "apply") "Use a string constant." 
+                //else "Use a constructor with a string constant."
               } else {
                 if(mathContext.isDefined) "Use a larger MathContext."
                 else "Add a custom MathContext."
               }
 
-            try {
+            if(improvement != "") try {
               // Ugly hack to get around a few different representations: 0.005, 5E-3, ...
               def cleanString(s: String): String = s.replaceAll("^-|[.]|[Ee].*$|(0[.])?0*", "")
               
               val bd = if(mathContext.isDefined) BigDecimal(strLiteral, mathContext.get) else BigDecimal(strLiteral)
-              if(cleanString(bd.toString) != cleanString(actualLiteral)) warn(tree, new PossibleLossOfPrecision(improvement))
+              if(cleanString(bd.toString) != cleanString(actualLiteral)) warn(treeLiteral, new PossibleLossOfPrecision(improvement))
             } catch {
               case e: java.lang.NumberFormatException =>
-                warn(tree, BigDecimalNumberFormat)
+                warn(treeLiteral, BigDecimalNumberFormat)
             }
 
           // new java.math.BigDecimal(0.1)
@@ -435,46 +493,6 @@ class LinterPlugin(val global: Global) extends Plugin {
           
           case _ =>
         }
-        tree match {
-          //Loss of precision on literals
-          case treeLiteral @ Literal(Constant(literal)) if literal != null && literal != (()) &&  isFloatingType(tree) =>
-
-            val (strLiteral, actualLiteral) = {
-                // Get the actual token from code
-                val floatRegex = "[-+]?[0-9.]+([eE][-+]?[0-9]+)?[dfDF]?".r
-                var token = ""
-                try {
-                  val pos = treeLiteral.pos
-                  token = floatRegex.findPrefixMatchOf(pos.lineContent.substring(pos.column - 1)).get.toString
-                  token.toDouble.toString // trigger NumberFormatException
-                } catch {
-                  case e: java.lang.UnsupportedOperationException => // Happens if tree doesn't have a position
-                  case e: java.lang.NumberFormatException => // Could warn here, but I don't trust the above code enough
-                  case e: MatchError =>
-                  case e: Exception =>  
-                    //println(treeLiteral.pos.lineContent)
-                    //e.printStackTrace
-                }
-                (literal.toString, token)
-              }
-
-            try {
-              // Ugly hack to get around a few different representations: 0.005, 5E-3, ...
-              def cleanString(s: String): String = s.replaceAll("^[-+]|[.]|[Ee].*$|[fdFD-]*$|(0[.])?0*", "")
-              
-              if(!strLiteral.isEmpty && !actualLiteral.isEmpty 
-              && (strLiteral matches ".*[0-9].*") && (actualLiteral matches ".*[0-9].*") //contains number
-              && cleanString(strLiteral) != cleanString(actualLiteral)
-              && ((if(strLiteral.toDouble < 0) "-" else "") + actualLiteral) != strLiteral)
-                warn(tree, new PossibleLossOfPrecision("Literal cannot be represented exactly by "+tree.tpe.widen+". ("+(if(strLiteral.toDouble < 0) "-" else "") + actualLiteral+" != "+strLiteral+")"))
-                
-            } catch {
-              case e: java.lang.NumberFormatException => //
-            }
-          
-          case _ =>
-        }
-        
         tree match {
           /// Checks for self-assignments: a = a
           case Assign(left, right) if left equalsStructure right =>
@@ -488,7 +506,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           //TODO: Possibly skips checking code in higher order functions later on
           case Select(fromFile, _) if fromFile startsWith "scala.io.Source.fromFile" =>
             warn(fromFile, CloseSourceFile)
-            return
+            superTraverse = false; return
             
           /// Comparing with == on instances of different types: 5 == "5"
           //TODO: Scala 2.10 has a similar check "comparing values of types Int and String using `==' will always yield false"
@@ -1213,9 +1231,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case _ => 
             //if(tree.toString contains "...") println(showRaw(tree))
         }
-
-        super.traverse(tree)
-      }
+      } catch catcher finally finalizer(tree)
     }
   }
 
@@ -1782,9 +1798,8 @@ class LinterPlugin(val global: Global) extends Plugin {
       val SeqLikeContains: Symbol = SeqLikeClass.info.member(newTermName("contains"))
       val SeqLikeApply: Symbol = SeqLikeClass.info.member(newTermName("apply"))
       val SeqLikeGenApply: Symbol = SeqLikeObject.info.member(newTermName("apply"))
-      def methodImplements(method: Symbol, target: Symbol): Boolean = {
-        method == target || method.allOverriddenSymbols.contains(target)
-      }
+      def methodImplements(method: Symbol, target: Symbol): Boolean =
+        try { method == target || method.allOverriddenSymbols.contains(target) } catch { case e: NullPointerException => false }
       
       //TODO: extend with more functions... and TEST TEST TEST TEST
       //// Attempt to compute part of the AST, and return Integer/List value
@@ -2730,8 +2745,18 @@ class LinterPlugin(val global: Global) extends Plugin {
         popDefinitions()
       }
 
-      override def traverse(tree: Tree) {
-        if(doNotTraverse contains tree) return
+      var superTraverse = true
+      def catcher(): PartialFunction[Throwable, Unit] = { 
+        case e: NullPointerException => //
+        case e: NoSuchMethodError => //
+        //TODO: Print details and ask user to report it
+      }
+      def finalizer(tree: Tree): Unit = { 
+        if(superTraverse) try { super.traverse(tree) } catch catcher
+      }
+      override def traverse(tree: Tree): Unit = try {
+        superTraverse = true
+        if(doNotTraverse contains tree) { superTraverse = false; return }
         treePosHolder = tree
         tree match {
           /// Very hacky support for some var interpretion
@@ -3001,10 +3026,10 @@ class LinterPlugin(val global: Global) extends Plugin {
             //if(vals.nonEmpty)println(">   "+vals);
             //if(showRaw(tree).startsWith("Literal") || showRaw(tree).startsWith("Constant"))println("in: "+showRaw(tree))
             //tree.children.foreach(traverse)
-            super.traverse(tree)
+            try { super.traverse(tree) } catch catcher
         }
         //super.traverse(tree)
-      }
+      } catch catcher
     }
   }
   
@@ -3025,7 +3050,17 @@ class LinterPlugin(val global: Global) extends Plugin {
     class PostRefChecksTraverser(unit: CompilationUnit) extends Traverser {
       implicit val unitt = unit
 
-      override def traverse(tree: Tree) {
+      var superTraverse = true
+      def catcher(): PartialFunction[Throwable, Unit] = { 
+        case e: NullPointerException => //
+        case e: NoSuchMethodError => //
+        //TODO: Print details and ask user to report it
+      }
+      def finalizer(tree: Tree): Unit = { 
+        if(superTraverse) try { super.traverse(tree) } catch catcher
+      }
+      override def traverse(tree: Tree): Unit = try {
+        superTraverse = true
         tree match {
           case DefDef(mods: Modifiers, name, _, valDefs, typeTree, body) =>
             //workaround for scala 2.9 - copied from compiler code
@@ -3063,8 +3098,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             
           case _ => 
         }
-        super.traverse(tree)
-      }
+      } catch catcher finally finalizer(tree)
     }
   }
 
