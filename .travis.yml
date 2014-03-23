@@ -6,8 +6,9 @@
    allow_failures:
      - scala: 2.11.0-RC3
  jdk:
-   - oraclejdk7
    - openjdk6
    - openjdk7
+   - oraclejdk7
+   - oraclejdk8
    
  script: "sbt ++$TRAVIS_SCALA_VERSION scalastyle test"
