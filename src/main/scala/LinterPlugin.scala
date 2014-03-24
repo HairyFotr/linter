@@ -80,8 +80,8 @@ class LinterPlugin(val global: Global) extends Plugin {
       def catcher(): PartialFunction[Throwable, Unit] = { 
         case e: NullPointerException => //
         case e: NoSuchMethodError => //
-        case e: StackOverflowError => //
-        //TODO: Print details and ask user to report it
+        case e: StackOverflowError => superTraverse = false
+        case e: Exception => //TODO: Print details and ask user to report it
       }
       def finalizer(tree: Tree): Unit = { 
         if(superTraverse) try { super.traverse(tree) } catch catcher
@@ -338,8 +338,8 @@ class LinterPlugin(val global: Global) extends Plugin {
       def catcher(): PartialFunction[Throwable, Unit] = { 
         case e: NullPointerException => //
         case e: NoSuchMethodError => //
-        case e: StackOverflowError => //
-        //TODO: Print details and ask user to report it
+        case e: StackOverflowError => superTraverse = false
+        case e: Exception => //TODO: Print details and ask user to report it
       }
       def finalizer(tree: Tree): Unit = { 
         if(superTraverse) try { super.traverse(tree) } catch catcher
@@ -1806,6 +1806,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       //TODO: extend with more functions... and TEST TEST TEST TEST
       //// Attempt to compute part of the AST, and return Integer/List value
       def computeExpr(tree: Tree): Values = {
+        if(doNotTraverse contains tree) return Values.empty
         treePosHolder = tree
         val out: Values = tree match {
           case Literal(Constant(value: Int)) => Values(value)
@@ -2751,11 +2752,11 @@ class LinterPlugin(val global: Global) extends Plugin {
       def catcher(): PartialFunction[Throwable, Unit] = { 
         case e: NullPointerException => //
         case e: NoSuchMethodError => //
-        case e: StackOverflowError => //
-        //TODO: Print details and ask user to report it
+        case e: StackOverflowError => superTraverse = false
+        case e: Exception => //TODO: Print details and ask user to report it
       }
-      def finalizer(tree: Tree): Unit = { 
-        if(superTraverse) try { super.traverse(tree) } catch catcher
+      def finalizer(tree: Tree): Unit = {
+        if(superTraverse) try { super.traverse(tree) } catch catcher else doNotTraverse += tree
       }
       override def traverse(tree: Tree): Unit = try {
         superTraverse = true
@@ -2881,13 +2882,13 @@ class LinterPlugin(val global: Global) extends Plugin {
             vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr)._1)).withDefaultValue(Values.empty)
             //println(vals)
             //ADD: if always true, or always false pass the return value, e.g. val a = 1; val b = if(a == 1) 5 else 4
-            super.traverse(t)
+            try { super.traverse(t) } catch catcher
 
             popDefinitions()
             pushDefinitions()
 
             vals = backupVals.map(a => (a._1, a._2.applyCond(condExpr)._2)).withDefaultValue(Values.empty)
-            super.traverse(f)
+            try { super.traverse(f) } catch catcher
             
             popDefinitions()
             //println(vals)
@@ -2919,7 +2920,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             vals = vals.filterNot(paramNames contains _._1)
             discardVars()
             doNotTraverse ++= params.flatten
-            super.traverse(block)
+            try { super.traverse(block) } catch catcher
             
             val returnVal = last match {
               case Return(ret) => 
@@ -2997,7 +2998,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             //println("block: "+b)
             pushDefinitions()
 
-            super.traverse(tree)
+            try { super.traverse(tree) } catch catcher
             
             /// Try to use vars - TODO: is probably buggy
             /*val block = stmts :+ ret
@@ -3057,8 +3058,8 @@ class LinterPlugin(val global: Global) extends Plugin {
       def catcher(): PartialFunction[Throwable, Unit] = { 
         case e: NullPointerException => //
         case e: NoSuchMethodError => //
-        case e: StackOverflowError => //
-        //TODO: Print details and ask user to report it
+        case e: StackOverflowError => superTraverse = false
+        case e: Exception => //TODO: Print details and ask user to report it
       }
       def finalizer(tree: Tree): Unit = { 
         if(superTraverse) try { super.traverse(tree) } catch catcher
