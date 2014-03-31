@@ -781,7 +781,12 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             nowarnPositions += yoda.pos
             
-          case Apply(Select(Literal(Constant(const)), func), List(notLiteral)) if (func.toString matches "[$](greater|less|eq)([$]eq)?") && !isLiteral(notLiteral) =>
+          case Apply(Select(Literal(Constant(const)), func), List(notLiteral))
+            if (func.toString matches "[$](greater|less|eq)([$]eq)?") 
+            && !isLiteral(notLiteral)
+            && !(notLiteral is "x") // Workaround for synthetic "abc".filter('a'==) ... TODO: skips all yoda conditions with x
+            && !(notLiteral is "x$1") => // Workaround for synthetic "abc".filter('a' == _)
+            
             warn(tree, YodaConditions)
 
           /// Unnecessary Ifs

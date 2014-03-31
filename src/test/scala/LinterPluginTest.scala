@@ -1132,6 +1132,11 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       var a = util.Random.nextInt
       if(5 < a && a <= 10) "foo"
     """)
+
+    //TODO: _ is marked as x, so it's ignored...  should(""" "abc".filter(x => 'b' == x) """)
+    should(""" "abc".filter(c => 'b' == c) """)
+    shouldnt(""" "abc".filter('b' == _) """)
+    shouldnt(""" "abc".filter('b'==) """)
   }
   
   
