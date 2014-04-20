@@ -20,7 +20,7 @@ sealed trait Warning {
   def message: String
   def name: String
 }
-
+// scalastyle:off public.methods.have.type
 object Warning {
   final val All: Seq[Warning] = Vector(
     AssigningOptionToNull,

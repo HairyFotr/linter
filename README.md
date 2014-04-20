@@ -202,10 +202,12 @@ Feel free to add your own ideas, or implement these. Pull requests welcome!
 * Detect vars, that could easily be vals (done in scala 2.11 -Xlint)
 
 Rule lists from other static analysis tools for inspiration:
+* WartRemover(Scala) - https://github.com/typelevel/wartremover#warts
 * ScalaStyle(Scala) - https://github.com/scalastyle/scalastyle/wiki
 * Findbugs(JVM) - http://findbugs.sourceforge.net/bugDescriptions.html
 * CheckStyle(Java) - http://checkstyle.sourceforge.net/availablechecks.html
 * PMD(Java) - http://pmd.sourceforge.net/pmd-5.0.3/rules/index.html
+* Error-prone(Java) - https://code.google.com/p/error-prone/wiki/BugPatterns
 * CodeNarc(Groovy) - http://codenarc.sourceforge.net/codenarc-rule-index.html
 * PVS-Studio(C++) - http://www.viva64.com/en/d/
 * Coverity(C++) - http://www.slideshare.net/Coverity/static-analysis-primer-22874326 (6,7)

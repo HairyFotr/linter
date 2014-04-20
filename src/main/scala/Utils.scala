@@ -23,7 +23,7 @@ object Utils {
   var disabledWarningNames: Seq[String] = Nil
   val nowarnPositions = mutable.HashSet[Global#Position]()
   
-  def warn(tree: Global#Tree, warning: Warning)(implicit unit: Global#CompilationUnit) { 
+  def warn(tree: Global#Tree, warning: Warning)(implicit unit: Global#CompilationUnit): Unit = { 
     if (disabledWarningNames.contains(warning.name) || (tree.pos.lineContent matches ".*// *nolint *") || (nowarnPositions contains tree.pos)) {
       // skip
     } else {

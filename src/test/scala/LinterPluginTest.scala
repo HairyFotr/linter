@@ -72,21 +72,21 @@ final object Compiler {
 final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   // A few hacks to scrap the boilerplate and better pinpoint the failing test
   def should(code: String, nt: Boolean = false)(implicit expectedMsg: String) {
-    val nonUnitResult = (expectedMsg, Compiler.compileAndLint(code)) must beLike {
+    val unitResult = (expectedMsg, Compiler.compileAndLint(code)) must beLike {
       case (expected, actual) if (nt ^ actual.contains(expected)) => ok
       case _ => ko("in "+(if(nt) "negative case" else "positive case")+":\n" + code + "\n ")
     }
   }
   def shouldnt(code: String)(implicit expectedMsg: String) { should(code, nt = true)(expectedMsg) }
-  def noWarnings(code: String) { val nonUnitResult = Compiler.compileAndLint(code) must be ("") }
+  def noWarnings(code: String): Unit = { val unitResult = Compiler.compileAndLint(code) must be ("") }
 
   /*@Before
-  def forceCompilerInit() {
-    val nonUnitResult = compiler.compileAndLint("1 + 1")
+  def forceCompilerInit(): Unit = {
+    val unitResult = compiler.compileAndLint("1 + 1")
   }*/
   
   @Test
-  def UseIfExpression() {
+  def UseIfExpression(): Unit = {
     implicit val msg = "Assign the result of the if expression"
     
     should("""var a = 5; if(util.Random.nextBoolean) a = 4 else a = 2""")
@@ -96,7 +96,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def UnnecessaryElseBranch() {
+  def UnnecessaryElseBranch(): Unit = {
     implicit val msg = "This else branch is unnecessary, as the then branch always returns"
     
     should("""
@@ -128,7 +128,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def NumberInstanceOf() {
+  def NumberInstanceOf(): Unit = {
     implicit val msg = "asInstanceOf"
     
     should("""4.asInstanceOf[Double]""")
@@ -137,7 +137,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def incompleteTest_InvariantCondition() {
+  def incompleteTest_InvariantCondition(): Unit = {
     implicit val msg = "This condition will"
     
     should("""val (a,b) = (1,2); if(a != b) a else b""")
@@ -149,28 +149,28 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def UseHypot() {
+  def UseHypot(): Unit = {
     implicit val msg = "Use math.hypot"
     
     should("""val x,y = util.Random.nextDouble; math.sqrt(x*x + y*y)""")
     should("""val x,y = util.Random.nextDouble; math.sqrt(x*x + math.pow(y, 2))""")
     should("""val x,y = util.Random.nextDouble; math.sqrt(x*x + math.pow(5, 2))""")
     shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + y)""")
-    shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + y)""")
+    shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x + y*y)""")
 
     should("""val x,y = util.Random.nextDouble; math.sqrt(25 + x*x)""")
     should("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 25)""")
     should("""val x,y = util.Random.nextDouble; math.sqrt(2147395600 + x*x)""")
     shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 24)""")
     shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 26)""")
-    shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 26)""")
+    shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(26 + x*x)""")
     shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 2147395601)""")
     shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 2147395599)""")
     
   }
 
   @Test
-  def UseCbrt() {
+  def UseCbrt(): Unit = {
     implicit val msg = "Use math.cbrt"
     
     should("""val x = util.Random.nextDouble; math.pow(x, 1/3d)""")
@@ -179,7 +179,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def UseLog10() {
+  def UseLog10(): Unit = {
     implicit val msg = "Use math.log10"
     
     should("""val x = util.Random.nextDouble; math.log(x)/math.log(10)""")
@@ -189,7 +189,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def PossibleLossOfPrecision() {
+  def PossibleLossOfPrecision(): Unit = {
     {
       implicit val msg = "Literal cannot be represented exactly"
      
@@ -204,7 +204,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def UnitImplicitOrdering() {
+  def UnitImplicitOrdering(): Unit = {
     implicit val msg = "Unit is returned here"
    
     should("""List(1,2,3) maxBy { x => val res = x }""")
@@ -228,7 +228,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test 
-  def Source_FromFile__close() {
+  def Source_FromFile__close(): Unit = {
     implicit val msg = "You should close the file stream after use."
      
     should("""scala.io.Source.fromFile("README.md").mkString""")
@@ -239,7 +239,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def contains__types() {
+  def contains__types(): Unit = {
     implicit val msg = "will probably return false"
 
     should("""val x = List(4); x.contains("foo")""")
@@ -251,14 +251,14 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
 
   @Test
-  def import__JavaConversions() {
+  def import__JavaConversions(): Unit = {
     implicit val msg = "Consider using the explicit collection.JavaConverters"
     should("import scala.collection.JavaConversions._;")
   }
 
   @Test
   @Ignore
-  def import__wildcard() {
+  def import__wildcard(): Unit = {
     implicit val msg = "Wildcard imports should be avoided. Favor import selector clauses."
 
     should("import collection._;")
@@ -268,7 +268,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def equals__types() {
+  def equals__types(): Unit = {
     implicit val msg = "Comparing with == on instances of different types"//(%s, %s) will probably return false.
 
     should("Nil == None")
@@ -293,7 +293,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
   @Test
   @Ignore
-  def null__check() {
+  def null__check(): Unit = {
     implicit val msg = "Using null is considered dangerous."
     
     should("""val a = null""")    
@@ -301,7 +301,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def if__useCondition() {
+  def if__useCondition(): Unit = {
     implicit val msg = "Remove the if and just use the"
     
     should("""
@@ -326,7 +326,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def if__sameBranches() {
+  def if__sameBranches(): Unit = {
     implicit val msg = "If statement branches have the same structure"
     should("""
       val a,b = 10
@@ -351,7 +351,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   
   @Test
   @Ignore
-  def if__condition() {
+  def if__condition(): Unit = {
     should("""if(1 > 5) 7 else 8""")("This condition will always be false.")
     should("""if(1 < 5) 7 else 8""")("This condition will always be true.")
 
@@ -359,7 +359,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def case__neigbouringCases() {
+  def case__neigbouringCases(): Unit = {
     implicit val msg = "neighbouring cases are identical"
     should("""
       val a = 7
@@ -369,9 +369,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
         case 5 => println("hello") 
         case _ => println("how low") 
       }""")
-
-    //TODO: shouldn't warn on complicated guards that can't really be merged
-    
     shouldnt("""
       val a = 7
       a match { 
@@ -399,7 +396,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def case__unreachable() {
+  def case__unreachable(): Unit = {
     implicit val msg = "Identical case condition detected above. This case will never match."
     
     should("""val a = 5; a match { case a if a == 5 => "f" case a if a == 5 => "d" }""")
@@ -411,7 +408,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def case__constantValue() {
+  def case__constantValue(): Unit = {
     implicit val msg = "Pattern matching on a constant value"
     
     should("""
@@ -432,7 +429,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   
   @Test
   @Ignore
-  def case__ifStatement() {
+  def case__ifStatement(): Unit = {
     implicit val msg = "This is probably better written as an if statement."
     
     should("""
@@ -445,7 +442,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
   @Test
   @Ignore
-  def case__useMonadic() {
+  def case__useMonadic(): Unit = {
     implicit val msg = "There are probably better ways of handling an Option"
     
     should("""
@@ -458,7 +455,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
   @Test
   @Ignore
-  def option__get() {
+  def option__get(): Unit = {
     implicit val msg = "Calling .get on Option will throw an exception if the Option is None."
 
     should("""Option(10).get""")
@@ -472,7 +469,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
   @Test
   @Ignore
-  def implicit__returnType() {
+  def implicit__returnType(): Unit = {
     implicit val msg = "needs explicit return type"
     
     should("""
@@ -487,7 +484,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def def__unusedParameters() {
+  def def__unusedParameters(): Unit = {
     implicit val msg = "not used in method"
     
     should("""def func(a:Int, b:Int) = { val c = a+1; c } """)
@@ -511,7 +508,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
   @Test
   @Ignore
-  def string__duplicatedLiterals() {
+  def string__duplicatedLiterals(): Unit = {
     implicit val msg = "String literal"
     
     should("""
@@ -541,7 +538,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   
   @Test
   @Ignore
-  def string__alreadyDefined() {
+  def string__alreadyDefined(): Unit = {
     implicit val msg = "You have defined that string as a val already"
     
     should("""
@@ -574,7 +571,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def abs_interpretation__assert() {
+  def abs_interpretation__assert(): Unit = {
     implicit var msg = "will never hold"
     
     should("""
@@ -615,7 +612,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def abs_interpretation__listAndCondition() {
+  def abs_interpretation__listAndCondition(): Unit = {
     //isUsed is the suspect, if this fails inside the if
     should(""" val a = List(1,2,3); if(a.size == 3) for(i <- a) 1/i """)("This condition will always hold.")
     should(""" val a = List(1,2,3); if(a.size > 3) for(i <- a) 1/i """)("This condition will never hold.")
@@ -639,7 +636,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def abs_interpretation__String() {
+  def abs_interpretation__String(): Unit = {
     implicit var msg = ""
     
     //TODO:
@@ -735,7 +732,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""val b = "bcd"+util.Random.nextInt; if(b != "bcd") "" """)("This not equals always returns the same value: true")
   }
   
-  def abs_interpretation__Option() {
+  def abs_interpretation__Option(): Unit = {
     
     should("""List(2).headOption.size < 0""")("will never hold")
     should("""List(2).headOption.size > 1""")("will never hold")
@@ -765,7 +762,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""val a = Option(5); if(a.isDefined) "foo" """)
   }
   
-  def abs_interpretation__StringAndInt() {
+  def abs_interpretation__StringAndInt(): Unit = {
     implicit var msg = ""
     msg = "string will never be empty"
     should(""" var a = 3; val b = ""+a; if(b.isEmpty) "foo" """)
@@ -813,7 +810,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def abs_interpretation__vartests() {
+  def abs_interpretation__vartests(): Unit = {
     //TODO: this should read both as test, and an invitation to improve where the value is actually obvious
     
     should(""" var b = 3; 1/(b-3) """)("divide by zero")
@@ -837,7 +834,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def regex__syntaxErrors() {
+  def regex__syntaxErrors(): Unit = {
     implicit val msg = "Regex pattern syntax error"
     
     should("""
@@ -882,7 +879,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   
   @Test
   @Ignore
-  def instanceOf__check() {
+  def instanceOf__check(): Unit = {
     implicit val msg = "Avoid using asInstanceOf"
     
     should("""
@@ -897,7 +894,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
    }
    
   @Test
-  def numeric_isNan() {
+  def numeric_isNan(): Unit = {
     implicit val msg = "Use .isNan instead"
 
     should("""
@@ -924,7 +921,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def numeric_log1p() {
+  def numeric_log1p(): Unit = {
     implicit val msg = "Use math.log1p(x) instead of"// math.log(1 + x) for added accuracy"
     should("""
       val a = 4d
@@ -961,7 +958,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     """)
   }
 
-  def numeric_exp1m() {
+  def numeric_exp1m(): Unit = {
     implicit val msg = "Use math.expm1(x) instead of"// math.exp(x) - 1 for added accuracy (if x is near 1).
     should("""
       val a = 4d
@@ -999,7 +996,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def probableBugs__selfAssign() {
+  def probableBugs__selfAssign(): Unit = {
     implicit val msg = "Assigning a variable to itself?"
 
     should("""
@@ -1025,7 +1022,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def probableBugs__sameElseIfCondition() {
+  def probableBugs__sameElseIfCondition(): Unit = {
     implicit val msg = "This condition has appeared earlier in the if-else chain and will never hold here."
 
     should("""
@@ -1075,7 +1072,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   
   @Test
   @Ignore
-  def probableBugs__sameExpression() {
+  def probableBugs__sameExpression(): Unit = {
     implicit val msg = /*Same value/expression */"on both sides"
 
     should("""
@@ -1117,7 +1114,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def style__YodaConditions() {
+  def style__YodaConditions(): Unit = {
     implicit val msg = "Yoda conditions"
 
     should("""
@@ -1142,7 +1139,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   
   @Test
   @Ignore
-  def string__constantLength() {
+  def string__constantLength(): Unit = {
     implicit val msg = "of a constant string"
 
     should("""
@@ -1164,7 +1161,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
   @Test
   @Ignore
-  def string__processingConstant() {
+  def string__processingConstant(): Unit = {
     implicit val msg = "Processing a constant string"
     
     should(""" 
@@ -1178,7 +1175,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def if__mergeInner() {
+  def if__mergeInner(): Unit = {
     implicit val msg = "These two nested ifs can be merged"
     
     should("""
@@ -1231,7 +1228,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def numeric__signum() {
+  def numeric__signum(): Unit = {
     implicit val msg = "Did you mean to use the signum function"
     
     should("""
@@ -1270,7 +1267,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def possibleBugs__anynothing() {
+  def possibleBugs__anynothing(): Unit = {
     implicit val msg = "Inferred type"//Any/Nothing. This might not be what you intended."
     
     should("""{ var a = if(3 == 3) 5 else ""; println(a) }""")
@@ -1290,7 +1287,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def possibleBugs__assignment() {
+  def possibleBugs__assignment(): Unit = {
     implicit val msg = "unused value before"
     
     should("""
@@ -1324,7 +1321,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def possibleBugs__assignment2() {
+  def possibleBugs__assignment2(): Unit = {
     implicit val msg = "unused value before"
     
     should("""
@@ -1344,7 +1341,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def possibleBugs__swapVars() {
+  def possibleBugs__swapVars(): Unit = {
     implicit val msg = "Did you mean to swap these two variables"
     
     should("""
@@ -1367,7 +1364,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
   @Test
   @Ignore
-  def style__tempVariable() {
+  def style__tempVariable(): Unit = {
     implicit val msg = "You don't need that temp variable"
    
     should("""
@@ -1389,7 +1386,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def possibleBugs__sameThingTwice() {
+  def possibleBugs__sameThingTwice(): Unit = {
     implicit val msg = "You're doing the exact same thing twice"
     
     should("""
@@ -1407,7 +1404,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def collections__negativeIndex() {
+  def collections__negativeIndex(): Unit = {
     implicit val msg = "negative index"
     
     should("""
@@ -1457,7 +1454,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     """)
   }
   @Test
-  def collections__tooLargeIndex() {
+  def collections__tooLargeIndex(): Unit = {
     implicit val msg = "too large index"
     
     should("""
@@ -1490,7 +1487,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def numeric__BigDecimal() {
+  def numeric__BigDecimal(): Unit = {
     implicit val msg = "Possible loss of precision"
     
     should("""BigDecimal(0.55555555555555555555555555555)""")
@@ -1523,7 +1520,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def numeric__divisionByZero() {
+  def numeric__divisionByZero(): Unit = {
     implicit val msg = " by zero"
     
     should("""1/0""")
@@ -1545,7 +1542,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def string__nonEmpty() {
+  def string__nonEmpty(): Unit = {
     implicit val msg = "string will never be empty"
     
     should("""
@@ -1566,7 +1563,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def style__find_isDefined_to_exists() {
+  def style__find_isDefined_to_exists(): Unit = {
     implicit var msg = "Use exists(...) instead of find(...)."
     
     should("""List(1,2,3).find(_ == 2).isDefined""")
@@ -1594,7 +1591,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def style__flatMap_to_filter() {
+  def style__flatMap_to_filter(): Unit = {
     implicit val msg = /*filter*/"instead of flatMap"
     
     should(""" List(1,2,3).flatMap(x => if(x == 2) Some(x) else None) """)
@@ -1605,7 +1602,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def style__if_to_optstuff() {
+  def style__if_to_optstuff(): Unit = {
     implicit val msg = " instead of if" //use getOrElse, orNull, ... instead of if
     
     should("""val a = Option("str"); if(a.isDefined) a.get else null""")
@@ -1634,7 +1631,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
 
   @Test
-  def numeric__badAbs() {
+  def numeric__badAbs(): Unit = {
     implicit val msg = "Use abs instead of"
     
     should("""math.sqrt(math.pow(15, 2))""")
@@ -1648,7 +1645,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def style__useUntil() {
+  def style__useUntil(): Unit = {
     implicit val msg = "Use (low until high) instead of (low to high-1)"
     
     should(""" val a = 5; val b = (1 to a-1) """)
@@ -1665,7 +1662,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   
   @Test
   @Ignore
-  def def__recursion() {
+  def def__recursion(): Unit = {
     implicit val msg = "infinite recursive call"
     
     should("""def k(a:Int):Int = 1 + k(a)""")
@@ -1674,7 +1671,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def def__constant() {
+  def def__constant(): Unit = {
     implicit val msg = "This method always returns the same value"
     
     should("""def k: Int = { val a = 0; val b = a+2; a+1 }""")
@@ -1685,7 +1682,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test 
-  def trait__unused_sealed() {
+  def trait__unused_sealed(): Unit = {
     implicit val msg = "This sealed trait is never"
     
     should("""sealed trait Hello""")
@@ -1700,7 +1697,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test 
-  def option__newbieChecks() {
+  def option__newbieChecks(): Unit = {
     
     should("""var a: String = null; if(a+"" == null) None else Some(a+"")""")("""Use Option(...), which automatically wraps null to None""")
     shouldnt("""var a: String = null; if(a == null) None else Some(a+"")""")("""Use Option(...), which automatically wraps null to None""")
@@ -1714,7 +1711,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test 
-  def random__checks() {
+  def random__checks(): Unit = {
     should("""util.Random.nextInt(-1)""")("""The parameter of this nextInt might be lower than 1 here.""")
     shouldnt("""util.Random.nextInt(1)""")("""The parameter of this nextInt might be lower than 1 here.""")
     should("""var a = new util.Random; a.nextInt(-1)""")("""The parameter of this nextInt might be lower than 1 here.""")
@@ -1722,7 +1719,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
     
   @Test
-  def map__apply() {
+  def map__apply(): Unit = {
     implicit val msg = "This key has already been defined"
     
     should(""" val a = 5; Map(a -> 5, 2 -> 4, a -> 2) """)
@@ -1735,7 +1732,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def list__isEmpty() {
+  def list__isEmpty(): Unit = {
     implicit val msg = "instead of comparing to List.size"//slow for lists, etc
     
     should(""" val a = List(1,2,3); if(a.size > 0) "" """)
@@ -1750,7 +1747,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def puzzlers__001() {
+  def puzzlers__001(): Unit = {
     implicit val msg = "You're passing a block that returns a function"
     
     should("""List(1, 2).map { println("Hi"); _ + 1 }""")
@@ -1758,7 +1755,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def numeric__IntDivIntoFloatVar() {
+  def numeric__IntDivIntoFloatVar(): Unit = {
     implicit val msg = "Integer division detected in an expression assigned to a floating point variable."
     
     should("""var a = 5; var b = 5f; println("Ignoring some other warning here... "+b); b = 1/a""")
@@ -1772,7 +1769,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
 
   @Test
-  def readmeExamples() {
+  def readmeExamples(): Unit = {
     val defs = """
     
       val a,b,x,y = util.Random.nextInt
@@ -1810,7 +1807,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  def absInterpreter() {
+  def absInterpreter(): Unit = {
     should("""{ val a = 5; { val a = 6; if(a == 6) "" } }""")("This condition will always hold.")
     shouldnt("""{ val a = 5; { val a = 6; if(a == 5) "" } }""")("This condition will always hold.")
     
@@ -1822,12 +1819,12 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def style__flatten() {
+  def style__flatten(): Unit = {
     should("""val a = List[Option[String]](Some("a"), None, Some("b")); a.filter(_.isDefined).map(_.get)""")("Use col.flatten instead of col.filter(_.isDefined).map(_.get)")
   }
 
   @Test
-  def style__partialfunction() {
+  def style__partialfunction(): Unit = {
     implicit val msg = "You can pass the partial function in directly"
     should("""List(Some(1), None) map { _ match { case Some(x) => x; case None => 10 }}""")
     should("""List(Some(1), None) map { item => item match { case Some(x) => x; case None => 10 }}""")
@@ -1837,7 +1834,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
   //stuff that doesn't work and I don't know why
   @Test 
-  def broken() {
+  def broken(): Unit = {
 
     ///this one works in the console, but doesn't if you put { } around it
     //should("""val a = "abcd"; a.substring(2,2).tail""")("Taking the tail of an empty string.")

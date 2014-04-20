@@ -33,7 +33,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     "%s:comma,separated,warning,names".format(name, LinterOptions.DisableOnlyArgument)
   ).map("  -P:" + name + ":" + _).mkString("\n"))
 
-  override def processOptions(options: List[String], error: String => Unit) {
+  override def processOptions(options: List[String], error: String => Unit): Unit = {
     LinterOptions.parse(options) match {
      case Left(errorMessage) => error(errorMessage)
      case Right(LinterOptions(disabledWarnings)) => 
@@ -54,13 +54,13 @@ class LinterPlugin(val global: Global) extends Plugin {
     private val sealedTraits = mutable.Map[Name, Tree]()
     private val usedTraits = mutable.Set[Name]()
     private var inTrait = false
-    private def resetTraits() {
+    private def resetTraits(): Unit = {
       sealedTraits.clear()
       usedTraits.clear()
       inTrait = false
     }
     override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
-      override def apply(unit: global.CompilationUnit) {
+      override def apply(unit: global.CompilationUnit): Unit = {
         if(!unit.isJava) {
           resetTraits()
           new PreTyperTraverser(unit).traverse(unit.body)
@@ -198,7 +198,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     val phaseName = "linter-typed"
 
     override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
-      override def apply(unit: global.CompilationUnit) {
+      override def apply(unit: global.CompilationUnit): Unit = {
         if(!unit.isJava) {
           new PostTyperTraverser(unit).traverse(unit.body)
         }
@@ -639,7 +639,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             var optionCase, booleanCase = false
             //TODO: Hacky hack hack -_-, sorry. use tpe <:< definitions.xxx.tpe
             val (optionCaseReg, booleanCaseReg) = ("(Some[\\[].*[\\]]|None[.]type)", "Boolean[(](true|false)[)]")
-            def checkCase(caseTree: CaseDef) {
+            def checkCase(caseTree: CaseDef): Unit = {
               val caseStr = caseTree.pat.toString
               val caseTypeStr = caseTree.pat.tpe.toString
               //println((caseStr, caseTypeStr))
@@ -647,7 +647,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               optionCase |= (caseTypeStr matches optionCaseReg)
               booleanCase |= (caseTypeStr matches booleanCaseReg)  
             }
-            def printCaseWarning() {
+            def printCaseWarning(): Unit = {
               if(cases.size == 2) {
                 if(optionCase) {
                   /// Checks if pattern matching on Option -- see: http://blog.tmorris.net/posts/scalaoption-cheat-sheet/ (disabled)
@@ -665,15 +665,15 @@ class LinterPlugin(val global: Global) extends Plugin {
             // only if isLiteral(c.pat), because other types can't easily be merged
             case class Streak(streak: Int, tree: CaseDef)
             var streak = Streak(0, cases.head)
-            def checkStreak(c: CaseDef) {
-              if((c.body equalsStructure streak.tree.body) && isLiteral(c.pat) && (c.guard == EmptyTree && streak.tree.guard == EmptyTree) && (c.body != EmptyTree)) {
+            def checkStreak(c: CaseDef): Unit = {
+              if((c.body != EmptyTree) && (c.body equalsStructure streak.tree.body) && isLiteral(c.pat) && (c.guard == EmptyTree && streak.tree.guard == EmptyTree)) {
                 streak = Streak(streak.streak + 1, c)
               } else {
                 printStreakWarning()
                 streak = Streak(1, c)
               }
             }
-            def printStreakWarning() {
+            def printStreakWarning(): Unit = {
               if(streak.streak == cases.size) {
                 //This one always turns out to be a false positive :)
                 //warn(tree, "All "+cases.size+" cases will return "+cases.head.body+", regardless of pattern value") 
@@ -683,7 +683,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
             
             /// Checking for unused variables in pattern matching (disabled)
-            def checkUsage(c: CaseDef) {
+            def checkUsage(c: CaseDef): Unit = {
               //TODO: use for self-testing from time to time - ~100 warnings currently :/
               /*val binds = for(b @ Bind(name, _) <- c.pat; if !name.toString.startsWith("_")) yield (b, name.toString)
               for(unused <- binds.filter { case (b, name) => !abstractInterpretation.isUsed(c, name)}) {
@@ -696,7 +696,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             //TODO: move to abs. interpreter to detect impossible guards
             //TODO: if there is a case (x,y) without a guard, it will make a latter case (x,y) with a guard unreachable
             val pastCases = mutable.ListBuffer[CaseDef]()
-            def checkUnreachable(c: CaseDef) {
+            def checkUnreachable(c: CaseDef): Unit = {
               //adapted from scala/reflect/internal/Trees.scala to cover wildcards in CaseDef
               def correspondsWildcardStructure(thiz: CaseDef, that: CaseDef): Boolean = {
                 val wildcards = mutable.HashSet[(Name, Name)]()//enumerate wildcard aliases
@@ -824,7 +824,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                   Nil
               })
             val conds = mutable.ListBuffer[Tree]()
-            def elseIf(tree: Tree) {
+            def elseIf(tree: Tree): Unit = {
               tree match {
                 case If(cond, t, e) => 
                   val subCondsOr = getSubConds(cond)(nme.ZOR)
@@ -871,7 +871,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             case class Used() extends AssignStatus
             
             val assigns = mutable.HashMap[Name, AssignStatus]().withDefaultValue(Unknown())
-            def checkAssigns(tree: Tree, onlySetUsed: Boolean) {
+            def checkAssigns(tree: Tree, onlySetUsed: Boolean): Unit = {
               tree match {
                 // TODO: It could check if it gets set in all branches - Ignores currently
                 case If(cond, t, f) =>
@@ -1153,7 +1153,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 Nil
             }
             
-            keys.foldLeft(List[Tree]())((acc, newItem) => 
+            val unitResult = keys.foldLeft(List[Tree]())((acc, newItem) => 
               if(acc.exists(item => item equalsStructure newItem)) {
                 warn(newItem, DuplicateKeyInMap)
                 acc
@@ -1252,7 +1252,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     val phaseName = "linter-typed-interpreter"
 
     override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
-      override def apply(unit: global.CompilationUnit) {
+      override def apply(unit: global.CompilationUnit): Unit = {
         if(!unit.isJava) {
           new PostTyperInterpreterTraverser(unit).traverse(unit.body)
         }
@@ -1270,7 +1270,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       import definitions.{OptionClass, SeqClass, TraversableClass, ListClass, StringClass}
       import definitions.{DoubleClass, FloatClass, CharClass, ByteClass, ShortClass, IntClass, LongClass, BooleanClass}
 
-      def checkRegex(reg: String) {
+      def checkRegex(reg: String): Unit = {
         try {
           val regex = reg.r
         } catch {
@@ -2029,22 +2029,22 @@ class LinterPlugin(val global: Global) extends Plugin {
       var stringVals = Set[StringAttrs]()
       var defModels = Map[String, Either[Values, StringAttrs]]().withDefaultValue(Left(Values.empty))
       var labels = Map[String, Tree]()
-      def discardVars() {
+      def discardVars(): Unit = {
         for(v <- vars) vals += v -> Values.empty
       }
-      def discardVars(tree: Tree) {
+      def discardVars(tree: Tree): Unit = {
         for(v <- vars; if isAssigned(tree, v)) {
           vals += v -> Values.empty
           stringVals = stringVals.filter(v => v.name.isDefined && !(vars contains v.name.get))
         }
       }
-      def discardVars(tree: Tree, force: Set[String]) {
+      def discardVars(tree: Tree, force: Set[String]): Unit = {
         for(v <- vars; if isAssigned(tree, v) || (force contains v)) {
           vals += v -> Values.empty
           stringVals = stringVals.filter(v => v.name.isDefined && !(vars contains v.name.get))
         }
       }
-      def discardVars(force: Set[String]) {
+      def discardVars(force: Set[String]): Unit = {
         for(v <- vars; if (force contains v)) {
           vals += v -> Values.empty
           stringVals = stringVals.filter(v => v.name.isDefined && !(vars contains v.name.get))
@@ -2053,10 +2053,10 @@ class LinterPlugin(val global: Global) extends Plugin {
       
       //vals,vars,stringVals,defModels
       val backupStack = mutable.Stack[(Map[String, Values], Set[String], Set[StringAttrs], Map[String, Either[Values, StringAttrs]])]()
-      def pushDefinitions() {
+      def pushDefinitions(): Unit = {
         val nonUnitResult = backupStack.push((vals, vars, stringVals, defModels))
       }
-      def popDefinitions() {
+      def popDefinitions(): Unit = {
         //discards new and discarded vars also
         val varsCurr = vars
         val (valsBack, varsBack, stringValsBack, defModelsBack) = backupStack.pop
@@ -2067,7 +2067,7 @@ class LinterPlugin(val global: Global) extends Plugin {
         defModels = defModelsBack
       }
       
-      def forLoop(tree: Tree) {
+      def forLoop(tree: Tree): Unit = {
         treePosHolder = tree
         //TODO: actually anything that takes (A <: (a Number) => _), this is awful
         val funcs = "foreach|map|filter(Not)?|exists|find|flatMap|forall|groupBy|count|((drop|take)While)|(min|max)By|partition|span"
@@ -2166,9 +2166,10 @@ class LinterPlugin(val global: Global) extends Plugin {
         //// Tries to execute string functions and returns either a String or Int representation
         def stringFunc(string: Tree, func: Name, params: List[Tree] = List[Tree]()): Either[StringAttrs, Values] = {
           val str = StringAttrs(string)
-          lazy val intParam = if(params.size == 1 && params.head.tpe.widen <:< IntClass.tpe) computeExpr(params.head) else Values.empty
+          val paramsSize = params.size
+          lazy val intParam = if(paramsSize == 1 && params.head.tpe.widen <:< IntClass.tpe) computeExpr(params.head) else Values.empty
           lazy val intParams = if(params.forall(_.tpe.widen <:< IntClass.tpe)) params.map(computeExpr).toList else List() //option?
-          lazy val stringParam = if(params.size == 1 && params.head.tpe.widen <:< StringClass.tpe) StringAttrs(params.head) else empty
+          lazy val stringParam = if(paramsSize == 1 && params.head.tpe.widen <:< StringClass.tpe) StringAttrs(params.head) else empty
           lazy val stringParams = if(params.forall(_.tpe.widen <:< StringClass.tpe)) params.map(StringAttrs.apply) else List()
 
           //println((string, func, params, str, intParam))
@@ -2181,7 +2182,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           //  Left(empty)
           //} else 
           func.toString match {
-            case "size"|"length" if params.size == 0 => 
+            case "size"|"length" if paramsSize == 0 => 
               Right(
                 str.exactValue
                   .map(v => Values(v.size))
@@ -2194,9 +2195,9 @@ class LinterPlugin(val global: Global) extends Plugin {
                       Values(str.getMinLength, str.getMaxLength)
                   ).addCondition(_ >= 0).addCondition(_ < str.getMaxLength)
               )
-            case "toString" if params.size == 0 =>
+            case "toString" if paramsSize == 0 =>
               Left(toStringAttrs(string))
-            case ("$plus"|"concat") if params.size == 1 =>
+            case ("$plus"|"concat") if paramsSize == 1 =>
               //println(str.toString +" + "+toStringAttrs(params.head).toString + " == "+ (str + toStringAttrs(params.head)).toString)
               Left(str + toStringAttrs(params.head))
             case "$times" =>
@@ -2225,16 +2226,16 @@ class LinterPlugin(val global: Global) extends Plugin {
                 Left(new StringAttrs(minLength = math.max(str.minLength-1, 0), maxLength = if(str.maxLength != Int.MaxValue) math.max(str.maxLength-1, 0) else Int.MaxValue))
               }
 
-            case "capitalize" if params.size == 0 => Left(str.capitalize)
-            case "distinct"   if params.size == 0 => Left(str.distinct)
-            case "reverse"    if params.size == 0 => Left(str.reverse)
-            case "count"      if params.size == 1 => 
+            case "capitalize" if paramsSize == 0 => Left(str.capitalize)
+            case "distinct"   if paramsSize == 0 => Left(str.distinct)
+            case "reverse"    if paramsSize == 0 => Left(str.reverse)
+            case "count"      if paramsSize == 1 => 
               val out = Values.empty.addCondition(_ >= 0)
               Right(if(str.getMaxLength != Int.MaxValue) out.addCondition(_ < str.getMaxLength) else out)
-            case "filter"     if params.size == 1 => 
+            case "filter"     if paramsSize == 1 => 
               Left(str.removeExactValue.zeroMinLengths)
             
-            case f @ ("indexOf"|"lastIndexOf") if params.size == 1 =>
+            case f @ ("indexOf"|"lastIndexOf") if paramsSize == 1 =>
               if(str.exactValue.isDefined && stringParam.exactValue.isDefined) {
                 if(f == "indexOf")
                   Right(Values(str.exactValue.get.indexOf(stringParam.exactValue.get)))
@@ -2247,9 +2248,9 @@ class LinterPlugin(val global: Global) extends Plugin {
               }
 
             //These come in (Char/String) versions
-            case "stringPrefix" if params.size == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stringPrefix)))
-            case "stripLineEnd" if params.size == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stripLineEnd)))
-            case "stripMargin"  if params.size == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stripMargin)))
+            case "stringPrefix" if paramsSize == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stringPrefix)))
+            case "stripLineEnd" if paramsSize == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stripLineEnd)))
+            case "stripMargin"  if paramsSize == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stripMargin)))
             
             case "toUpperCase" => Left(str.toUpperCase)
             case "toLowerCase" => Left(str.toLowerCase)
@@ -2747,7 +2748,7 @@ class LinterPlugin(val global: Global) extends Plugin {
          "StringAttrs" + (if(exactValue.isDefined) "("+exactValue.get+")" else (name, getMinLength, getTrimmedMinLength, getMaxLength, getTrimmedMaxLength, prefix, suffix, knownPieces))
       }
      
-      def traverseBlock(tree: Tree) {
+      def traverseBlock(tree: Tree): Unit = {
         pushDefinitions()
         traverse(tree)
         popDefinitions()
@@ -3051,7 +3052,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     val phaseName = "linter-refchecked"
     
     override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
-      override def apply(unit: global.CompilationUnit) {
+      override def apply(unit: global.CompilationUnit): Unit = {
         if(!unit.isJava) new PostRefChecksTraverser(unit).traverse(unit.body)
       }
     }
