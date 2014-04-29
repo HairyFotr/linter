@@ -2,12 +2,6 @@
 
 Linter is a Scala compiler plugin that adds compile-time checks to help protect against various possible bugs and style problems.
 
-It's currently a work in progress - some parts will need to be rewritten.
-
-But it is usable (and useful), and all forms of feedback are very welcome.
-
-To see it in action, try it out on your code or run `sbt console` in its folder.
-
 ## Usage
 
 __Note:__ If you have instructions for another build tool or IDE, or better instructions for current ones, please make a pull request.
@@ -26,8 +20,8 @@ You can also use the snapshot with [sbt offline mode](http://www.scala-sbt.org/0
 ### Manually
 You can download the latest jars here:
 [Scala 2.10.x](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar?raw=true), 
-[Scala 2.9.3](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.9.3/0.1-SNAPSHOT/linter_2.9.3-0.1-SNAPSHOT.jar?raw=true) (outdated),
-[Scala 2.11.0-RC3](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11.0-RC3/0.1-SNAPSHOT/linter_2.11.0-RC3-0.1-SNAPSHOT.jar?raw=true) (unstable)
+[Scala 2.11.0-RC3](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11.0/0.1-SNAPSHOT/linter_2.11.0-0.1-SNAPSHOT.jar?raw=true) (unstable), 
+[Scala 2.9.3](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.9.3/0.1-SNAPSHOT/linter_2.9.3-0.1-SNAPSHOT.jar?raw=true) (outdated)
 
     terminal:
       scalac -Xplugin:<path-to-linter-jar>.jar ...
@@ -42,11 +36,23 @@ You can download the latest jars here:
         </args>
       </configuration>
 
+
+### Configuration
+
+Warnings can be turned off using a `+`-separated list of warning names:
+
+    scalacOptions += "-P:linter:disable:UseHypot+CloseSourceFile+OptionOfOption"
+
+Or only specific warnings can be turned on using:
+
+    scalacOptions += "-P:linter:enable-only:UseHypot+CloseSourceFile+OptionOfOption"
+    
 ## Currently supported warnings
 
-__Note:__ These are just some examples. Full documentation is in the making.
+### Full list of warning names
+UnextendedSealedTrait, UseLog, UseExpm, UnlikelyEquality, UseHypot, UseCbrt, UseLog, UseAbsNotSqrtSquare, UseIsNanNotSelfComparison, UseIsNanNotNanComparison, UseSignum, BigDecimalNumberFormat, BigDecimalPrecisionLoss, ReflexiveAssignment, CloseSourceFile, JavaConverters, ContainsTypeMismatch, NumberInstanceOf, PatternMatchConstant, PreferIfToBooleanMatch, IdenticalCaseBodies, IdenticalCaseConditions, ReflexiveComparison, YodaConditions, UseConditionDirectly, UseIfExpression, UnnecessaryElseBranch, DuplicateIfBranches, IdenticalIfElseCondition, MergeNestedIfs, VariableAssignedUnusedValue, MalformedSwap, IdenticalIfCondition, IdenticalStatements, IndexingWithNegativeNumber, DivisionByLiteralZero, OptionOfOption, UndesirableTypeInference, AssigningOptionToNull, WrapNullWithOption, UseGetOrElseOnOption, UseOptionOrNull, UseOptionGetOrElse, UseExistsOnOption, UseFilterNotFlatMap, AvoidOptionStringSize, AvoidOptionCollectionSize, AvoidOptionSize, DuplicateKeyInMap, InefficientUseOfListSize, OnceEvaluatedStatementsInBlockReturningFunction, IntDivisionAssignedToFloat, UseFlattenNotFilterOption, PassPartialFunctionDirectly, UnitImplicitOrdering, RegexSyntaxError, InvariantCondition, DecomposingEmptyCollection, InvariantExtrema, UnnecessaryMethodCall, ProducesEmptyCollection, OperationAlwaysProducesZero, ModuloByOne, DivideByOne, LikelyDivideByZero, UseUntilNotToMinusOne, InvalidParamToRandomNextInt, UnusedForLoopIteratorValue, StringMultiplicationByNonPositive, LikelyIndexOutOfBounds, UnnecessaryReturn, InvariantReturn, UnusedParameter, InvalidStringFormat, InvalidStringConversion, UnnecessaryStringNonEmpty, UnnecessaryStringIsEmpty, PossibleLossOfPrecision
 
-You can also check the [test code](https://github.com/HairyFotr/linter/blob/master/src/test/scala/LinterPluginTest.scala#L95) for more.
+Below are some examples of warnings. You can also check the [test code](https://github.com/HairyFotr/linter/blob/master/src/test/scala/LinterPluginTest.scala#L95) for more.
 
 ### If checks
 #### Repeated condition in an else-if chain

@@ -25,12 +25,12 @@ class LinterPlugin(val global: Global) extends Plugin {
   import Utils._
 
   val name = "linter"
-  val description = "a static analysis compiler plugin"
+  val description = "a static analysis compiler plugin to help protect against bugs and style problems"
   val components = List[PluginComponent](PreTyperComponent, PostTyperComponent, PostTyperInterpreterComponent, PostRefChecksComponent)
   
   override val optionsHelp: Option[String] = Some(Seq(
     "%s:plus+separated+warning+names".format(name, LinterOptions.EnableOnlyArgument),
-    "%s:plus+separated+warning+names".format(name, LinterOptions.DisableOnlyArgument)
+    "%s:plus+separated+warning+names".format(name, LinterOptions.DisableArgument)
   ).map("  -P:" + name + ":" + _).mkString("\n"))
 
   override def processOptions(options: List[String], error: String => Unit): Unit = {
