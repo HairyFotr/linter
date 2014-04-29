@@ -12,13 +12,13 @@ class LinterOptionsTest extends JUnitMustMatchers {
 
   @Test
   def disableOnlyTwoWarning() {
-    val Right(linterOptions) = LinterOptions.parse(List("disable-only:UseLog1p,UseExpm1"))
+    val Right(linterOptions) = LinterOptions.parse(List("disable-only:UseLog1p+UseExpm1"))
     val nonUnitResult = linterOptions.disabledWarningNames.toList must be_==(List("UseLog1p", "UseExpm1"))
   }
 
   @Test
   def enableOnlyTwoWarning() {
-    val Right(linterOptions) = LinterOptions.parse(List("enable-only:UseExpm1,UseLog1p"))
+    val Right(linterOptions) = LinterOptions.parse(List("enable-only:UseExpm1+UseLog1p"))
     val nonUnitResult = (Warning.AllNames.toSet -- linterOptions.disabledWarningNames).toList.sorted must be_==(List("UseExpm1", "UseLog1p"))
   }
 }

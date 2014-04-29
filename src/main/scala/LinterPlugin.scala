@@ -29,8 +29,8 @@ class LinterPlugin(val global: Global) extends Plugin {
   val components = List[PluginComponent](PreTyperComponent, PostTyperComponent, PostTyperInterpreterComponent, PostRefChecksComponent)
   
   override val optionsHelp: Option[String] = Some(Seq(
-    "%s:comma,separated,warning,names".format(name, LinterOptions.EnableOnlyArgument),
-    "%s:comma,separated,warning,names".format(name, LinterOptions.DisableOnlyArgument)
+    "%s:plus+separated+warning+names".format(name, LinterOptions.EnableOnlyArgument),
+    "%s:plus+separated+warning+names".format(name, LinterOptions.DisableOnlyArgument)
   ).map("  -P:" + name + ":" + _).mkString("\n"))
 
   override def processOptions(options: List[String], error: String => Unit): Unit = {
@@ -324,9 +324,8 @@ class LinterPlugin(val global: Global) extends Plugin {
       def isMathPow2(pow: Tree, allowSquares: Boolean = false): Boolean = pow match { 
         case Apply(pow, List(_, Literal(Constant(2.0)))) if (pow is "scala.math.`package`.pow") => true   // math.pow(x, 2)
         case Apply(Select(id1, nme.MUL), List(id2)) if (id1 equalsStructure id2) => true                  // x*x
-        case Literal(Constant(x: Int))                                                                      
-          if (allowSquares) && (x > 1) && (math.sqrt(x.toDouble) == math.sqrt(x.toDouble).toInt) => true  // square numbers
-        case _ => false
+        case Literal(Constant(x: Int)) if (allowSquares) && (x > 1) && (math.sqrt(x.toDouble) == math.sqrt(x.toDouble).toInt) => true  // square numbers
+        case _ => /*println(showRaw(pow));*/ false
       }
       
       def isReturnStatement(t: Tree): Boolean = t match {
@@ -384,6 +383,10 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// Suggest using hypot instead of sqrt(a*a, b*b)
           case Apply(sqrt, List(Apply(Select(pow1, nme.ADD), List(pow2))))
             if (sqrt is "scala.math.`package`.sqrt") && isMathPow2(pow1, allowSquares = true) && isMathPow2(pow2, allowSquares = true) =>
+            
+            warn(tree, UseHypot)
+          case Apply(sqrt, List(Select(Apply(Select(pow1, nme.ADD), List(pow2)), toDouble))) // Handle toDouble (implicit) converion
+            if (sqrt is "scala.math.`package`.sqrt") && isMathPow2(pow1, allowSquares = true) && isMathPow2(pow2, allowSquares = true) && (toDouble is "toDouble") =>
             
             warn(tree, UseHypot)
 
@@ -1818,11 +1821,11 @@ class LinterPlugin(val global: Global) extends Plugin {
           //TODO: I don't think .this. ones work at all...
           case Select(This(typeT), termName) =>
             val name = termName.toString
-            val n = (if(name.contains(".this.")) name.substring(name.lastIndexOf(".")+1) else name).trim
+            val n = (if(name.contains(".this.")) name.substring(name.lastIndexOf('.')+1) else name).trim
             vals(n)
           case Ident(termName) => 
             val name = termName.toString
-            val n = (if(name.contains(".this.")) name.substring(name.lastIndexOf(".")+1) else name).trim
+            val n = (if(name.contains(".this.")) name.substring(name.lastIndexOf('.')+1) else name).trim
             //println(n+": "+vals(n))
             if(vals contains n) vals(n) else if((defModels contains n) && defModels(n).isLeft) defModels(n).left.get else Values.empty
           case Apply(Ident(termName), params) if defModels contains termName.toString =>

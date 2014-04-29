@@ -23,7 +23,7 @@ object LinterOptions {
 
   final val EnableOnlyArgument = "enable-only"
   final val DisableOnlyArgument = "disable-only"
-  final val WarningNameDelimiter = ","
+  final val WarningNameDelimiter = """\+"""
   final val OptionKeyValueDelimiter = ":"
 
   private def parseWarningList(fullOption: String): Either[String, Seq[String]] = fullOption.split(OptionKeyValueDelimiter) match {

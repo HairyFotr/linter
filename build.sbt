@@ -62,7 +62,7 @@ scalacOptions ++= Seq(
 
 org.scalastyle.sbt.ScalastylePlugin.Settings
 
-// Findbugs
+// Findbugs (optionally put findbugs plugins (such as fb-contrib and findsecbugs) jars into ~/.findbugs/plugin)
 
 findbugsSettings
 
