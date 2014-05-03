@@ -328,6 +328,13 @@ class LinterPlugin(val global: Global) extends Plugin {
         case _ => /*println(showRaw(pow));*/ false
       }
       
+      def getAbs(t: Tree): Option[Tree] = t match {
+        case Apply(abs, List(arg)) if (abs is "scala.math.`package`.abs") => Some(arg)
+        case Select(Apply(scala_Predef_xWrapper, List(arg)), abs) 
+          if (scala_Predef_xWrapper.toString endsWith "Wrapper") && (abs is "abs") => Some(arg)
+        case _ => None
+      }
+      
       def isReturnStatement(t: Tree): Boolean = t match {
         case Return(_) => true
         case _ => false
@@ -431,7 +438,15 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             warn(pos, UseSignum)
 
-          case _ => 
+          case t => 
+            /// Possibly unsafe use of abs -- math.abs(Int.MinValue) == -2147483648
+            getAbs(t).foreach {
+              case pos @ Apply(Select(rand, nextX), List())
+                if (rand.tpe.widen.toString startsWith "scala.util.Random")
+                && ((nextX is "nextInt") || (nextX is "nextLong")) =>
+                
+                warn(pos, new UnsafeAbs("Use nextInt(MaxValue) instead."))
+            }
         }
         
         tree match {

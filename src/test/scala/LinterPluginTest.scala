@@ -217,6 +217,22 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     shouldnt("""List(1,2,3) maxBy { x => println("hello"); x }""")
   }
     
+  @Test
+  def UnsafeAbs(): Unit = {
+    implicit val msg = "unsafe use of abs"
+   
+    should("""math.abs(util.Random.nextInt)""")
+    should("""val a = new util.Random; math.abs(a.nextInt)""")
+    
+    should("""util.Random.nextInt.abs""")
+    should("""val a = new util.Random; a.nextInt.abs""")
+
+    should("""util.Random.nextLong.abs""")
+
+    shouldnt("""math.abs(-10)""")
+    shouldnt("""-10.abs""")
+  }
+    
   
   // ^ New tests named after their Warning.scala name ^
   // ----------------- OLD TESTS ----------------------

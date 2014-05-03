@@ -99,7 +99,8 @@ object Warning {
     UseUntilNotToMinusOne,
     new VariableAssignedUnusedValue(""),
     WrapNullWithOption,
-    YodaConditions
+    YodaConditions,
+    new UnsafeAbs("")
   )
 
   final val AllNames = All.map(_.name)
@@ -255,3 +256,9 @@ case object UnnecessaryStringIsEmpty extends NoArgMessageWarning("This string wi
 case class PossibleLossOfPrecision(improvement: String) extends OneArgMessageWarning("Possible loss of precision. %s", improvement) {
   def name = "PossibleLossOfPrecision"
 }
+case class UnsafeAbs(improvement: String) extends OneArgMessageWarning("Possibly unsafe use of abs. %s", improvement) {
+  def name = "UnsafeAbs"
+}
+
+
+
