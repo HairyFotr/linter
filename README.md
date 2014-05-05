@@ -20,7 +20,7 @@ You can also use the snapshot with [sbt offline mode](http://www.scala-sbt.org/0
 ### Manually
 You can download the latest jars here:
 [Scala 2.10.x](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar?raw=true), 
-[Scala 2.11.0-RC3](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11.0/0.1-SNAPSHOT/linter_2.11.0-0.1-SNAPSHOT.jar?raw=true) (unstable), 
+[Scala 2.11.0](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11.0/0.1-SNAPSHOT/linter_2.11.0-0.1-SNAPSHOT.jar?raw=true) (unstable), 
 [Scala 2.9.3](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.9.3/0.1-SNAPSHOT/linter_2.9.3-0.1-SNAPSHOT.jar?raw=true) (outdated)
 
     terminal:
@@ -39,7 +39,7 @@ You can download the latest jars here:
 
 ### Configuration
 
-Warnings can be turned off using a `+`-separated list of warning names:
+Warnings can be turned off using a plus-separated list of warning names:
 
     scalacOptions += "-P:linter:disable:UseHypot+CloseSourceFile+OptionOfOption"
 
@@ -50,7 +50,7 @@ Or only specific warnings can be turned on using:
 ## Currently supported warnings
 
 ### Full list of warning names
-UnextendedSealedTrait, UseLog, UseExpm, UnlikelyEquality, UseHypot, UseCbrt, UseLog, UseAbsNotSqrtSquare, UseIsNanNotSelfComparison, UseIsNanNotNanComparison, UseSignum, BigDecimalNumberFormat, BigDecimalPrecisionLoss, ReflexiveAssignment, CloseSourceFile, JavaConverters, ContainsTypeMismatch, NumberInstanceOf, PatternMatchConstant, PreferIfToBooleanMatch, IdenticalCaseBodies, IdenticalCaseConditions, ReflexiveComparison, YodaConditions, UseConditionDirectly, UseIfExpression, UnnecessaryElseBranch, DuplicateIfBranches, IdenticalIfElseCondition, MergeNestedIfs, VariableAssignedUnusedValue, MalformedSwap, IdenticalIfCondition, IdenticalStatements, IndexingWithNegativeNumber, DivisionByLiteralZero, OptionOfOption, UndesirableTypeInference, AssigningOptionToNull, WrapNullWithOption, UseGetOrElseOnOption, UseOptionOrNull, UseOptionGetOrElse, UseExistsOnOption, UseFilterNotFlatMap, AvoidOptionStringSize, AvoidOptionCollectionSize, AvoidOptionSize, DuplicateKeyInMap, InefficientUseOfListSize, OnceEvaluatedStatementsInBlockReturningFunction, IntDivisionAssignedToFloat, UseFlattenNotFilterOption, PassPartialFunctionDirectly, UnitImplicitOrdering, RegexSyntaxError, InvariantCondition, DecomposingEmptyCollection, InvariantExtrema, UnnecessaryMethodCall, ProducesEmptyCollection, OperationAlwaysProducesZero, ModuloByOne, DivideByOne, LikelyDivideByZero, UseUntilNotToMinusOne, InvalidParamToRandomNextInt, UnusedForLoopIteratorValue, StringMultiplicationByNonPositive, LikelyIndexOutOfBounds, UnnecessaryReturn, InvariantReturn, UnusedParameter, InvalidStringFormat, InvalidStringConversion, UnnecessaryStringNonEmpty, UnnecessaryStringIsEmpty, PossibleLossOfPrecision
+UnextendedSealedTrait, UseLog, UseExpm, UnlikelyEquality, UseHypot, UseCbrt, UseLog, UseAbsNotSqrtSquare, UseIsNanNotSelfComparison, UseIsNanNotNanComparison, UseSignum, BigDecimalNumberFormat, BigDecimalPrecisionLoss, ReflexiveAssignment, CloseSourceFile, JavaConverters, ContainsTypeMismatch, NumberInstanceOf, PatternMatchConstant, PreferIfToBooleanMatch, IdenticalCaseBodies, IdenticalCaseConditions, ReflexiveComparison, YodaConditions, UseConditionDirectly, UseIfExpression, UnnecessaryElseBranch, DuplicateIfBranches, IdenticalIfElseCondition, MergeNestedIfs, VariableAssignedUnusedValue, MalformedSwap, IdenticalIfCondition, IdenticalStatements, IndexingWithNegativeNumber, DivisionByLiteralZero, OptionOfOption, UndesirableTypeInference, AssigningOptionToNull, WrapNullWithOption, UseGetOrElseOnOption, UseOptionOrNull, UseOptionGetOrElse, UseExistsOnOption, UseFilterNotFlatMap, AvoidOptionStringSize, AvoidOptionCollectionSize, AvoidOptionSize, DuplicateKeyInMap, InefficientUseOfListSize, OnceEvaluatedStatementsInBlockReturningFunction, IntDivisionAssignedToFloat, UseFlattenNotFilterOption, PassPartialFunctionDirectly, UnitImplicitOrdering, RegexSyntaxError, InvariantCondition, DecomposingEmptyCollection, InvariantExtrema, UnnecessaryMethodCall, ProducesEmptyCollection, OperationAlwaysProducesZero, ModuloByOne, DivideByOne, LikelyDivideByZero, UseUntilNotToMinusOne, InvalidParamToRandomNextInt, UnusedForLoopIteratorValue, StringMultiplicationByNonPositive, LikelyIndexOutOfBounds, UnnecessaryReturn, InvariantReturn, UnusedParameter, InvalidStringFormat, InvalidStringConversion, UnnecessaryStringNonEmpty, UnnecessaryStringIsEmpty, PossibleLossOfPrecision, UnsafeAbs
 
 Below are some examples of warnings. You can also check the [test code](https://github.com/HairyFotr/linter/blob/master/src/test/scala/LinterPluginTest.scala#L95) for more.
 
