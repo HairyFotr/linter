@@ -1,4 +1,7 @@
 import de.johoop.findbugs4sbt._
+import de.johoop.cpd4sbt.CopyPasteDetector._
+import de.johoop.cpd4sbt.{ReportType => CPDReportType}
+import org.scalastyle.sbt.ScalastylePlugin
 
 name := "linter"
 
@@ -53,25 +56,25 @@ scalacOptions ++= Seq(
 // Also, a self-test
 
 //scalacOptions += "-Xplugin:../linteRepo/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar"
-
 //scalacOptions += "-Xplugin:../linteRepo/releases/com/foursquare/lint/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar"
 
 // Also, what others are doing
 
 // ScalaStyle
-
-org.scalastyle.sbt.ScalastylePlugin.Settings
+ScalastylePlugin.Settings
 
 // Findbugs (optionally put findbugs plugins (such as fb-contrib and findsecbugs) jars into ~/.findbugs/plugin)
-
 findbugsSettings
 
 findbugsEffort := Effort.Maximum
 
-findbugsReportPath <<= baseDirectory { base => Some(base / "findbugs.xml") }
+findbugsReportPath <<= baseDirectory { base => Some(base / "findbugsoutput.xml") }
 
 // CPD
-
-//import de.johoop.cpd4sbt.CopyPasteDetector._
-
 cpdSettings
+
+cpdTargetPath <<= baseDirectory { base => base }
+
+cpdReportName := "cpdoutput.txt"
+
+cpdReportType := CPDReportType.Simple
