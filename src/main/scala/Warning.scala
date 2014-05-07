@@ -100,7 +100,8 @@ object Warning {
     new VariableAssignedUnusedValue(""),
     WrapNullWithOption,
     YodaConditions,
-    new UnsafeAbs("")
+    new UnsafeAbs(""),
+    new TypeToType("")
   )
 
   final val AllNames = All.map(_.name)
@@ -258,6 +259,9 @@ case class PossibleLossOfPrecision(improvement: String) extends OneArgMessageWar
 }
 case class UnsafeAbs(improvement: String) extends OneArgMessageWarning("Possibly unsafe use of abs. %s", improvement) {
   def name = "UnsafeAbs"
+}
+case class TypeToType(tpe: String) extends TwoArgMessageWarning("Using to%s on something that is already of type %s", tpe, tpe) {
+  def name = "TypeToType"
 }
 
 

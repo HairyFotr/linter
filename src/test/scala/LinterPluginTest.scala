@@ -233,6 +233,26 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     shouldnt("""-10.abs""")
   }
     
+  @Test
+  def TypeToType(): Unit = {
+    implicit val msg = "that is already of type"
+   
+    should(""" "".toString """)
+    shouldnt(""" "5".toInt """)
+    
+    should(""" val a = ""; a.toString """)
+    shouldnt(""" val a = 5; a.toString """)
+
+    should("""5.toInt""")
+    shouldnt("""5.toShort""")
+    shouldnt("""5.toLong""")
+    shouldnt("""5.toDouble""")
+
+    should("""5.0.toDouble""")
+    shouldnt("""5.0.toFloat""")
+
+    should("""val a = 5.0; a.toDouble""")
+  }
   
   // ^ New tests named after their Warning.scala name ^
   // ----------------- OLD TESTS ----------------------

@@ -593,6 +593,13 @@ class LinterPlugin(val global: Global) extends Plugin {
           /*case Literal(Constant(null)) =>
             warn(tree, "Using null is considered dangerous, use Option.")*/
 
+          /// TypeToType ... "hello".toString, 5.toInt, ...
+          case Select(tpe, toTpe)
+            if (tpe.tpe.widen.toString matches "[A-Z][a-z]+")
+            && (toTpe.toString == "to"+tpe.tpe.widen.toString) =>
+            
+            warn(tree, new TypeToType(tpe.tpe.widen.toString))
+
           //// String checks 
           /// Repeated string literals (disabled)
           /*case Literal(Constant(str: String)) =>
