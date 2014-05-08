@@ -593,12 +593,20 @@ class LinterPlugin(val global: Global) extends Plugin {
           /*case Literal(Constant(null)) =>
             warn(tree, "Using null is considered dangerous, use Option.")*/
 
-          /// TypeToType ... "hello".toString, 5.toInt, ...
+          /// TypeToType ... "hello".toString, 5.toInt, List(1,2,3).toList ...
           case Select(tpe, toTpe)
-            if (tpe.tpe.widen.toString matches "[A-Z][a-z]+")
-            && (toTpe.toString == "to"+tpe.tpe.widen.toString) =>
+            if (toTpe.toString startsWith "to") && {
+              val toTyp = 
+                "to"+tpe.tpe.widen.toString.stripPrefix("scala.collection.immutable.")
+                //toSet/q on mutable returns immutable  .stripPrefix("scala.collection.mutable.")
+                  
+               ((toTyp startsWith toTpe.toString) &&
+                (((toTyp stripPrefix toTpe.toString) == "") || ((toTyp stripPrefix toTpe.toString) matches "\\[.*\\]")))
+            } =>
             
-            warn(tree, new TypeToType(tpe.tpe.widen.toString))
+            //println((tpe.tpe.widen, toTpe.toString))
+            
+            warn(tree, new TypeToType(toTpe.toString stripPrefix "to"))
 
           //// String checks 
           /// Repeated string literals (disabled)

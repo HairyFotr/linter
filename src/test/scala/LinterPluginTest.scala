@@ -252,6 +252,16 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     shouldnt("""5.0.toFloat""")
 
     should("""val a = 5.0; a.toDouble""")
+
+    should("""val a = List(1,2,3); a.toList""")
+    should("""val a = Seq(1,2,3); a.toSeq""")
+    should("""val a = Set(1,2,3); a.toSet""")
+    should("""val a = Vector(1,2,3); a.toVector""")
+    shouldnt("""val a = List(1,2,3); a.toSeq""")
+    shouldnt("""val a = Seq(1,2,3); a.toList""")
+    shouldnt("""val a = Seq(1,2,3); a.toVector""")
+    shouldnt("""val a = collection.mutable.Seq(1,2,3); a.toSeq""")
+    shouldnt("""val a = collection.mutable.Set(1,2,3); a.toSet""")
   }
   
   // ^ New tests named after their Warning.scala name ^
