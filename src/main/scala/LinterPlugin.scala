@@ -534,10 +534,16 @@ class LinterPlugin(val global: Global) extends Plugin {
             if methodImplements(eqeq.symbol, Object_==)
             && !isSubtype(lhs, rhs) && !isSubtype(rhs, lhs)
             && lhs.tpe.widen.toString != "Null" && rhs.tpe.widen.toString != "Null" 
-            && !lhs.tpe.widen.toString.matches(""".*(\[|\()(((_\$?|\?)[0-9]+)(, )?)+(\]|\)).*""") //Workaround for runtime Class[_$1] == Class[Int] stuff
-            && !rhs.tpe.widen.toString.matches(""".*(\[|\()(((_\$?|\?)[0-9]+)(, )?)+(\]|\)).*""") => 
-            //&& !lhs.tpe.widen.toString.matches(""".*\[(_\$|\?)[0-9]+\].*""") //Workaround for runtime Class[_$1] == Class[Int] stuff
-            //&& !rhs.tpe.widen.toString.matches(""".*\[(_\$|\?)[0-9]+\].*""") => 
+            && ((lhs.tpe.widen.toString.takeWhile(_ != '[') != rhs.tpe.widen.toString.takeWhile(_ != '[')) || {
+              val higherReg = """.+?\[(.+)\]""".r
+              val higherReg(lhsHigher) = lhs.tpe.widen.toString
+              val higherReg(rhsHigher) = rhs.tpe.widen.toString
+              
+              def generic(s: String): Boolean = 
+                s.split(',').exists { t => (t.size == 1 || t.contains("_") || t.contains("?")) }
+
+              ((lhsHigher != rhsHigher) && !generic(lhsHigher) && !generic(rhsHigher))
+            }) =>
             
             warn(eqeq, new UnlikelyEquality(lhs.tpe.widen.toString, rhs.tpe.widen.toString))
 
@@ -599,12 +605,11 @@ class LinterPlugin(val global: Global) extends Plugin {
               val toTyp = 
                 "to"+tpe.tpe.widen.toString.stripPrefix("scala.collection.immutable.")
                 //toSet/q on mutable returns immutable  .stripPrefix("scala.collection.mutable.")
-                  
-               ((toTyp startsWith toTpe.toString) &&
-                (((toTyp stripPrefix toTpe.toString) == "") || ((toTyp stripPrefix toTpe.toString) matches "\\[.*\\]")))
+
+              //println((tpe.tpe.widen, toTpe.toString))
+
+              ((toTyp == toTpe.toString) || ((toTyp stripPrefix toTpe.toString) matches "\\[.*\\]"))
             } =>
-            
-            //println((tpe.tpe.widen, toTpe.toString))
             
             warn(tree, new TypeToType(toTpe.toString stripPrefix "to"))
 
@@ -864,8 +869,11 @@ class LinterPlugin(val global: Global) extends Plugin {
                   val subCondsAnd = getSubConds(cond)(nme.ZAND)
                   
                   for(newCond <- (subCondsOr ++ subCondsAnd); 
-                      oldCond <- conds; if newCond equalsStructure oldCond)
-                    warn(newCond, IdenticalIfElseCondition)
+                      oldCond <- conds) {                    
+                    if((newCond equalsStructure oldCond) && !(newCond.toString.toLowerCase contains "random")) {
+                      warn(newCond, IdenticalIfElseCondition)
+                    }
+                  }
                   
                   conds ++= subCondsOr
 
@@ -980,7 +988,11 @@ class LinterPlugin(val global: Global) extends Plugin {
                   
                 warn(cond2, IdenticalIfCondition)
 
-              case (s1, s2) if (s1 equalsStructure s2) && !(s1 is "scala.this.Predef.println()") =>
+              case (s1, s2) 
+                if (s1 equalsStructure s2) 
+                && !(s1 is "scala.this.Predef.println()")
+                && !(s1.toString contains "Next") && !(s1.toString contains "next") =>
+
                 nowarnPositions += s2.pos
                 warn(s1, IdenticalStatements)
 
@@ -1249,16 +1261,18 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, UseFlattenNotFilterOption)
 
           /// use partial function directly - temporary variable is unnecessary (idea by yzgw)
-          case Apply(_, List(Function(List(ValDef(mods, x_1, TypeTree(), EmptyTree)), Match(x_1_, _))))
-            if ((x_1 is "x$1") && (x_1_ is "x$1") && (mods.isSynthetic) && (mods.isParameter))   // _ match { ... }
-            || ((x_1.toString == x_1_.toString) && !(mods.isSynthetic) && (mods.isParameter)) => // x match { ... }
+          case Apply(_, List(Function(List(ValDef(mods, x_1, typeTree: TypeTree, EmptyTree)), Match(x_1_, _))))
+            if (((x_1 is "x$1") && (x_1_ is "x$1") && (mods.isSynthetic) && (mods.isParameter)) // _ match { ... }
+            ||  ((x_1.toString == x_1_.toString) && !(mods.isSynthetic) && (mods.isParameter))) // x => x match { ... } 
+            && (typeTree.original == null) => // fails on: x: Type => x match { ... }
             
             val param = if(x_1 is "x$1") "_" else x_1.toString + " => " + x_1.toString
             
             //TODO: also detects for(x <- col) x match { ... } ... current workaround with filter has false negatives
             val line = tree.pos.lineContent
-            if (!List("for", "<-").exists(line.contains(_))) 
+            if(!List("for", "<-").exists(line.contains(_))) {
               warn(tree, new PassPartialFunctionDirectly(param))
+            }
 
           /// Using the implicit ordering for Unit is probably wrong
           case Apply(Apply(TypeApply(Select(_, minMaxBy), _), List(Function(_, Block(_, u @ Literal(Constant(())))))), List(Select(scala_math_Ordering, _unit)))
@@ -2201,7 +2215,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           val str = StringAttrs(string)
           val paramsSize = params.size
           lazy val intParam = if(paramsSize == 1 && params.head.tpe.widen <:< IntClass.tpe) computeExpr(params.head) else Values.empty
-          lazy val intParams = if(params.forall(_.tpe.widen <:< IntClass.tpe)) params.map(computeExpr).toList else List() //option?
+          lazy val intParams = if(params.forall(_.tpe.widen <:< IntClass.tpe)) params.map(computeExpr) else List() //option?
           lazy val stringParam = if(paramsSize == 1 && params.head.tpe.widen <:< StringClass.tpe) StringAttrs(params.head) else empty
           lazy val stringParams = if(params.forall(_.tpe.widen <:< StringClass.tpe)) params.map(StringAttrs.apply) else List()
 

@@ -40,7 +40,7 @@ object LinterOptions {
   private def parse0(options: List[String], linterOptions: LinterOptions): Either[String, LinterOptions] = options match {
     case Nil => Right(linterOptions)
     case option :: xs if (option.startsWith(DisableArgument) || option.startsWith(EnableOnlyArgument)) => parseWarningList(option) match {
-      case Right(warnings) if option.startsWith(EnableOnlyArgument) => parse0(xs, linterOptions.copy(disabledWarningNames = Warning.AllNames.diff(warnings).toSeq)) 
+      case Right(warnings) if option.startsWith(EnableOnlyArgument) => parse0(xs, linterOptions.copy(disabledWarningNames = Warning.AllNames.diff(warnings))) 
       case Right(warnings) => parse0(xs, linterOptions.copy(disabledWarningNames = warnings))
       case Left(errorMessage) => Left(errorMessage)
     }

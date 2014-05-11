@@ -1071,7 +1071,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
   @Test
   def probableBugs__sameElseIfCondition(): Unit = {
-    implicit val msg = "This condition has appeared earlier in the if-else chain and will never hold here."
+    implicit val msg = "condition has appeared earlier"
 
     should("""
       var a = "b"+util.Random.nextInt
@@ -1115,6 +1115,14 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
           println("hi")
         else if(a == 5) 
           println("hello")
+    """)
+    shouldnt("""
+      import util.Random._
+      
+      if(nextBoolean) 
+        println("hi")
+      else if(nextBoolean) 
+        println("hello")
     """)
   }
   
@@ -1876,6 +1884,8 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     implicit val msg = "You can pass the partial function in directly"
     should("""List(Some(1), None) map { _ match { case Some(x) => x; case None => 10 }}""")
     should("""List(Some(1), None) map { item => item match { case Some(x) => x; case None => 10 }}""")
+    should("""List(1,2,3) map { a => a match { case _ => 5 }}""")
+    shouldnt("""List(1,2,3) map { a: AnyVal => a match { case _ => 5 }}""")
     shouldnt("""List(Some(1), None) map { case Some(x) => x; case None => 10 }""")
     shouldnt("""for(a <- List(Some(1), None)) a match { case Some(x) => x; case None => 10 }""")
   }
