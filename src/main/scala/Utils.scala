@@ -86,7 +86,7 @@ class Utils[G <: Global](val global: G) {
     (t.tpe.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe) 
     && t.tpe.widen.typeArgs.exists(_.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe)))
   
-  def isLiteral(t:Tree): Boolean = t match {
+  def isLiteral(t: Tree): Boolean = t match {
     case Literal(_) => true
     case _ => false
   }

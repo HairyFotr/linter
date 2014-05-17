@@ -252,7 +252,7 @@ class LinterPlugin(val global: Global) extends Plugin {
         (t.tpe.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe) 
         && t.tpe.widen.typeArgs.exists(_.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe)))
       
-      def isLiteral(t:Tree): Boolean = t match {
+      def isLiteral(t: Tree): Boolean = t match {
         case Literal(_) => true
         case _ => false
       }
@@ -291,6 +291,7 @@ class LinterPlugin(val global: Global) extends Plugin {
         def endsWithAny(str: String*): Boolean = str.exists(n.toString endsWith _)
       }
       // (scala 2.9 implicit class)
+      import scala.language.implicitConversions
       implicit def richTree(n: Tree): RichToStr[Tree] = new RichToStr(n) {}
       implicit def richName(n: Name): RichToStr[Name] = new RichToStr(n) {}
       

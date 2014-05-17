@@ -52,6 +52,7 @@ final object Compiler {
       settings.outputDirs setSingleOutput virtualDirectory
       val compiler = super.newCompiler(settings, reporter)
       val linterPlugin = new LinterPlugin(compiler)
+      import scala.language.reflectiveCalls
       for (phase <- linterPlugin.components)
         compiler.asInstanceOf[{def phasesSet: mutable.HashSet[tools.nsc.SubComponent]}].phasesSet += phase
       compiler
