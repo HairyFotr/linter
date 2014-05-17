@@ -87,6 +87,7 @@ class WarningTest extends JUnitMustMatchers {
       case YodaConditions => 1
       case UnsafeAbs(_) => 1
       case TypeToType(_) => 1
+      case EmptyStringInterpolator => 1
       // ------------------------------------------------------------------------------------------------------
       // If you get a warning here, it's likely because you added a new warning type but forgot to add it here. 
       // The real point is that you need to add the new Warning to Warning.All.

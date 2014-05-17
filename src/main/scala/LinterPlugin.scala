@@ -447,6 +447,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 && ((nextX is "nextInt") || (nextX is "nextLong")) =>
                 
                 warn(pos, new UnsafeAbs("Use nextInt(MaxValue) instead."))
+              case _ => //foo
             }
         }
         
@@ -2455,24 +2456,27 @@ class LinterPlugin(val global: Global) extends Plugin {
               }
             /// String format checks (runtime exception)
             case f @ "format"
-              if (params.nonEmpty) && !(params.head.tpe.widen <:< StringClass.tpe) && !(params.head.tpe.widen <:< rootMirror.getClassByName(newTermName("java.util.Locale")).tpe) => 
+              if (params.nonEmpty) && (params.head.tpe.widen <:< StringClass.tpe) && !(params.head.tpe.widen <:< rootMirror.getClassByName(newTermName("java.util.Locale")).tpe) => 
               //Ignore the default Java impl, just work with scala's format(Any*)
+              //TODO: see: http://docs.oracle.com/javase/7/docs/api/java/util/Formatter.html
+                // in some cases at least length could be inferred, but option parser would need to be implemented
+                // a check for "%s %s".format(stuff) could be added (not enough or too many parameters)
               //TODO: scrap the whole thing, and tell people to use string interpolators ;)
               
               val parActual = params map {
                 case param if(param.tpe.widen <:< IntClass.tpe) => computeExpr(param)
                 case param if(param.tpe.widen <:< StringClass.tpe) => StringAttrs(param)
                 case Literal(Constant(x)) => x
-                case _ => Values.empty
+                case _ => StringAttrs.empty
               }
               
-              val areValues = parActual forall { 
+              val valuesDefined = parActual forall { 
                 case v: Values => v.isValue
-                case s: StringAttrs => s.exactValue.isDefined
-                case _ => true
+                case s: StringAttrs => s.exactValue.isDefined // Nonliterals are StringAttrs.empty, and go to false here
+                case _ => true // Literals are defined
               }
               
-              if(str.exactValue.isDefined && areValues) {
+              if(str.exactValue.isDefined && valuesDefined) {
                 try {
                   Left(new StringAttrs(exactValue = Some(str.exactValue.get.format(parActual map {
                     case v: Values => v.getValue
@@ -2492,13 +2496,15 @@ class LinterPlugin(val global: Global) extends Plugin {
                   case e: Exception =>
                     Left(empty)
                 }
-              } else if(str.exactValue.isDefined && !areValues) {
+              } else if(str.exactValue.isDefined && !valuesDefined) {
                 try {
-                  str.exactValue.get.format()
+                  str.exactValue.get.format(parActual map { a => null }:_*)
                 } catch {
                   case e: java.util.UnknownFormatConversionException =>
                     warn(string, new InvalidStringFormat(e.getMessage))
-                  case e: Exception => 
+                  case e: java.util.MissingFormatArgumentException =>
+                    warn(string, new InvalidStringFormat(e.getMessage))
+                  case e: Exception => //IllegalFormatConversionException... anything else?
                 }
                 Left(empty)
               } else {
@@ -2527,6 +2533,35 @@ class LinterPlugin(val global: Global) extends Plugin {
                 .find(_.name.exists(_ == name.toString))
                 .getOrElse(empty)
                 
+            // String interpolator
+            case Apply(Select(Apply(scala_StringContext_apply, literalList), interpolator), paramList) 
+              if (scala_StringContext_apply.toString == "scala.StringContext.apply") 
+              && (interpolator.toString == "s") =>
+              
+              
+              try {
+                if(paramList.isEmpty) {
+                  warn(tree, EmptyStringInterpolator)
+                  apply(literalList.head)
+                } else {
+                  var out = empty
+                  var i = 0                
+                  do {
+                    out += 
+                      (if(i%2 == 0 && i/2 < literalList.size) apply(literalList(i/2))
+                      else if(i/2 < literalList.size) apply(paramList(i/2))
+                      else new StringAttrs(exactValue = Some("")))
+                    
+                    i += 1
+                  } while(i < literalList.length + paramList.length)
+                  out
+                }
+              } catch {
+                case e: Exception => 
+                  e.printStackTrace
+                  empty
+              }
+
             case Apply(Ident(name), params) if defModels contains name.toString =>
               defModels
                 .find(m => m._1 == name.toString && m._2.isRight)

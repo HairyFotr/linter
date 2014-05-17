@@ -13,7 +13,7 @@ resolvers ++= Seq("snapshots", "releases").map(Resolver.sonatypeRepo)
 libraryDependencies <++= (scalaVersion) { (scalaVersion) =>
   Seq(
     "org.scala-lang" % "scala-compiler"  % scalaVersion,
-    "org.specs2"     %% "specs2"          % "2.3.11" % "test",
+    "org.specs2"     %% "specs2"         % "2.3.12" % "test",
     "junit"          % "junit"           % "4.11"   % "test",
     "com.novocode"   % "junit-interface" % "0.10"   % "test"
   )

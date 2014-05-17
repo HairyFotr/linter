@@ -42,7 +42,7 @@ final object Compiler {
   //settings.deprecation.value = true // enable detailed deprecation warnings
   //settings.unchecked.value = true // enable detailed unchecked warnings    
   settings.Xwarnfatal.value = true // warnings cause compile failures too
-  if(Properties.versionString contains "2.10") settings.stopAfter.value = List("linter-refchecked") // fails in 2.11
+  //if(Properties.versionString contains "2.10") settings.stopAfter.value = List("linter-refchecked") // fails in 2.11
 
   val stringWriter = new StringWriter()
 
@@ -263,6 +263,23 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     shouldnt("""val a = Seq(1,2,3); a.toVector""")
     shouldnt("""val a = collection.mutable.Seq(1,2,3); a.toSeq""")
     shouldnt("""val a = collection.mutable.Set(1,2,3); a.toSet""")
+  }
+  
+  @Test
+  def InvalidStringFormat(): Unit = {
+    implicit val msg = "string format will fail"
+   
+    should(""" { val a = 5; "%s %i".format("a", 1) } """) // wrong formatter %i
+    should(""" { val a = "%s %d".format("a") } """)    // not enough params
+    shouldnt(""" { val a = 5; "%s %d".format("a", 1) } """)
+  }
+  
+  @Test
+  def EmptyStringInterpolator(): Unit = {
+    implicit val msg = "string interpolation"
+    
+    should(""" val a = s"wat" """)
+    shouldnt(""" { val a = 5; s" $a " } """)
   }
   
   // ^ New tests named after their Warning.scala name ^
