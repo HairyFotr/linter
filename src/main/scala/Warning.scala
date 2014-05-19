@@ -102,7 +102,8 @@ object Warning {
     YodaConditions,
     new UnsafeAbs(""),
     new TypeToType(""),
-    EmptyStringInterpolator
+    EmptyStringInterpolator,
+    new UnlikelyToString("")
   )
 
   final val AllNames = All.map(_.name)
@@ -265,6 +266,8 @@ case class TypeToType(tpe: String) extends TwoArgWarning("Using to%s on somethin
   def name = "TypeToType"
 }
 case object EmptyStringInterpolator extends NoArgWarning("This string interpolation has no arguments.")
-
+case class UnlikelyToString(tpe: String) extends OneArgWarning("Using toString on type %s is likely unintended.", tpe) {
+  def name = "UnlikelyToString"
+}
 
 

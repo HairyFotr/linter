@@ -567,6 +567,13 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             warn(contains, new ContainsTypeMismatch(seq.tpe.widen.toString, target.tpe.widen.toString))
 
+          /// Using toString on an Array
+          case Apply(Select(array, toString), List()) 
+            if (toString is "toString")
+            && (array.tpe.widen.toString startsWith "Array[") =>
+
+            warn(tree, new UnlikelyToString("Array"))
+          
           /// Warn about using .asInstanceOf[T] (disabled)
           //TODO: false positives in case class A(), and in the interpreter init
           /*case aa @ Apply(a, List(b @ Apply(s @ Select(instanceOf,dd),ee))) if methodImplements(instanceOf.symbol, AsInstanceOf) =>

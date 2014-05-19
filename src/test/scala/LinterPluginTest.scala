@@ -42,7 +42,7 @@ final object Compiler {
   //settings.deprecation.value = true // enable detailed deprecation warnings
   //settings.unchecked.value = true // enable detailed unchecked warnings    
   settings.Xwarnfatal.value = true // warnings cause compile failures too
-  //if(Properties.versionString contains "2.10") settings.stopAfter.value = List("linter-refchecked") // fails in 2.11
+  if(Properties.versionString contains "2.10") settings.stopAfter.value = List("linter-refchecked") // fails in 2.11
 
   val stringWriter = new StringWriter()
 
@@ -281,6 +281,17 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should(""" val a = s"wat" """)
     shouldnt(""" { val a = 5; s" $a " } """)
   }
+
+  @Test
+  def UnlikelyToString(): Unit = {
+    implicit val msg = "Using toString on type"
+    
+    should(""" Array("1").toString """)
+    should(""" val a = Array(1,2,3); println(a.toString) """)
+    should(""" def x(a: Array[Long]): String = a.toString """)
+    shouldnt(""" val a = Seq(1,2,3); println(a.toString) """)
+
+  }  
   
   // ^ New tests named after their Warning.scala name ^
   // ----------------- OLD TESTS ----------------------
