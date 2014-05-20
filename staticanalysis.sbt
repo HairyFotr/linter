@@ -1,6 +1,6 @@
 import de.johoop.findbugs4sbt._
 import de.johoop.cpd4sbt.CopyPasteDetector._
-import de.johoop.cpd4sbt.{ReportType => CPDReportType, OutputType => CPDOutputType}
+import de.johoop.cpd4sbt.{ReportType => CPDReportType}
 import org.scalastyle.sbt.{ScalastylePlugin, PluginKeys}
 
 scalacOptions ++= Seq(
@@ -50,5 +50,3 @@ cpdTargetPath <<= baseDirectory { base => base / "sca" }
 cpdReportName := "cpdoutput.txt"
 
 cpdReportType := CPDReportType.Simple
-
-cpdOutputType := CPDOutputType.File
