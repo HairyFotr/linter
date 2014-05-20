@@ -2207,8 +2207,12 @@ class LinterPlugin(val global: Global) extends Plugin {
               }
 
               val minLen = stringPrefix.length+2
-              val out = new StringAttrs(minLength = minLen, trimmedMinLength = minLen, prefix = stringPrefix, suffix = ")")
-              out
+              new StringAttrs(
+                minLength = minLen,
+                trimmedMinLength = minLen,
+                prefix = stringPrefix,
+                suffix = ")",
+                knownPieces = Set(stringPrefix, ")"))
             } else {
               //TODO:discover moar
               //if(!(param.tpe.widen <:< StringClass.tpe) && !(param.tpe.widen <:< AnyClass.tpe))println(((str, param), (param.tpe, param.tpe.widen)))
@@ -2272,14 +2276,16 @@ class LinterPlugin(val global: Global) extends Plugin {
                   warn(treePosHolder, new DecomposingEmptyCollection(f, "string"))
                   Left(empty)
                 } else {
-                  Left(new StringAttrs(str.exactValue.map(a => if(f=="init") a.init else a.tail)))
+                  Left(new StringAttrs(str.exactValue.map(a => if(f == "init") a.init else a.tail)))
                 }
               } else {
                 if(str.maxLength == 0) {
                   warn(treePosHolder, new DecomposingEmptyCollection(f, "string"))
                 }
 
-                Left(new StringAttrs(minLength = math.max(str.minLength-1, 0), maxLength = if(str.maxLength != Int.MaxValue) math.max(str.maxLength-1, 0) else Int.MaxValue))
+                Left(new StringAttrs(
+                  minLength = math.max(str.minLength-1, 0), 
+                  maxLength = if(str.maxLength != Int.MaxValue) math.max(str.maxLength-1, 0) else Int.MaxValue))
               }
 
             case "capitalize" if paramsSize == 0 => Left(str.capitalize)
@@ -2463,7 +2469,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               }
             /// String format checks (runtime exception)
             case f @ "format"
-              if (params.nonEmpty) && (params.head.tpe.widen <:< StringClass.tpe) && !(params.head.tpe.widen <:< rootMirror.getClassByName(newTermName("java.util.Locale")).tpe) => 
+              if (params.nonEmpty) && !(params.head.tpe.widen <:< rootMirror.getClassByName(newTermName("java.util.Locale")).tpe) => 
               //Ignore the default Java impl, just work with scala's format(Any*)
               //TODO: see: http://docs.oracle.com/javase/7/docs/api/java/util/Formatter.html
                 // in some cases at least length could be inferred, but option parser would need to be implemented
@@ -2483,40 +2489,45 @@ class LinterPlugin(val global: Global) extends Plugin {
                 case _ => true // Literals are defined
               }
               
-              if(str.exactValue.isDefined && valuesDefined) {
-                try {
-                  Left(new StringAttrs(exactValue = Some(str.exactValue.get.format(parActual map {
-                    case v: Values => v.getValue
-                    case s: StringAttrs => s.exactValue.get
-                    case x => x
-                  }:_*))))
-                } catch {
-                  case e: java.util.UnknownFormatConversionException =>
-                    warn(string, new InvalidStringFormat(e.getMessage))
-                    Left(empty)
-                  case e: java.util.IllegalFormatConversionException if !e.getMessage.contains("!= java.lang.String") =>
-                    warn(string, new InvalidStringFormat(e.getMessage))
-                    Left(empty)
-                  case e: java.util.MissingFormatArgumentException =>
-                    warn(string, new InvalidStringFormat(e.getMessage))
-                    Left(empty)
-                  case e: Exception =>
-                    Left(empty)
+              var outStr = Left(empty)
+              if(str.exactValue.isDefined) {
+                val strValue = str.exactValue.get
+                val prefix = strValue.takeWhile(_ != '%')
+                if(valuesDefined) {
+                  try {
+                    outStr = Left(new StringAttrs(exactValue = Some(strValue.format(parActual map {
+                      case v: Values => v.getValue
+                      case s: StringAttrs => s.exactValue.get
+                      case x => x
+                    }:_*))))
+                  } catch {
+                    case e: java.util.UnknownFormatConversionException =>
+                      warn(string, new InvalidStringFormat(e.toString))
+                    case e: java.util.IllegalFormatConversionException if !e.getMessage.contains("!= java.lang.String") => // TODO: Why this condition?
+                      warn(string, new InvalidStringFormat(e.toString))
+                    case e: java.util.MissingFormatArgumentException =>
+                      warn(string, new InvalidStringFormat(e.toString))
+                    case e: Exception =>
+                  }
+                } else {
+                  try {
+                    strValue.format(parActual.map { a => null }:_*)
+                    outStr = Left(new StringAttrs(
+                      minLength = prefix.length, 
+                      trimmedMinLength = prefix.trim.length,
+                      prefix = prefix,
+                      knownPieces = Set(prefix)))
+                  } catch {
+                    case e: java.util.UnknownFormatConversionException =>
+                      warn(string, new InvalidStringFormat(e.toString))
+                    case e: java.util.MissingFormatArgumentException =>
+                      warn(string, new InvalidStringFormat(e.toString))
+                    case e: Exception =>
+                  }
                 }
-              } else if(str.exactValue.isDefined && !valuesDefined) {
-                try {
-                  str.exactValue.get.format(parActual map { a => null }:_*)
-                } catch {
-                  case e: java.util.UnknownFormatConversionException =>
-                    warn(string, new InvalidStringFormat(e.getMessage))
-                  case e: java.util.MissingFormatArgumentException =>
-                    warn(string, new InvalidStringFormat(e.getMessage))
-                  case e: Exception => //IllegalFormatConversionException... anything else?
-                }
-                Left(empty)
-              } else {
-                Left(empty)
               }
+              
+              outStr
             case _ =>
               //if(str.exactValue.isDefined)println((str, func, params))
               Left(empty)
@@ -2544,7 +2555,6 @@ class LinterPlugin(val global: Global) extends Plugin {
             case Apply(Select(Apply(scala_StringContext_apply, literalList), interpolator), paramList) 
               if (scala_StringContext_apply.toString == "scala.StringContext.apply") 
               && (interpolator.toString == "s") =>
-              
               
               try {
                 if(paramList.isEmpty) {
