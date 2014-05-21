@@ -1,10 +1,10 @@
  language: scala
  scala:
    - 2.10.4
-   - 2.11.0
+   - 2.11.1
  matrix:
    allow_failures:
-     - scala: 2.11.0
+     - scala: 2.11.1
  jdk:
    - openjdk6
    - openjdk7
