@@ -1609,6 +1609,17 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     implicit val msg = " by zero"
     
     should("""1/0""")
+    should("""1/0L""")
+    //should("""1/0f""") //parser makes it Infinity
+    //should("""1/0d""")    
+    should("""val a = 1; a/0""")
+    should("""val a = 1; a/0d""")
+    should("""val a = 1; a/0f""")
+
+    shouldnt("""class x { def /(d: Int): Int = d }; val b = new x; b/0""")
+    
+    shouldnt("""1/2""")
+
     should("""
       val a = 5
       println(a/(a-5))
@@ -1619,7 +1630,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       println(a.size/(a.size-3))
     """)
     
-    shouldnt("""1/2""")
     shouldnt("""
       val a = List(1,2,3)
       println(a.size/(a.size-4))

@@ -1013,17 +1013,22 @@ class LinterPlugin(val global: Global) extends Plugin {
             if methodImplements(pos.symbol, SeqLikeApply) && index < 0 =>
             warn(pos, IndexingWithNegativeNumber)
 
-          /// Literal division by zero (obsolete?)
-          // cannot check double/float, as typer will automatically translate it to Infinity
-          case divByZero @ Apply(Select(rcvr, op), List(Literal(Constant(0))))
-            if (op == nme.DIV || op == nme.MOD)
-            && (rcvr.tpe <:< ByteClass.tpe
-             || rcvr.tpe <:< ShortClass.tpe
-             || rcvr.tpe <:< IntClass.tpe
-             || rcvr.tpe <:< LongClass.tpe) =>
-            warn(divByZero, DivisionByLiteralZero)
+          /// Literal division by zero (obsoleted by abs-int? not for all types, sadly...)
+          // can't always check double/float, as even the parser will change it to Infinity
+          case divByZero @ Apply(Select(num, op), List(denomLiteral @ Literal(Constant(denom))))
+            if (op == nme.DIV || op == nme.MOD) 
+            && (num.tpe.widen weak_<:< DoubleClass.tpe) 
+            && (denomLiteral.tpe.widen weak_<:< DoubleClass.tpe) 
+            && (denom == 0 || denom == 1) =>
+            
+            if(denom == 0) {
+              warn(divByZero, DivisionByLiteralZero)
+            } else if(denom == 1) {
+              if(op == nme.DIV) warn(divByZero, DivideByOne)
+              else if(op == nme.MOD) warn(divByZero, ModuloByOne)
+            }
 
-          case _ =>
+          case _ => //
         }
 
         def containsAnyType(tpe: Type): Boolean = (tpe =:= AnyClass.tpe || tpe.typeArgs.exists(_ =:= AnyClass.tpe))
@@ -1910,23 +1915,25 @@ class LinterPlugin(val global: Global) extends Plugin {
             StringAttrs.stringFunc(string, func, params).right.getOrElse(Values.empty)
 
           /// Division by zero
-          case pos @ Apply(Select(_, op), List(expr)) if (op == nme.DIV || op == nme.MOD) && {
-            val value = computeExpr(expr)
-            if(value.isValue && value.getValue == 1) {
-              if(op == nme.MOD)
-                warn(pos, ModuloByOne)
-              else
-                warn(pos, DivideByOne)
+          case pos @ Apply(Select(num, op), List(expr)) 
+            if (op == nme.DIV || op == nme.MOD) 
+            && (num.tpe.widen weak_<:< DoubleClass.tpe) && {
+              val value = computeExpr(expr)
+              if(value.isValue && value.getValue == 1) {
+                if(op == nme.MOD)
+                  warn(pos, ModuloByOne)
+                else
+                  warn(pos, DivideByOne)
 
-              true
-            } else if(value.contains(0)) {
-              warn(pos, LikelyDivideByZero)
+                true
+              } else if(value.contains(0)) {
+                warn(pos, LikelyDivideByZero)
 
-              true
-            } else {
-              false //Fallthrough
-            }
-          } =>
+                true
+              } else {
+                false //Fallthrough
+              }
+            } =>
             Values.empty
 
           // Range
