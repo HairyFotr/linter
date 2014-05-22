@@ -31,7 +31,7 @@ class WarningTest extends JUnitMustMatchers {
       case IntDivisionAssignedToFloat => 1
       case InvalidParamToRandomNextInt => 1
       case InvalidStringConversion(_) => 1
-      case InvalidStringFormat(_) => 1
+      case InvalidStringFormat(_, _) => 1
       case InvariantCondition(_,_) => 1
       case InvariantExtrema(_,_) => 1
       case InvariantReturn(_,_) => 1

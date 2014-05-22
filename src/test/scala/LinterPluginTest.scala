@@ -267,11 +267,15 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   
   @Test
   def InvalidStringFormat(): Unit = {
-    implicit val msg = "string format will fail"
+    implicit val msg = "string format will throw"
    
     should(""" { val a = 5; "%s %i".format("a", 1) } """) // wrong formatter %i
-    should(""" { val a = "%s %d".format("a") } """)    // not enough params
+    should(""" { val a = "%s %d".format("a") } """)       // not enough params
+    should(""" { val a = "%s %  d".format("a", 3) } """)  // two spaces
     shouldnt(""" { val a = 5; "%s %d".format("a", 1) } """)
+    
+    should(""" "dafdsfdsa".format(1) """)("percent sign")
+    should(""" "dafdsf%dsa".format(1,2) """)("percent sign")
   }
   
   @Test

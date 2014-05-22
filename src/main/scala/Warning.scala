@@ -248,7 +248,7 @@ case class UnusedParameter(parameters: Seq[String], method: String) extends
     method) {
   def name = "UnusedParameter"
 }
-case class InvalidStringFormat(errorMessage: String) extends OneArgWarning("This string format will fail with: %s", errorMessage) {
+case class InvalidStringFormat(errorMessage: String, exception: Boolean = true) extends OneArgWarning(if(exception) "This string format will throw: %s" else "%s", errorMessage) {
   def name = "InvalidStringFormat"
 }
 case class InvalidStringConversion(conversionType: String) extends OneArgWarning("This String %s conversion will likely fail.", conversionType) {

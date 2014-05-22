@@ -29,9 +29,9 @@ class LinterPlugin(val global: Global) extends Plugin {
   val components = List[PluginComponent](PreTyperComponent, PostTyperComponent, PostTyperInterpreterComponent, PostRefChecksComponent)
   
   override val optionsHelp: Option[String] = Some(Seq(
-    "%s:plus+separated+warning+names".format(name, LinterOptions.EnableOnlyArgument),
-    "%s:plus+separated+warning+names".format(name, LinterOptions.DisableArgument)
-  ).map("  -P:" + name + ":" + _).mkString("\n"))
+    "%s:plus+separated+warning+names".format(LinterOptions.DisableArgument),
+    "%s:plus+separated+warning+names".format(LinterOptions.EnableOnlyArgument)
+  ).map(" -P:" + name + ":" +  _).mkString("\n"))
 
   override def processOptions(options: List[String], error: String => Unit): Unit = {
     LinterOptions.parse(options) match {
@@ -2496,10 +2496,20 @@ class LinterPlugin(val global: Global) extends Plugin {
                 case _ => true // Literals are defined
               }
               
+              val prefixReg = "([^%]*).*".r
+              def getPrefix(s: String): String = try { val prefixReg(out) = s; out } catch { case e: MatchError => "" }
+              val suffixReg = ".*?[^%]( [^%]*)".r
+              def getSuffix(s: String): String = try { val suffixReg(out) = s; out } catch { case e: MatchError => "" }
+              
               var outStr = Left(empty)
               if(str.exactValue.isDefined) {
                 val strValue = str.exactValue.get
-                val prefix = strValue.takeWhile(_ != '%')
+                val percentCnt = strValue.count(_ == '%')
+                if(percentCnt == 0) {
+                  warn(string, new InvalidStringFormat("There are no percent signs in the format string.", exception = false))
+                } else if(parActual.length > percentCnt) {
+                  warn(string, new InvalidStringFormat("There are more parameters being passed to format, than there are percent signs in the format string.", exception = false))
+                }
                 if(valuesDefined) {
                   try {
                     outStr = Left(new StringAttrs(exactValue = Some(strValue.format(parActual map {
@@ -2514,24 +2524,40 @@ class LinterPlugin(val global: Global) extends Plugin {
                       warn(string, new InvalidStringFormat(e.toString))
                     case e: java.util.MissingFormatArgumentException =>
                       warn(string, new InvalidStringFormat(e.toString))
+                    case e: java.util.DuplicateFormatFlagsException => 
+                      warn(string, new InvalidStringFormat(e.toString))
                     case e: Exception =>
                   }
                 } else {
                   try {
                     strValue.format(parActual.map { a => null }:_*)
+                    val prefix = getPrefix(strValue)
+                    val suffix = getSuffix(strValue)
                     outStr = Left(new StringAttrs(
-                      minLength = prefix.length, 
-                      trimmedMinLength = prefix.trim.length,
+                      minLength = math.max(prefix.length, suffix.length), 
+                      trimmedMinLength = math.max(prefix.trim.length, suffix.trim.length),
                       prefix = prefix,
-                      knownPieces = Set(prefix)))
+                      suffix = suffix,
+                      knownPieces = Set(prefix, suffix)))
                   } catch {
                     case e: java.util.UnknownFormatConversionException =>
                       warn(string, new InvalidStringFormat(e.toString))
                     case e: java.util.MissingFormatArgumentException =>
                       warn(string, new InvalidStringFormat(e.toString))
+                    case e: java.util.DuplicateFormatFlagsException => 
+                      warn(string, new InvalidStringFormat(e.toString))
                     case e: Exception =>
                   }
                 }
+              } else if(str.prefix != "" || str.suffix != "") {
+                val prefix = str.prefix
+                val suffix = str.suffix
+                outStr = Left(new StringAttrs(
+                  minLength = math.max(prefix.length, suffix.length), 
+                  trimmedMinLength = math.max(prefix.trim.length, suffix.trim.length),
+                  prefix = prefix,
+                  suffix = suffix,
+                  knownPieces = Set(prefix, suffix)))
               }
               
               outStr
