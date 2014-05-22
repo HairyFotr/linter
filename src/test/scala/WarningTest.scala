@@ -18,7 +18,9 @@ class WarningTest extends JUnitMustMatchers {
       case NumberInstanceOf(_) => 1
       case DecomposingEmptyCollection(_,_) => 1
       case DivideByOne => 1
-      case DivisionByLiteralZero => 1
+      case ModuloByOne => 1
+      case DivideByZero => 1
+      case ZeroDivideBy => 1
       case DuplicateIfBranches => 1
       case DuplicateKeyInMap => 1
       case IdenticalCaseBodies(_) => 1
@@ -36,11 +38,9 @@ class WarningTest extends JUnitMustMatchers {
       case InvariantExtrema(_,_) => 1
       case InvariantReturn(_,_) => 1
       case JavaConverters => 1
-      case LikelyDivideByZero => 1
       case LikelyIndexOutOfBounds(_) => 1
       case MalformedSwap => 1
       case MergeNestedIfs => 1
-      case ModuloByOne => 1
       case OnceEvaluatedStatementsInBlockReturningFunction => 1
       case OperationAlwaysProducesZero(_) => 1
       case OptionOfOption => 1

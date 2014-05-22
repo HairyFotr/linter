@@ -42,6 +42,7 @@ class LinterPlugin(val global: Global) extends Plugin {
   }
 
   val inferred = mutable.HashSet[Position]() // Used for a scala 2.9 hack (can't find out which types are inferred)
+  val intLiteralDiv = mutable.HashSet[Position]()
 
   private object PreTyperComponent extends PluginComponent {
     val global = LinterPlugin.this.global
@@ -143,6 +144,12 @@ class LinterPlugin(val global: Global) extends Plugin {
             /*if(mods.isImplicit && typeTree.isEmpty && !(name.toString matches "((i?)to).+|.*(To|2)[A-Z].*")) {
               warn(tree, "Implicit method %s needs explicit return type" format name)
             }*/
+
+          //
+          case Apply(Select(numLiteral @ Literal(Constant(num: Int)), op), List(denomLiteral @ Literal(Constant(denom: Int))))
+            if (op == nme.DIV || op == nme.MOD) =>
+            
+            intLiteralDiv += tree.pos
 
           //Loss of precision on literals
           //Moved here because ConstantFolder in typechecker messes it up
@@ -1015,18 +1022,25 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           /// Literal division by zero (obsoleted by abs-int? not for all types, sadly...)
           // can't always check double/float, as even the parser will change it to Infinity
-          case divByZero @ Apply(Select(num, op), List(denomLiteral @ Literal(Constant(denom))))
+          case Apply(Select(num, op), List(denomLiteral @ Literal(Constant(denom))))
             if (op == nme.DIV || op == nme.MOD) 
             && (num.tpe.widen weak_<:< DoubleClass.tpe) 
             && (denomLiteral.tpe.widen weak_<:< DoubleClass.tpe) 
             && (denom == 0 || denom == 1) =>
             
             if(denom == 0) {
-              warn(divByZero, DivisionByLiteralZero)
+              warn(tree, DivideByZero)
             } else if(denom == 1) {
-              if(op == nme.DIV) warn(divByZero, DivideByOne)
-              else if(op == nme.MOD) warn(divByZero, ModuloByOne)
+              if(op == nme.DIV) warn(tree, DivideByOne)
+              else if(op == nme.MOD) warn(tree, ModuloByOne)
             }
+          case Apply(Select(numLiteral @ Literal(Constant(num)), op), List(denom))
+            if (op == nme.DIV || op == nme.MOD)
+            && (numLiteral.tpe.widen weak_<:< DoubleClass.tpe)
+            && (denom.tpe.widen weak_<:< DoubleClass.tpe)
+            && (num == 0) =>
+            
+            warn(tree, ZeroDivideBy)
 
           case _ => //
         }
@@ -1264,6 +1278,8 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(body, IntDivisionAssignedToFloat)
           case ValDef(_, _, tpe, body) if isFloatingType(tpe) && hasIntegerDivision(body) =>
             warn(body, IntDivisionAssignedToFloat)
+          case Literal(Constant(num)) if (intLiteralDiv contains tree.pos) && isFloatingType(tree.tpe) =>
+            warn(tree, IntDivisionAssignedToFloat)
 
           /// col.flatten instead of col.filter(_.isDefined).map(_.get)
           case Apply(TypeApply(Select(Apply(Select(col, filter), List(Function(List(ValDef(_, p1, _, _)), Select(p1_, isDefined)))), map), _), List(Function(List(ValDef(_, p2, _, _)), Select(p2_, get))))
@@ -1918,19 +1934,24 @@ class LinterPlugin(val global: Global) extends Plugin {
           case pos @ Apply(Select(num, op), List(expr)) 
             if (op == nme.DIV || op == nme.MOD) 
             && (num.tpe.widen weak_<:< DoubleClass.tpe) && {
-              val value = computeExpr(expr)
-              if(value.isValue && value.getValue == 1) {
+              val denom = computeExpr(expr)
+              if(denom.isValue && denom.getValue == 1) {
                 if(op == nme.MOD)
                   warn(pos, ModuloByOne)
                 else
                   warn(pos, DivideByOne)
 
-                true
-              } else if(value.contains(0)) {
-                warn(pos, LikelyDivideByZero)
+                false //
+              } else if(denom.contains(0)) {
+                warn(pos, DivideByZero)
 
                 true
               } else {
+                val numer = computeExpr(num)
+                if(numer.isValue && numer.getValue == 0) {
+                  warn(pos, ZeroDivideBy)
+                }
+                
                 false //Fallthrough
               }
             } =>

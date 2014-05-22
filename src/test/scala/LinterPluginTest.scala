@@ -701,23 +701,23 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     //isUsed is the suspect, if this fails inside the if
     should(""" val a = List(1,2,3); if(a.size == 3) for(i <- a) 1/i """)("This condition will always hold.")
     should(""" val a = List(1,2,3); if(a.size > 3) for(i <- a) 1/i """)("This condition will never hold.")
-    should(""" val a = List(1,2,3); for(i <- a) 1/(i-1) """)("You will likely divide by zero here.")
+    should(""" val a = List(1,2,3); for(i <- a) 1/(i-1) """)("Possible division by zero.")
     should(""" val k = 3; val a = List(1,2,3); if(a.size == k) for(i <- a) 1/i """)("This condition will always hold.")
     should(""" val k = 4; val a = List(1,2,3); if(a.size == k) for(i <- a) 1/i """)("This condition will never hold.")
-    should(""" val k = 1; val a = List(1,2,3); for(i <- a) 1/(i-k) """)("You will likely divide by zero here.")
+    should(""" val k = 1; val a = List(1,2,3); for(i <- a) 1/(i-k) """)("Possible division by zero.")
     
     should(""" var k = 3; val a = List(1,2,3); if(a.size == k) for(i <- a) 1/i """)("This condition will always hold.")
     should(""" var k = 4; val a = List(1,2,3); if(a.size == k) for(i <- a) 1/i """)("This condition will never hold.")
-    should(""" var k = 1; val a = List(k,2,3); for(i <- a) 1/(i-k) """)("You will likely divide by zero here.")
+    should(""" var k = 1; val a = List(k,2,3); for(i <- a) 1/(i-k) """)("Possible division by zero.")
     
-    shouldnt(""" val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b-3) """)("You will likely divide by zero here.")
-    should(""" val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b-2) """)("You will likely divide by zero here.")
-    should(""" val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b-1) """)("You will likely divide by zero here.")
-    should(""" val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b-0) """)("You will likely divide by zero here.")
-    shouldnt(""" val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b+1) """)("You will likely divide by zero here.")
+    shouldnt(""" val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b-3) """)("Possible division by zero.")
+    should(""" val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b-2) """)("Possible division by zero.")
+    should(""" val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b-1) """)("Possible division by zero.")
+    should(""" val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b-0) """)("Possible division by zero.")
+    shouldnt(""" val b = if(util.Random.nextBoolean) { if(util.Random.nextBoolean) 0 else 2 } else { 1 }; 1/(b+1) """)("Possible division by zero.")
     
-    should("""for(i <- (1 to 10).map(a => a+1)) 1/(i-2)""")("You will likely divide by zero here.")
-    shouldnt("""for(i <- (1 to 10).map(a => a+2)) 1/(i-2)""")("You will likely divide by zero here.")
+    should("""for(i <- (1 to 10).map(a => a+1)) 1/(i-2)""")("Possible division by zero.")
+    shouldnt("""for(i <- (1 to 10).map(a => a+2)) 1/(i-2)""")("Possible division by zero.")
   }
   
   @Test
@@ -898,16 +898,16 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   def abs_interpretation__vartests(): Unit = {
     //TODO: this should read both as test, and an invitation to improve where the value is actually obvious
     
-    should(""" var b = 3; 1/(b-3) """)("divide by zero")
-    shouldnt(""" var b = 3; { b = 3; 1+1; }; 1/(b-3) """)("divide by zero") //but could
-    shouldnt(""" var b = 3; { b = 4; 1+1; }; 1/(b-3) """)("divide by zero")
+    should(""" var b = 3; 1/(b-3) """)("division by zero")
+    shouldnt(""" var b = 3; { b = 3; 1+1; }; 1/(b-3) """)("division by zero") //but could
+    shouldnt(""" var b = 3; { b = 4; 1+1; }; 1/(b-3) """)("division by zero")
 
-    should(""" var b = 3; for(i <- 1 to 10) { b = i; 1/(b-3) } """)("divide by zero")
+    should(""" var b = 3; for(i <- 1 to 10) { b = i; 1/(b-3) } """)("division by zero")
 
-    should(""" var b = "3"; 1/(b.toInt-3) """)("divide by zero")
+    should(""" var b = "3"; 1/(b.toInt-3) """)("division by zero")
     //TODO: in the for loop it doesn't warn even if there is a problem, because range to string is not covered
-    shouldnt(""" var b = "0"; for(i <- 1 to 10) { b = i.toString; 1/(b.toInt-333) }; 1/b.toInt """)("divide by zero")
-    shouldnt(""" var b = "0"; for(i <- -4 to 0) { b = i.toString; 1/(b.toInt-333) }; 1/b.toInt """)("divide by zero")
+    shouldnt(""" var b = "0"; for(i <- 1 to 10) { b = i.toString; 1/(b.toInt-333) }; 1/b.toInt """)("division by zero")
+    shouldnt(""" var b = "0"; for(i <- -4 to 0) { b = i.toString; 1/(b.toInt-333) }; 1/b.toInt """)("division by zero")
 
     should("""def a = { val a = 0; if (a == 0) 1.0 else 5 / a }""")("This condition will always hold.")
     should("""def a = { val a = 0; def precision = if (a == 0) 1.0 else 5 / a }""")("This condition will always hold.")
@@ -1889,7 +1889,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should(defs+"""a match { case 3 => "hello" case 4 => "hello" case 5 => "hello" case _ => "how low" }""")("""Bodies of 3 neighbouring cases are identical and could be merged.""")
     should(defs+"""bool match { case true => 0 case false => 1 }""")("""This is probably better written as an if statement.""")
     should(defs+"""for(i <- 10 to 20) { if(i > 20) "" }""")("""This condition will never hold.""")
-    should(defs+"""for(i <- 1 to 10) { 1/(i-1)  }""")("""You will likely divide by zero here.""")
+    should(defs+"""for(i <- 1 to 10) { 1/(i-1)  }""")("""Possible division by zero.""")
     should(defs+"""{ val a = List(1,2,3); for(i <- 1 to 10) { println(a(i)) } }""")("""You will likely use a too large index.""")
     should(defs+"""for(i <- 10 to 20) { if(i.toString.length == 3) "" }""")("""This condition will never hold.""")
     should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s contains "world") ""; """)("""This contains always returns the same value: true""")
@@ -1974,7 +1974,7 @@ src/main/scala/AbstractInterpretation.scala:              unit.warning(treePosHo
 src/main/scala/AbstractInterpretation.scala:      if(!isUsed(body, param) && func != "foreach") unit.warning(tree.pos, "Iterator value is not used in the body.")
 src/main/scala/AbstractInterpretation.scala:        unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
 src/main/scala/AbstractInterpretation.scala:        if(stringVals contains str) unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
-src/main/scala/AbstractInterpretation.scala:        unit.warning(pos.pos, "You will likely divide by zero here.")
+src/main/scala/AbstractInterpretation.scala:        unit.warning(pos.pos, "Possible division by zero.")
 src/main/scala/AbstractInterpretation.scala:        unit.warning(pos.pos, "You will likely use a too large index for a collection here.")
 src/main/scala/AbstractInterpretation.scala:        unit.warning(pos.pos, "You will likely use a negative index for a collection here.")
 src/main/scala/AbstractInterpretation.scala:            unit.warning(pos.pos, "This function always returns the same value.")

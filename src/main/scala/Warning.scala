@@ -33,8 +33,10 @@ object Warning {
     new ContainsTypeMismatch("",""),
     new NumberInstanceOf(""),
     new DecomposingEmptyCollection("",""),
+    ModuloByOne,
     DivideByOne,
-    DivisionByLiteralZero,
+    DivideByZero,
+    ZeroDivideBy,
     DuplicateIfBranches,
     DuplicateKeyInMap,
     new IdenticalCaseBodies(""),
@@ -52,11 +54,9 @@ object Warning {
     new InvariantExtrema(max = true, returnsFirst = true),
     new InvariantReturn("method", "returnValue"),
     JavaConverters,
-    LikelyDivideByZero,
     new LikelyIndexOutOfBounds(""),
     MalformedSwap,
     MergeNestedIfs,
-    ModuloByOne,
     OnceEvaluatedStatementsInBlockReturningFunction,
     new OperationAlwaysProducesZero(""),
     OptionOfOption,
@@ -175,7 +175,6 @@ case object MalformedSwap extends NoArgWarning("Did you mean to swap these two v
 case object IdenticalIfCondition extends NoArgWarning("Two subsequent ifs have the same condition")
 case object IdenticalStatements extends NoArgWarning("You're doing the exact same thing twice or more.")
 case object IndexingWithNegativeNumber extends NoArgWarning("Using a negative index for a collection.")
-case object DivisionByLiteralZero extends NoArgWarning("Literal division by zero.")
 case object OptionOfOption extends NoArgWarning("Why would you need an Option of an Option?")
 case class UndesirableTypeInference(inferredType: String) extends OneArgWarning("Inferred type %s. This might not be what you intended. Add explicit type if that's what you want.", inferredType) {
   def name = "UndesirableTypeInference"
@@ -228,9 +227,10 @@ case object ProducesEmptyCollection extends NoArgWarning("The resulting collecti
 case class OperationAlwaysProducesZero(operation: String) extends OneArgWarning("Same values on both sides of %s will return 0.", operation) {
   def name = "OperationAlwaysProducesZero"
 }
-case object ModuloByOne extends NoArgWarning("Taking the modulo by one will always return zero.")
-case object DivideByOne extends NoArgWarning("Dividing by one will always return the original number.")
-case object LikelyDivideByZero extends NoArgWarning("You will likely divide by zero here.")
+case object ModuloByOne extends NoArgWarning("Taking the modulo by one will return zero.")
+case object DivideByOne extends NoArgWarning("Dividing by one will return the original number.")
+case object DivideByZero extends NoArgWarning("Possible division by zero.")
+case object ZeroDivideBy extends NoArgWarning("Division of zero will return zero.")
 case object UseUntilNotToMinusOne extends NoArgWarning("Use (low until high) instead of (low to high-1).")
 case object InvalidParamToRandomNextInt extends NoArgWarning("The parameter of this nextInt might be lower than 1 here.")
 case object UnusedForLoopIteratorValue extends NoArgWarning("Iterator value is not used in the for loop's body.")
