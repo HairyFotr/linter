@@ -3115,6 +3115,18 @@ class LinterPlugin(val global: Global) extends Plugin {
             treePosHolder = regExpr
             StringAttrs(regExpr).exactValue.foreach(checkRegex)
             
+          /// Some format string passing
+          case Apply(formatFunc, params) 
+            if ((formatFunc.toString endsWith "Predef.printf")
+            || (formatFunc.toString endsWith "Console.printf")
+            || (formatFunc.toString endsWith "lang.String.format"))
+            && (params.size >= 2) && (params(1) match { 
+              case Typed(_, Ident(tpnme.WILDCARD_STAR)) => false
+              case _ => true
+            }) =>
+            
+            StringAttrs.stringFunc(params.head, newTermName("format"), params.tail)
+
           /// Checks conditions that use Option.size (there is a separate check for all uses of Option.size)
           //ADD: Generalize... move to applyCond completely, make it less hacky
           case t @ Apply(Select(Select(Apply(option2Iterable, List(opt)), size), op), List(expr))

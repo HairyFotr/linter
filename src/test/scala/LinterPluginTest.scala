@@ -274,6 +274,10 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should(""" { val a = "%s %  d".format("a", 3) } """)  // two spaces
     shouldnt(""" { val a = 5; "%s %d".format("a", 1) } """)
     
+    should(""" String.format("%s %s %s", "a", "1") """)
+    should(""" printf("%s %s %s", "a", "1") """)
+    should(""" Console.printf("%s %s %s", "a", "1") """)
+    
     should(""" "dafdsfdsa".format(1) """)("percent sign")
     should(""" "dafdsf%dsa".format(1,2) """)("percent sign")
   }
