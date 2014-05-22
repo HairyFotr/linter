@@ -1,0 +1,1 @@
+grep -Po 'case (class|object) [a-zA-Z]+' src/main/scala/Warning.scala | cut -d' ' -f3 | tr '\n' ',' | sed "s/,/, /g"; echo
