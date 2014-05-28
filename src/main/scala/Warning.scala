@@ -104,7 +104,8 @@ object Warning {
     new TypeToType(""),
     EmptyStringInterpolator,
     new UnlikelyToString(""),
-    UnthrownException)
+    UnthrownException,
+    SuspiciousMatches)
 
   final val AllNames = All.map(_.name)
 
@@ -270,5 +271,6 @@ case class UnlikelyToString(tpe: String) extends OneArgWarning("Using toString o
   def name = "UnlikelyToString"
 }
 case object UnthrownException extends NoArgWarning("This exception is likely meant to be thrown here.")
+case object SuspiciousMatches extends NoArgWarning("This regex starts with ^ or ends with $. The matches method always matches the entire string.")
 
 

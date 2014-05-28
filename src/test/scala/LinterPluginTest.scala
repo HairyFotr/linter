@@ -308,6 +308,19 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     shouldnt(""" def a: Int = { println(""); throw new Exception(); 5 } """)
     shouldnt(""" def a: Int = { println(""); return 4; 5 } """)
   }
+  
+  @Test
+  def SuspiciousMatches(): Unit = {
+    implicit val msg = "matches the entire string"
+    
+    should(""" val a = util.Random.nextString(5) matches "^abc$" """)
+    shouldnt(""" val a = util.Random.nextString(5) matches "abc" """)
+    should(""" val a = util.Random.nextString(5); val b = a matches (a+"$") """)
+    should(""" val a = util.Random.nextString(5); val b = a matches ("^"+a) """)
+    shouldnt(""" val a = util.Random.nextString(5); a matches a """)
+    should(""" if(List("") forall { _ matches "^[A-Za-z0-9_]{1,20}$" }) println""")
+  }
+  
   // ^ New tests named after their Warning.scala name ^
   // ----------------- OLD TESTS ----------------------
 

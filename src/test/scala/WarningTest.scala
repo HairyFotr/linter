@@ -90,6 +90,7 @@ class WarningTest extends JUnitMustMatchers {
       case EmptyStringInterpolator => 1
       case UnlikelyToString(_) => 1
       case UnthrownException => 1
+      case SuspiciousMatches => 1
       // ------------------------------------------------------------------------------------------------------
       // If you get a warning here, it's likely because you added a new warning type but forgot to add it here. 
       // The real point is that you need to add the new Warning to Warning.All.

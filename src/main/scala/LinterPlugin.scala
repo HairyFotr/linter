@@ -2482,13 +2482,14 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             // str.func(String)
             /// Try to verify String contains, startsWith, endsWith
-            case func @ ("contains"|"startsWith"|"endsWith"|"equals"|"$eq$eq"|"$bang$eq") =>
+            case func @ ("contains"|"startsWith"|"endsWith"|"equals"|"$eq$eq"|"$bang$eq"|"matches") =>
               val result = func match {
                 case "contains"   => (str contains stringParam)
                 case "startsWith" => (str startsWith stringParam)
                 case "endsWith"   => (str endsWith stringParam)
                 case "equals"|"$eq$eq" => (str equals stringParam)
                 case "$bang$eq" => (str nequals stringParam)
+                case "matches" => (str matches stringParam)
                 case _ => None
               }
               val function = if(func == "$eq$eq") "equals" else if(func == "$bang$eq") "not equals" else func
@@ -2767,6 +2768,19 @@ class LinterPlugin(val global: Global) extends Plugin {
           if(s.length > getMaxLength) Some(false)
           else if(suffix.isEmpty || s.length > suffix.length) None
           else Some(suffix endsWith s)
+          
+        def matches(s: StringAttrs): Option[Boolean] = {
+          if((s startsWith "^") == Some(true) || (s endsWith "$") == Some(true)) warn(treePosHolder, SuspiciousMatches)
+         
+          if(s.exactValue.isDefined) this.matches(s.exactValue.get)
+          else None
+        }
+        def matches(s: String): Option[Boolean] = {
+          if((s startsWith "^") || (s endsWith "$")) warn(treePosHolder, SuspiciousMatches)
+         
+          if(exactValue.isDefined) Some(exactValue.get matches s)
+          else None
+        }
 
         def capitalize: StringAttrs = 
           new StringAttrs(
@@ -3053,6 +3067,11 @@ class LinterPlugin(val global: Global) extends Plugin {
           case If(condExpr, t, f) => //TODO: moved to computeExpr?
             val backupVals = vals
             val backupStrs = stringVals
+            
+            pushDefinitions()
+            super.traverse(condExpr)
+            popDefinitions()
+            
             pushDefinitions()
             
             //println(vals)
@@ -3143,10 +3162,12 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Apply(Select(str, func), List(regExpr)) if (str.tpe.widen <:< StringClass.tpe) && (func.toString matches "matches|split") =>
             treePosHolder = regExpr
             StringAttrs(regExpr).exactValue.foreach(checkRegex)
+            if(func.toString == "matches") computeExpr(tree)
             
           case Apply(Select(str, func), List(regExpr, _str)) if (str.tpe.widen <:< StringClass.tpe) && (func.toString matches "replace(All|First)") =>
             treePosHolder = regExpr
             StringAttrs(regExpr).exactValue.foreach(checkRegex)
+            computeExpr(tree)
 
           case Select(Apply(scala_Predef_augmentString, List(regExpr)), r)
             if(scala_Predef_augmentString.toString.endsWith(".augmentString") && r.toString == "r") =>
