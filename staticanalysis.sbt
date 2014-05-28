@@ -1,6 +1,6 @@
 import de.johoop.findbugs4sbt._
 import de.johoop.cpd4sbt.CopyPasteDetector._
-import de.johoop.cpd4sbt.{ReportType => CPDReportType}
+import de.johoop.cpd4sbt.{ReportType => CPDReportType, OutputType => CPDOutputType}
 import org.scalastyle.sbt.{ScalastylePlugin, PluginKeys}
 
 scalacOptions ++= Seq(
@@ -21,13 +21,18 @@ scalacOptions ++= Seq(
 
 // Linter
 //resolvers += "linter" at "http://hairyfotr.github.io/linteRepo/releases"
+
 //addCompilerPlugin("com.foursquare.lint" %% "linter" % "0.1-SNAPSHOT")
+
 //scalacOptions += "-P:linter:disable:UseHypot+CloseSourceFile"
+
 //scalacOptions += "-Xplugin:../linteRepo/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar"
+
 //scalacOptions += "-Xplugin:../linteRepo/releases/com/foursquare/lint/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar"
 
 // Wartremover
 //addCompilerPlugin("org.brianmckenna" %% "wartremover" % "0.10")
+
 //scalacOptions in (Compile, compile) += "-P:wartremover:only-warn-traverser:org.brianmckenna.wartremover.warts.Unsafe"
 
 // Scalastyle
@@ -50,3 +55,5 @@ cpdTargetPath <<= baseDirectory { base => base / "sca" }
 cpdReportName := "cpdoutput.txt"
 
 cpdReportType := CPDReportType.Simple
+
+cpdOutputType := CPDOutputType.Console

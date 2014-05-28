@@ -103,8 +103,8 @@ object Warning {
     new UnsafeAbs(""),
     new TypeToType(""),
     EmptyStringInterpolator,
-    new UnlikelyToString("")
-  )
+    new UnlikelyToString(""),
+    UnthrownException)
 
   final val AllNames = All.map(_.name)
 
@@ -269,5 +269,6 @@ case object EmptyStringInterpolator extends NoArgWarning("This string interpolat
 case class UnlikelyToString(tpe: String) extends OneArgWarning("Using toString on type %s is likely unintended.", tpe) {
   def name = "UnlikelyToString"
 }
+case object UnthrownException extends NoArgWarning("This exception is likely meant to be thrown here.")
 
 

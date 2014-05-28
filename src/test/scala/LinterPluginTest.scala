@@ -298,9 +298,16 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should(""" val a = Array(1,2,3); println(a.toString) """)
     should(""" def x(a: Array[Long]): String = a.toString """)
     shouldnt(""" val a = Seq(1,2,3); println(a.toString) """)
-
   }  
   
+  @Test
+  def UnthrownException(): Unit = {
+    implicit val msg = "This exception is likely meant to be thrown here."
+    
+    should(""" def a: Int = { println(""); new Exception(); 5 } """)
+    shouldnt(""" def a: Int = { println(""); throw new Exception(); 5 } """)
+    shouldnt(""" def a: Int = { println(""); return 4; 5 } """)
+  }
   // ^ New tests named after their Warning.scala name ^
   // ----------------- OLD TESTS ----------------------
 
