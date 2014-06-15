@@ -24,7 +24,9 @@ object Utils {
   val nowarnPositions = mutable.HashSet[Global#Position]()
   
   def warn(tree: Global#Tree, warning: Warning)(implicit unit: Global#CompilationUnit): Unit = { 
-    if (disabledWarningNames.contains(warning.name) || (tree.pos.lineContent matches ".*// *nolint *") || (nowarnPositions contains tree.pos)) {
+    if((disabledWarningNames contains warning.name)
+    || (tree.pos.lineContent matches ".*// *linter:("+warning.name+":)?[nN]o[wW]arn(ing)? *(//.*)?")
+    || (nowarnPositions contains tree.pos)) {
       // skip
     } else {
       // scalastyle:off regex

@@ -228,6 +228,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       val SeqLikeClass: Symbol = rootMirror.getClassByName(newTermName("scala.collection.SeqLike"))
       val SeqLikeContains: Symbol = SeqLikeClass.info.member(newTermName("contains"))
       val SeqLikeApply: Symbol = SeqLikeClass.info.member(newTermName("apply"))
+      val MapFactoryClass = rootMirror.getClassByName(newTermName("scala.collection.generic.MapFactory"))
 
       val OptionGet: Symbol = OptionClass.info.member(nme.get)
       
@@ -261,6 +262,9 @@ class LinterPlugin(val global: Global) extends Plugin {
         selector.name == nme.WILDCARD && selector.renamePos == -1
       }
       
+      def containsAnyType(tpe: Type): Boolean = (tpe =:= AnyClass.tpe || tpe.typeArgs.exists(_ =:= AnyClass.tpe))
+      def containsNothingType(tpe: Type): Boolean = (tpe =:= NothingClass.tpe || tpe.typeArgs.exists(_ =:= NothingClass.tpe))
+
       def isOptionOption(t: Tree): Boolean = 
         (t.tpe.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe) 
         && t.tpe.widen.typeArgs.exists(_.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe)))
@@ -296,17 +300,16 @@ class LinterPlugin(val global: Global) extends Plugin {
   
       // Just a way to make the Tree/Name-String comparisons more readable
       abstract class RichToStr[T](n: T) {
-        def is(str: String): Boolean = n.toString == str
-        def isAny(str: String*): Boolean = str.exists(n.toString == _)
-        def startsWith(str: String): Boolean = n.toString startsWith str
-        def startsWithAny(str: String*): Boolean = str.exists(n.toString startsWith _)
-        def endsWith(str: String): Boolean = n.toString endsWith str
-        def endsWithAny(str: String*): Boolean = str.exists(n.toString endsWith _)
+        val nstr = n.toString
+        def is(str: String): Boolean = nstr == str
+        def isAny(str: String*): Boolean = str.exists(nstr == _)
+        def startsWith(str: String): Boolean = nstr startsWith str
+        def startsWithAny(str: String*): Boolean = str.exists(nstr startsWith _)
+        def endsWith(str: String): Boolean = nstr endsWith str
+        def endsWithAny(str: String*): Boolean = str.exists(nstr endsWith _)
       }
-      // (scala 2.9 implicit class)
-      import scala.language.implicitConversions
-      implicit def richTree(n: Tree): RichToStr[Tree] = new RichToStr(n) {}
-      implicit def richName(n: Name): RichToStr[Name] = new RichToStr(n) {}
+      implicit class richTree(n: Tree) extends RichToStr[Tree](n)
+      implicit class richName(n: Name) extends RichToStr[Name](n)
       
       // Returns the string subtree of a string.length/size subtree
       def getStringFromLength(t: Tree): Option[Tree] = t match {
@@ -342,6 +345,14 @@ class LinterPlugin(val global: Global) extends Plugin {
         case _ => /*println(showRaw(pow));*/ false
       }
       
+      def isMath_E(e: Tree): Boolean = e match {
+        case Literal(Constant(e)) 
+          if (e == 2.718281828459045)
+          || (e == 2.7182817) => true
+        case _ if (e is "scala.math.`package`.E") => true
+        case _ => /*println(showRaw(pow));*/ false
+      }
+
       def getAbs(t: Tree): Option[Tree] = t match {
         case Apply(abs, List(arg)) if (abs is "scala.math.`package`.abs") => Some(arg)
         case Select(Apply(scala_Predef_xWrapper, List(arg)), abs) 
@@ -366,7 +377,6 @@ class LinterPlugin(val global: Global) extends Plugin {
       }
       override def traverse(tree: Tree): Unit = try {
         superTraverse = true
-        //TODO: the matchers are broken up for one reason only - Scala 2.9 pattern matcher :)
         // Workarounds for some cases
         tree match {
           /// Workaround: case class generated code triggers a lot of the checks...
@@ -379,9 +389,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               case ValDef(_modifiers, _id1, _, _) :: Assign(_id2, _) :: _ => true
               case _ => false
             }} => superTraverse = false; return
-          case _ =>
-        }
-        tree match {
+
           //// Some numeric checks
           /*case Apply(Select(lhs, nme.EQ), List(rhs))
             if isSubtype(lhs, DoubleClass.tpe) || isSubtype(lhs, FloatClass.tpe) || isSubtype(rhs, DoubleClass.tpe) || isSubtype(rhs, FloatClass.tpe) =>
@@ -418,6 +426,19 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             warn(tree, UseCbrt)
           
+          /// Suggest using sqrt instead of pow(a, 0.5)
+          case Apply(pow, List(_num, Literal(Constant(0.5)))) 
+            if (pow is "scala.math.`package`.pow") =>
+
+            warn(tree, UseSqrt)
+          
+          /// Suggest using exp instead of pow(E, a)
+          case Apply(pow, List(e, num_))
+            if (pow is "scala.math.`package`.pow")
+            && (isMath_E(e)) =>
+
+            warn(tree, UseExp)
+
           /// Suggest using log10(x) instead of log(x)/log(10)
           case Apply(Select(Apply(log1, List(_num)), nme.DIV), List(Apply(log2, List(Literal(Constant(10.0)))))) 
             if (log1 is "scala.math.`package`.log") && (log2 is "scala.math.`package`.log") =>
@@ -452,9 +473,9 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             warn(pos, UseSignum)
 
-          case t => 
+          case _ if {
             /// Possibly unsafe use of abs -- math.abs(Int.MinValue) == -2147483648
-            getAbs(t).foreach {
+            getAbs(tree).foreach {
               case pos @ Apply(Select(rand, nextX), Nil)
                 if (rand.tpe.widen.toString startsWith "scala.util.Random")
                 && ((nextX is "nextInt") || (nextX is "nextLong")) =>
@@ -462,9 +483,10 @@ class LinterPlugin(val global: Global) extends Plugin {
                 warn(pos, new UnsafeAbs("Use nextInt(MaxValue) instead."))
               case _ => //foo
             }
-        }
-        
-        tree match {
+            
+            false
+          } => // fallthrough
+
           /// BigDecimal checks
           // BigDecimal(0.1) //TODO: someday move to interpreter - detect this for known values
           case Apply(Select(bigDecimal, apply_valueOf), (treeLiteral @ Literal(Constant(literal))) :: paramTail)
@@ -525,10 +547,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             if java_math_BigDecimal is "java.math.BigDecimal" =>
             
             warn(tree, BigDecimalPrecisionLoss)
-          
-          case _ =>
-        }
-        tree match {
+
           /// Checks for self-assignments: a = a
           case Assign(left, right) if left equalsStructure right =>
             warn(left, ReflexiveAssignment)
@@ -576,7 +595,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// Collection.contains on different types: List(1,2,3).contains("2")
           case Apply(contains @ Select(seq, _), List(target)) 
             if methodImplements(contains.symbol, SeqLikeContains) 
-            && !(target.tpe <:< seqMemberType(seq.tpe)) =>
+            && !(target.tpe weak_<:< seqMemberType(seq.tpe)) =>
             
             warn(contains, new ContainsTypeMismatch(seq.tpe.widen.toString, target.tpe.widen.toString))
 
@@ -1057,13 +1076,6 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             warn(tree, ZeroDivideBy)
 
-          case _ => //
-        }
-
-        def containsAnyType(tpe: Type): Boolean = (tpe =:= AnyClass.tpe || tpe.typeArgs.exists(_ =:= AnyClass.tpe))
-        def containsNothingType(tpe: Type): Boolean = (tpe =:= NothingClass.tpe || tpe.typeArgs.exists(_ =:= NothingClass.tpe))
-
-        tree match {
           /// an Option of an Option
           //TODO: make stricter if you want, but Ident(_) could get annoying if someone out there is actually using this :)
           case ValDef(_, _, _, value) if isOptionOption(value) =>
@@ -1126,6 +1138,12 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// Comparing Option to None instead of using isDefined (disabled)
           /*case Apply(Select(opt, op), List(scala_None)) if (op == nme.EQ || op == nme.NE) && (scala_None is "scala.None") =>
             warn(tree, "Use .isDefined instead of comparing to None")*/
+
+          /// filter(...).headOption is better written as find(...)
+          case Select(Apply(Select(_col, filter), List(Function(List(ValDef(_, _, _, _)), _))), headOption)
+            if (filter is "filter") && (headOption is "headOption") =>
+
+            warn(tree, UseFindNotFilterHead)
 
           /// orElse(Some(...)).get is better written as getOrElse(...)
           case Select(Apply(TypeApply(Select(_option, orElse), _), List(Apply(scala_Some_apply, List(_value)))), get)
@@ -1207,6 +1225,15 @@ class LinterPlugin(val global: Global) extends Plugin {
                 //println((showRaw(expr1), showRaw(expr2)))
             }
             
+            /// Warning about using Option.headOption,lastOption,tail
+            case Select(Apply(option2Iterable, List(opt)), bad)
+              if (opt.tpe.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe))
+              && ((bad is "headOption")
+               || (bad is "lastOption")
+               || (bad is "tail")) =>
+
+              warn(tree, AvoidOptionMethod(bad.toString))
+
             /// Warnings about using Option.size, which is probably a bug (use .isDefined instead)
             case t @ Select(Apply(option2Iterable, List(opt)), size) if (option2Iterable.toString contains "Option.option2Iterable") && (size is "size") =>
               
@@ -1215,13 +1242,8 @@ class LinterPlugin(val global: Global) extends Plugin {
               else if(opt.tpe.widen.typeArgs.exists(tp => tp.widen.baseClasses.exists(_.tpe =:= TraversableClass.tpe)))
                 warn(t, AvoidOptionCollectionSize)
               else
-                warn(t, AvoidOptionSize)
+                warn(t, AvoidOptionMethod("size", "use Option.isDefined instead."))
               
-          case _ =>
-        }
-        
-        val MapFactoryClass = rootMirror.getClassByName(newTermName("scala.collection.generic.MapFactory"))
-        tree match {
           /// Checks for duplicate mappings in a Map
           case Apply(TypeApply(Select(map, apply), _), args)
             if (apply is "apply")
@@ -1367,9 +1389,10 @@ class LinterPlugin(val global: Global) extends Plugin {
       def checkRegex(reg: String): Unit = {
         try {
           val regex = reg.r
+          if(reg matches "[\\^]?([|]+|([(][|]*[)])+)+[$]?") warn(treePosHolder, new RegexWarning("Regex "+reg+" matches only empty string", error = false))
         } catch {
           case e: java.util.regex.PatternSyntaxException =>
-            warn(treePosHolder, new RegexSyntaxError(e.getDescription))
+            warn(treePosHolder, new RegexWarning(e.getDescription))
           case e: Exception =>
         }
       }
@@ -1699,7 +1722,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             val out = this.distinct
             out.addActualSize(out.size)
           
-          case id if (id.toString matches "reverse") => this //Will hold, while Set is used for values
+          case id if (id.toString == "reverse") => this //Will hold, while Set is used for values
           case max if (max.toString == "max") && this.nonEmpty => Values(this.max)
           case min if (min.toString == "min") && this.nonEmpty => Values(this.min)
           case sum if (sum.toString == "sum") && this.nonEmpty && this.distinct.size == this.actualSize => Values(this.sum)
@@ -1720,23 +1743,22 @@ class LinterPlugin(val global: Global) extends Plugin {
         def applyBinary(op: Name, right: Values): Values = {
           val left = this
 
-          type F = ((Int, Int) => Int, Boolean) // 2.9 typer fails at pattern matching :)
-
-          val (func, isRangeSafe): F = op match {
-              case nme.ADD => (_ + _, true): F
-              case nme.SUB => (_ - _, true): F
-              case nme.MUL => (_ * _, false): F //ADD: are all these really unsafe for ranges (where you only process first and last)
-              case nme.AND => (_ & _, false): F
-              case nme.OR  => (_ | _, false): F
-              case nme.XOR => (_ ^ _, false): F
-              case nme.LSL => (_ << _, false): F
-              case nme.LSR => (_ >>> _, false): F
-              case nme.ASR => (_ >> _, false): F
-              case nme.MOD if right.size == 1 && right.getValueForce != 0 => (_ % _, false): F
-              case nme.DIV if right.size == 1 && right.getValueForce != 0 => (_ / _, false): F
-              case a if a.toString matches "apply|take|drop|max|min|contains|map|count" => ((a: Int, b: Int) => throw new Exception(), false): F //Foo, check below
+          val (func, isRangeSafe): ((Int, Int) => Int, Boolean) = 
+            op match {
+              case nme.ADD => (_ + _, true)
+              case nme.SUB => (_ - _, true)
+              case nme.MUL => (_ * _, false) //ADD: are all these really unsafe for ranges (where you only process first and last)
+              case nme.AND => (_ & _, false)
+              case nme.OR  => (_ | _, false)
+              case nme.XOR => (_ ^ _, false)
+              case nme.LSL => (_ << _, false)
+              case nme.LSR => (_ >>> _, false)
+              case nme.ASR => (_ >> _, false)
+              case nme.MOD if right.size == 1 && right.getValueForce != 0 => (_ % _, false)
+              case nme.DIV if right.size == 1 && right.getValueForce != 0 => (_ / _, false)
+              case a if a.toString matches "apply|take|drop|max|min|contains|map|count" => ((a: Int, b: Int) => throw new Exception(), false) //Foo, check below
               case _ => return Values.empty
-          }
+           }
           
           val out: Values = (
             if(op.toString == "count") {
@@ -1949,6 +1971,14 @@ class LinterPlugin(val global: Global) extends Plugin {
             if (scala_augmentString.toString endsWith "augmentString") =>
             
             StringAttrs.stringFunc(string, func, params).right.getOrElse(Values.empty)
+
+            case Apply(Select(Apply(scala_StringContext_apply, literalList), interpolator), paramList) 
+              if (scala_StringContext_apply.toString == "scala.StringContext.apply") 
+              && (interpolator.toString == "s") =>
+
+            StringAttrs(tree)
+            
+            Values.empty
 
           /// Division by zero
           case pos @ Apply(Select(num, op), List(expr)) 
@@ -2498,20 +2528,32 @@ class LinterPlugin(val global: Global) extends Plugin {
               Left(empty)
               
             //str.func(String, String)
-            case f @ ("replaceAll") if stringParams.size == 2 && stringParams.forall(_.exactValue.isDefined) =>
+            case f @ ("replaceAll"|"replaceFirst") if stringParams.size == 2 && stringParams.forall(_.exactValue.isDefined) =>
               val (p0,p1) = (stringParams(0).exactValue.get, stringParams(1).exactValue.get)
+              
+              if(p1.isEmpty) {
+                //TODO: nopenopenopenope - matches the end of replaceX func, because this gets traversed multiple times with the wrong pos
+                val posFiltering = treePosHolder.toString matches (".*?[ .]"+ f + """ *[(].*, *("{2}|"{6}) *[)]""")
+
+                val special = """.\^$*+?()\[{\\|""";
+                val plainString = s"""([^${special}]|[\\\\][${special}])+""";
+                if(posFiltering && (p0 matches plainString+"\\$"))
+                  warn(treePosHolder, new RegexWarning(s"This $f can be substituted with stripSuffix", error = false))
+                if(posFiltering && (p0 matches "\\^"+plainString))
+                  warn(treePosHolder, new RegexWarning(s"This $f can be substituted with stripPrefix", error = false))
+              }
               
               if(str.exactValue.isDefined) {
                 try { 
-                  Left(new StringAttrs(Some(str.exactValue.get.replaceAll(p0, p1))))
+                  Left(new StringAttrs(Some(if(f == "replaceAll") str.exactValue.get.replaceAll(p0, p1) else str.exactValue.get.replaceFirst(p0, p1))))
                 } catch {
                   case e: java.util.regex.PatternSyntaxException =>
                     Left(empty)
                 }
               } else if((p0 matches """\[[^\]]+\]""") && p1.size == 1) { //keeps the same length
-                Left(str)
+                Left(str.justLengths)
               } else if(p1 == "") { //length is 0..size
-                Left(str.zeroMinLengths)
+                Left(str.justLengths.zeroMinLengths)
               } else {
                 Left(empty)
               }
@@ -2770,7 +2812,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           else Some(suffix endsWith s)
           
         def matches(s: StringAttrs): Option[Boolean] = {
-          if((s startsWith "^") == Some(true) || (s endsWith "$") == Some(true)) warn(treePosHolder, SuspiciousMatches)
+          if((s startsWith "^") == Some(true) || ((s endsWith "$") == Some(true) && (s endsWith "\\$") == Some(false))) warn(treePosHolder, SuspiciousMatches)
          
           if(s.exactValue.isDefined) this.matches(s.exactValue.get)
           else None
@@ -2846,6 +2888,7 @@ class LinterPlugin(val global: Global) extends Plugin {
         def addName(name: String): StringAttrs = new StringAttrs(exactValue, Some(name), getMinLength, trimmedMinLength, getMaxLength, trimmedMaxLength, prefix, suffix, knownPieces)
         def removeExactValue: StringAttrs = new StringAttrs(None, name, getMinLength, trimmedMinLength, getMaxLength, trimmedMaxLength)
         def zeroMinLengths: StringAttrs = new StringAttrs(exactValue, name, 0, 0, getMaxLength, trimmedMaxLength, prefix, suffix, knownPieces)
+        def justLengths: StringAttrs = new StringAttrs(None, name, getMinLength, getTrimmedMinLength, getMaxLength, trimmedMaxLength, "", "", Set())
         
         def alwaysIsEmpty: Boolean = getMaxLength == 0
         def alwaysNonEmpty: Boolean = getMinLength > 0
@@ -3280,20 +3323,8 @@ class LinterPlugin(val global: Global) extends Plugin {
         superTraverse = true
         tree match {
           case DefDef(mods: Modifiers, name, _, valDefs, _, body) =>
-            //workaround for scala 2.9 - copied from compiler code
-            def isOverridingSymbol(s: Symbol): Boolean = {
-              def canMatchInheritedSymbols: Boolean = (
-                   (s ne NoSymbol)
-                && s.owner.isClass
-                && !s.isClass
-                && !s.isConstructor
-              )
-
-              (canMatchInheritedSymbols && s.owner.ancestors.exists(base => s.overriddenSymbol(base) != NoSymbol))
-            }
-          
             /// Unused method parameters
-            if(name.toString != "<init>" && !body.isEmpty && !(mods.isOverride || isOverridingSymbol(tree.symbol))) {
+            if(name.toString != "<init>" && !body.isEmpty && !(mods.isOverride || tree.symbol.isOverridingSymbol)) {
               //Get the parameters, except the implicit ones
               val params = valDefs.flatMap(_.filterNot(_.mods.isImplicit)).map(_.name.toString).toBuffer
 

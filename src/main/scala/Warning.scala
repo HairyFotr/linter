@@ -25,7 +25,7 @@ object Warning {
   final val All: Seq[Warning] = Vector(
     AssigningOptionToNull,
     AvoidOptionCollectionSize,
-    AvoidOptionSize,
+    new AvoidOptionMethod("", ""),
     AvoidOptionStringSize,
     BigDecimalNumberFormat,
     BigDecimalPrecisionLoss,
@@ -68,7 +68,7 @@ object Warning {
     ProducesEmptyCollection,
     ReflexiveAssignment,
     ReflexiveComparison,
-    new RegexSyntaxError(""),
+    new RegexWarning("", false),
     StringMultiplicationByNonPositive,
     new UndesirableTypeInference(""),
     UnextendedSealedTrait,
@@ -82,6 +82,8 @@ object Warning {
     UseHypot,
     UseLog10,
     UseCbrt,
+    UseSqrt,
+    UseExp,
     UseAbsNotSqrtSquare,
     new UseConditionDirectly(negated = false),
     new UseIfExpression(""),
@@ -90,6 +92,7 @@ object Warning {
     UseFilterNotFlatMap,
     UseFlattenNotFilterOption,
     UseGetOrElseOnOption,
+    UseFindNotFilterHead,
     UseIsNanNotNanComparison,
     UseIsNanNotSelfComparison,
     UseLog1p,
@@ -132,8 +135,10 @@ case class UnlikelyEquality(lhs: String, rhs: String) extends
   TwoArgWarning("Comparing with == on instances of different types (%s, %s) will probably return false.", lhs, rhs) {
   def name = "UnlikelyEquality"
 }
-case object UseHypot extends NoArgWarning("Use math.hypot(x, y), instead of sqrt(x^2, y^2) for improved accuracy.")
-case object UseCbrt extends NoArgWarning("Use math.cbrt(x), instead of pow(x, 1/3) for improved accuracy.")
+case object UseHypot extends NoArgWarning("Use math.hypot(x, y), instead of sqrt(x^2, y^2) for improved accuracy (but diminished performance).")
+case object UseCbrt extends NoArgWarning("Use math.cbrt(x), instead of pow(x, 1/3) for improved accuracy and performance.")
+case object UseSqrt extends NoArgWarning("Use math.sqrt(x), instead of pow(x, 1/2) for improved accuracy and performance.")
+case object UseExp extends NoArgWarning("Use math.exp(x), instead of pow(E, x) for improved performance.")
 case object UseLog10 extends NoArgWarning("Use math.log10(x), instead of log(x)/log(10) for improved accuracy.")
 case object UseAbsNotSqrtSquare extends NoArgWarning("Use abs instead of sqrt(x^2).")
 case object UseIsNanNotSelfComparison extends NoArgWarning("Use .isNan instead of comparing to itself.")
@@ -195,7 +200,9 @@ case class UseExistsOnOption(findFilter: String, isEmptyisDefined: String) exten
 case object UseFilterNotFlatMap extends NoArgWarning("Use filter(x => condition) instead of flatMap(x => if(condition) ... else ...).")
 case object AvoidOptionStringSize extends NoArgWarning("Did you mean to take the size of the string inside the Option?")
 case object AvoidOptionCollectionSize extends NoArgWarning("Did you mean to take the size of the collection inside the Option?")
-case object AvoidOptionSize extends NoArgWarning("Using Option.size is not recommended; use Option.isDefined instead.")
+case class AvoidOptionMethod(method: String, explanation: String = "") extends TwoArgWarning("Using Option.%s is not recommended. %s", method, explanation) {
+  def name = "AvoidOptionMethod"
+}
 case object DuplicateKeyInMap extends NoArgWarning("This key has already been defined, and will override the previous mapping.")
 case class InefficientUseOfListSize(replacement: String) extends OneArgWarning("Use %s instead of comparing to List.size.", replacement) {
   def name = "InefficientUseOfListSize"
@@ -209,8 +216,8 @@ case class PassPartialFunctionDirectly(matchVar: String) extends OneArgWarning("
 case class UnitImplicitOrdering(function: String) extends OneArgWarning("Unit is returned here, so this %s will always return the first element.", function) {
   def name = "UnitImplicitOrdering"
 }
-case class RegexSyntaxError(errorMessage: String) extends OneArgWarning("Regex pattern syntax error: %s", errorMessage) {
-  def name = "RegexSyntaxError"
+case class RegexWarning(errorMessage: String, error: Boolean = true) extends OneArgWarning("Regex pattern "+(if(error) "syntax error" else "warning")+": %s", errorMessage) {
+  def name = "RegexWarning"
 }
 case class InvariantCondition(always: Boolean, doWhat: String) extends TwoArgWarning("This condition will %s %s.", if (always) "always" else "never", doWhat) {
   def name = "InvariantCondition"
@@ -272,5 +279,4 @@ case class UnlikelyToString(tpe: String) extends OneArgWarning("Using toString o
 }
 case object UnthrownException extends NoArgWarning("This exception is likely meant to be thrown here.")
 case object SuspiciousMatches extends NoArgWarning("This regex starts with ^ or ends with $. The matches method always matches the entire string.")
-
-
+case object UseFindNotFilterHead extends NoArgWarning("Unless there are side-effects, .filter(...).headOption can be replaced by .find(...).")

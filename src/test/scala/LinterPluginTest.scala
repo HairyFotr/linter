@@ -61,7 +61,7 @@ final object Compiler {
 
   def compileAndLint(code: String): String = {
     stringWriter.getBuffer.delete(0, stringWriter.getBuffer.length)
-    val thunked = "() => { %s }".format(code)
+    val thunked = "() => { \n%s\n }".format(code)
     interpreter.interpret(thunked) match {
       case Results.Success => ""
       case Results.Error => stringWriter.toString
@@ -72,13 +72,13 @@ final object Compiler {
 
 final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   // A few hacks to scrap the boilerplate and better pinpoint the failing test
-  def should(code: String, nt: Boolean = false)(implicit expectedMsg: String) {
+  def should(code: String, not: Boolean = false)(implicit expectedMsg: String) {
     val unitResult = (expectedMsg, Compiler.compileAndLint(code)) must beLike {
-      case (expected, actual) if (nt ^ actual.contains(expected)) => ok
-      case _ => ko("in "+(if(nt) "negative case" else "positive case")+":\n" + code + "\n ")
+      case (expected, actual) if (not ^ actual.contains(expected)) => ok
+      case _ => ko("in "+(if(not) "negative case" else "positive case")+":\n" + code + "\n ")
     }
   }
-  def shouldnt(code: String)(implicit expectedMsg: String) { should(code, nt = true)(expectedMsg) }
+  def shouldnt(code: String)(implicit expectedMsg: String) { should(code, not = true)(expectedMsg) }
   def noWarnings(code: String): Unit = { val unitResult = Compiler.compileAndLint(code) must be ("") }
 
   /*@Before
@@ -86,6 +86,18 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     val unitResult = compiler.compileAndLint("1 + 1")
   }*/
   
+  @Test
+  def nowarn(): Unit = {
+    implicit val msg = "Regex pattern"
+    
+    should(""" "ffasd".replaceFirst("/$", "") """)
+    shouldnt(""" "ffasd".replaceFirst("/$", "") // linter:RegexWarning:nowarn """)
+    shouldnt(""" "ffasd".replaceFirst("/$", "") // linter:nowarn """)
+
+    should(""" "ffasd".replaceFirst("/$", ""); val a = 1/0 // linter:RegexWarning:nowarn """)("division")
+    shouldnt(""" "ffasd".replaceFirst("/$", ""); val a = 1/0 // linter:nowarn """)
+  }
+
   @Test
   def UseIfExpression(): Unit = {
     implicit val msg = "Assign the result of the if expression"
@@ -179,6 +191,22 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""val x = util.Random.nextDouble; math.pow(x, 1/3d)""")
     should("""val x = util.Random.nextDouble; math.pow(x, 1/3f)""")
     should("""val x = util.Random.nextDouble; math.pow(20*x+1, 1/3f)""")
+  }
+  @Test
+  def UseSqrt(): Unit = {
+    implicit val msg = "Use math.sqrt"
+    
+    should("""val x = util.Random.nextDouble; math.pow(x, 1/2d)""")
+    should("""val x = util.Random.nextDouble; math.pow(x, 1/2f)""")
+    should("""val x = util.Random.nextDouble; math.pow(20*x+1, 0.5)""")
+  }
+  @Test
+  def UseExp(): Unit = {
+    implicit val msg = "Use math.exp"
+    
+    should("""{ val x = util.Random.nextDouble; math.pow(2.718281828459045, 1/x) }""")
+    should("""val x = util.Random.nextDouble; math.pow(math.E, x/2f)""")
+    should("""val x = util.Random.nextDouble; math.pow(math.E, 20*x+1)""")
   }
 
   @Test
@@ -287,6 +315,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     implicit val msg = "string interpolation"
     
     should(""" val a = s"wat" """)
+    should(""" println(s"wat") """)
     shouldnt(""" { val a = 5; s" $a " } """)
   }
 
@@ -320,7 +349,52 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     shouldnt(""" val a = util.Random.nextString(5); a matches a """)
     should(""" if(List("") forall { _ matches "^[A-Za-z0-9_]{1,20}$" }) println""")
   }
-  
+    
+  @Test
+  def UseFindNotFilterHead(): Unit = {
+    implicit val msg = ".headOption can be replaced by .find"
+    
+    should(""" val a = List(1,2,3); a.filter( _ >= 2).headOption """)
+    shouldnt(""" val a = List(1,2,3); a.filter( _ >= 2) """)
+  }
+
+
+  @Test
+  def RegexWarning(): Unit = {
+    implicit val msg = "Regex pattern"
+    
+    should(""" "ffasd".replaceFirst("/$", "") """)
+    should(""" "ffasd".replaceAll("^/", "") """)
+    should(""" "ffasd".replaceFirst("\\.git$", "") """)
+    should(""" "ffasd".replaceFirst("^refs/heads/", "") """)
+
+    should(""" "*+".r """)
+    should(""" "[".r """)
+    should("""
+      val a = "*+"
+      a.r
+    """)
+    should(""" "fsdfds".split("*+") """)
+    should(""" "fsdfds".replaceAll("*", "") """)
+    should("""
+      val a = "*"
+      java.util.regex.Pattern.compile(a)
+    """)
+    should(""" "|(|)".r """)
+    
+    shouldnt(""" "3*[a]+".r """)
+    shouldnt(""" "[a-t]".r """)
+    shouldnt("""
+      val a = "4*a+"
+      a.r
+    """)
+    shouldnt(""" "3*[a]+".format("hello") """)
+    shouldnt("""
+      val a = "*"
+      java.util.regex.Pattern.compile("(pattern)"+a)
+    """)
+  }
+
   // ^ New tests named after their Warning.scala name ^
   // ----------------- OLD TESTS ----------------------
 
@@ -937,51 +1011,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     
     shouldnt(""" def test(a: Int = 0) = if(a > 0) "x" else "y" """)("This condition will never hold.")
   }
-  
-  @Test
-  def regex__syntaxErrors(): Unit = {
-    implicit val msg = "Regex pattern syntax error"
     
-    should("""
-      "*+".r
-    """)
-    should("""
-      "[".r
-    """)
-    should("""
-      val a = "*+"
-      a.r
-    """)
-    should("""
-      "fsdfds".split("*+")
-    """)
-    should("""
-      "fsdfds".replaceAll("*", "")
-    """)
-    should("""
-      val a = "*"
-      java.util.regex.Pattern.compile(a)
-    """)
-    
-    shouldnt("""
-      "3*[a]+".r
-    """)
-    shouldnt("""
-      "[a-t]".r
-    """)
-    shouldnt("""
-      val a = "4*a+"
-      a.r
-    """)
-    shouldnt("""
-      "3*[a]+".format("hello")
-    """)
-    shouldnt("""
-      val a = "*"
-      java.util.regex.Pattern.compile("(pattern)"+a)
-    """)
-  }
-  
   @Test
   @Ignore
   def instanceOf__check(): Unit = {

@@ -9,7 +9,7 @@ class WarningTest extends JUnitMustMatchers {
     val count: Int = Warning.All.distinct.map { (_: Warning) match {
       case AssigningOptionToNull => 1
       case AvoidOptionCollectionSize => 1
-      case AvoidOptionSize => 1
+      case AvoidOptionMethod(_, _) => 1
       case AvoidOptionStringSize => 1
       case BigDecimalNumberFormat => 1
       case BigDecimalPrecisionLoss => 1
@@ -52,7 +52,7 @@ class WarningTest extends JUnitMustMatchers {
       case ProducesEmptyCollection => 1
       case ReflexiveAssignment => 1
       case ReflexiveComparison => 1
-      case RegexSyntaxError(_) => 1
+      case RegexWarning(_, _) => 1
       case StringMultiplicationByNonPositive => 1
       case UndesirableTypeInference(_) => 1
       case UnextendedSealedTrait => 1
@@ -65,6 +65,8 @@ class WarningTest extends JUnitMustMatchers {
       case UnusedParameter(_,_) => 1
       case UseHypot => 1
       case UseCbrt => 1
+      case UseSqrt => 1
+      case UseExp => 1
       case UseLog10 => 1
       case UseAbsNotSqrtSquare => 1
       case UseConditionDirectly(_) => 1
@@ -91,6 +93,7 @@ class WarningTest extends JUnitMustMatchers {
       case UnlikelyToString(_) => 1
       case UnthrownException => 1
       case SuspiciousMatches => 1
+      case UseFindNotFilterHead => 1
       // ------------------------------------------------------------------------------------------------------
       // If you get a warning here, it's likely because you added a new warning type but forgot to add it here. 
       // The real point is that you need to add the new Warning to Warning.All.
