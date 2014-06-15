@@ -2812,7 +2812,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           else Some(suffix endsWith s)
           
         def matches(s: StringAttrs): Option[Boolean] = {
-          if((s startsWith "^") == Some(true) || ((s endsWith "$") == Some(true) && (s endsWith "\\$") == Some(false))) warn(treePosHolder, SuspiciousMatches)
+          if((s startsWith "^") == Some(true) || ((s endsWith "$") == Some(true) && (s.suffix.length == 1 || (s endsWith "\\$") == Some(false)))) warn(treePosHolder, SuspiciousMatches)
          
           if(s.exactValue.isDefined) this.matches(s.exactValue.get)
           else None

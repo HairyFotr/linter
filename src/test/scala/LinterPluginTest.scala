@@ -344,7 +344,11 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     
     should(""" val a = util.Random.nextString(5) matches "^abc$" """)
     shouldnt(""" val a = util.Random.nextString(5) matches "abc" """)
+    
     should(""" val a = util.Random.nextString(5); val b = a matches (a+"$") """)
+    should(""" val a = util.Random.nextString(5); val b = a matches ("fdsf$") """)
+    shouldnt(""" val a = util.Random.nextString(5); val b = a matches ("fdsf\$") """)
+    
     should(""" val a = util.Random.nextString(5); val b = a matches ("^"+a) """)
     shouldnt(""" val a = util.Random.nextString(5); a matches a """)
     should(""" if(List("") forall { _ matches "^[A-Za-z0-9_]{1,20}$" }) println""")
