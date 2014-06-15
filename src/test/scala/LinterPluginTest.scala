@@ -91,11 +91,11 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     implicit val msg = "Regex pattern"
     
     should(""" "ffasd".replaceFirst("/$", "") """)
-    shouldnt(""" "ffasd".replaceFirst("/$", "") // linter:RegexWarning:nowarn """)
-    shouldnt(""" "ffasd".replaceFirst("/$", "") // linter:nowarn """)
+    shouldnt(""" "ffasd".replaceFirst("/$", "") // linter:disable:RegexWarning """)
+    shouldnt(""" "ffasd".replaceFirst("/$", "") // linter:disable """)
 
-    should(""" "ffasd".replaceFirst("/$", ""); val a = 1/0 // linter:RegexWarning:nowarn """)("division")
-    shouldnt(""" "ffasd".replaceFirst("/$", ""); val a = 1/0 // linter:nowarn """)
+    should(""" "ffasd".replaceFirst("/$", ""); val a = 1/0 // linter:disable:RegexWarning """)("division")
+    shouldnt(""" "ffasd".replaceFirst("/$", ""); val a = 1/0 // linter:disable """)
   }
 
   @Test

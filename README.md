@@ -37,7 +37,11 @@ You can download the latest jars here:
       </configuration>
 
 
-### Configuration
+## Currently supported warnings
+
+UnextendedSealedTrait, UseLog, UseExpm, UnlikelyEquality, UseHypot, UseCbrt, UseSqrt, UseExp, UseLog, UseAbsNotSqrtSquare, UseIsNanNotSelfComparison, UseIsNanNotNanComparison, UseSignum, BigDecimalNumberFormat, BigDecimalPrecisionLoss, ReflexiveAssignment, CloseSourceFile, JavaConverters, ContainsTypeMismatch, NumberInstanceOf, PatternMatchConstant, PreferIfToBooleanMatch, IdenticalCaseBodies, IdenticalCaseConditions, ReflexiveComparison, YodaConditions, UseConditionDirectly, UseIfExpression, UnnecessaryElseBranch, DuplicateIfBranches, IdenticalIfElseCondition, MergeNestedIfs, VariableAssignedUnusedValue, MalformedSwap, IdenticalIfCondition, IdenticalStatements, IndexingWithNegativeNumber, OptionOfOption, UndesirableTypeInference, AssigningOptionToNull, WrapNullWithOption, UseGetOrElseOnOption, UseOptionOrNull, UseOptionGetOrElse, UseExistsOnOption, UseFilterNotFlatMap, AvoidOptionStringSize, AvoidOptionCollectionSize, AvoidOptionMethod, DuplicateKeyInMap, InefficientUseOfListSize, OnceEvaluatedStatementsInBlockReturningFunction, IntDivisionAssignedToFloat, UseFlattenNotFilterOption, PassPartialFunctionDirectly, UnitImplicitOrdering, RegexWarning, InvariantCondition, DecomposingEmptyCollection, InvariantExtrema, UnnecessaryMethodCall, ProducesEmptyCollection, OperationAlwaysProducesZero, ModuloByOne, DivideByOne, DivideByZero, ZeroDivideBy, UseUntilNotToMinusOne, InvalidParamToRandomNextInt, UnusedForLoopIteratorValue, StringMultiplicationByNonPositive, LikelyIndexOutOfBounds, UnnecessaryReturn, InvariantReturn, UnusedParameter, InvalidStringFormat, InvalidStringConversion, UnnecessaryStringNonEmpty, UnnecessaryStringIsEmpty, PossibleLossOfPrecision, UnsafeAbs, TypeToType, EmptyStringInterpolator, UnlikelyToString, UnthrownException, SuspiciousMatches, UseFindNotFilterHead
+
+### Turning warnings on and off
 
 Warnings can be turned off using a plus-separated list of warning names:
 
@@ -46,13 +50,16 @@ Warnings can be turned off using a plus-separated list of warning names:
 Or only specific warnings can be turned on using:
 
     scalacOptions += "-P:linter:enable-only:UseHypot+CloseSourceFile+OptionOfOption"
+
+If you think some instances of a warning are false positives, you can ignore them with a code comment:
     
-## Currently supported warnings
-
-### Full list of warning names
-UnextendedSealedTrait, UseLog, UseExpm, UnlikelyEquality, UseHypot, UseCbrt, UseLog, UseAbsNotSqrtSquare, UseIsNanNotSelfComparison, UseIsNanNotNanComparison, UseSignum, BigDecimalNumberFormat, BigDecimalPrecisionLoss, ReflexiveAssignment, CloseSourceFile, JavaConverters, ContainsTypeMismatch, NumberInstanceOf, PatternMatchConstant, PreferIfToBooleanMatch, IdenticalCaseBodies, IdenticalCaseConditions, ReflexiveComparison, YodaConditions, UseConditionDirectly, UseIfExpression, UnnecessaryElseBranch, DuplicateIfBranches, IdenticalIfElseCondition, MergeNestedIfs, VariableAssignedUnusedValue, MalformedSwap, IdenticalIfCondition, IdenticalStatements, IndexingWithNegativeNumber, OptionOfOption, UndesirableTypeInference, AssigningOptionToNull, WrapNullWithOption, UseGetOrElseOnOption, UseOptionOrNull, UseOptionGetOrElse, UseExistsOnOption, UseFilterNotFlatMap, AvoidOptionStringSize, AvoidOptionCollectionSize, AvoidOptionSize, DuplicateKeyInMap, InefficientUseOfListSize, OnceEvaluatedStatementsInBlockReturningFunction, IntDivisionAssignedToFloat, UseFlattenNotFilterOption, PassPartialFunctionDirectly, UnitImplicitOrdering, RegexSyntaxError, InvariantCondition, DecomposingEmptyCollection, InvariantExtrema, UnnecessaryMethodCall, ProducesEmptyCollection, OperationAlwaysProducesZero, ModuloByOne, DivideByOne, DivideByZero, ZeroDivideBy, UseUntilNotToMinusOne, InvalidParamToRandomNextInt, UnusedForLoopIteratorValue, StringMultiplicationByNonPositive, LikelyIndexOutOfBounds, UnnecessaryReturn, InvariantReturn, UnusedParameter, InvalidStringFormat, InvalidStringConversion, UnnecessaryStringNonEmpty, UnnecessaryStringIsEmpty, PossibleLossOfPrecision, UnsafeAbs, TypeToType, EmptyStringInterpolator, UnlikelyToString, UnthrownException, SuspiciousMatches
-
-Below are some examples of warnings. You can also check the [test code](https://github.com/HairyFotr/linter/blob/master/src/test/scala/LinterPluginTest.scala#L95) for more.
+    scala> val x = math.pow(5, 1/3d) + 1/0 // linter:disable:UseCbrt+DivideByZero // ignores UseCbrt and DivideByZero
+    <console>:8: warning: Integer division detected in an expression assigned to a floating point variable.
+                  math.pow(5, 1/3d) + 1/0 // linter:disable:UseCbrt+DivideByZero // ignores UseCbrt and DivideByZero
+                                    ^
+    scala> val x = math.pow(5, 1/3d) + 1/0 // linter:disable // ignores all warnings
+    
+### Some examples of warnings
 
 ### If checks
 #### Repeated condition in an else-if chain

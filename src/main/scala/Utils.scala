@@ -25,7 +25,7 @@ object Utils {
   
   def warn(tree: Global#Tree, warning: Warning)(implicit unit: Global#CompilationUnit): Unit = { 
     if((disabledWarningNames contains warning.name)
-    || (tree.pos.lineContent matches ".*// *linter:("+warning.name+":)?[nN]o[wW]arn(ing)? *(//.*)?")
+    || (tree.pos.lineContent matches ".*// *linter:(nowarn|ignore|disable)(:([a-zA-Z]+[+])*?"+warning.name+"([+][a-zA-Z]+)*?)? *(//.*)?")
     || (nowarnPositions contains tree.pos)) {
       // skip
     } else {
