@@ -1095,6 +1095,15 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       val a = 4d
       math.log1p(a + 1)
     """)
+
+    should("""
+      val a = 4d
+      Math.log(1 + a)
+    """)
+    should("""
+      val a = 4d
+      StrictMath.log(1 + a)
+    """)
   }
 
   def numeric_exp1m(): Unit = {
@@ -1401,6 +1410,10 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""
       val a = 4d
       math.abs(a)/a
+    """)
+    should("""
+      val a = 4d
+      Math.abs(a)/a
     """)
 
     shouldnt("""

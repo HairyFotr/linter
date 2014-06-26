@@ -338,28 +338,44 @@ class LinterPlugin(val global: Global) extends Plugin {
           None
       }
       
+      def isMath(t: Tree, name: String): Boolean = t match {
+        case field
+          if (field is "scala.math.`package`."+name) 
+          || (field is "java.this.lang.Math."+name)
+          || (field is "java.this.lang.StrictMath."+name) => true
+        case Apply(func, _params) 
+          if (func is "scala.math.`package`."+name) 
+          || (func is "java.this.lang.Math."+name)
+          || (func is "java.this.lang.StrictMath."+name) => true
+        case Select(Apply(scala_Predef_xWrapper, List(arg)), func) 
+          if (scala_Predef_xWrapper.toString endsWith "Wrapper") && (func is name) 
+          && (t.tpe.widen weak_<:< DoubleClass.tpe) => true
+        case _ => false
+      }
+
       def isMathPow2(pow: Tree, allowSquares: Boolean = false): Boolean = pow match { 
-        case Apply(pow, List(_, Literal(Constant(2.0)))) if (pow is "scala.math.`package`.pow") => true   // math.pow(x, 2)
+        case Apply(pow, List(_, Literal(Constant(2.0)))) if isMath(pow, "pow") => true   // math.pow(x, 2)
         case Apply(Select(id1, nme.MUL), List(id2)) if (id1 equalsStructure id2) => true                  // x*x
         case Literal(Constant(x: Int)) if (allowSquares) && (x > 1) && (math.sqrt(x.toDouble) == math.sqrt(x.toDouble).toInt) => true  // square numbers
         case _ => /*println(showRaw(pow));*/ false
       }
       
       def isMath_E(e: Tree): Boolean = e match {
-        case Literal(Constant(e)) 
-          if (e == 2.718281828459045)
-          || (e == 2.7182817) => true
-        case _ if (e is "scala.math.`package`.E") => true
-        case _ => /*println(showRaw(pow));*/ false
+        case Literal(Constant(e: Double)) 
+          if (e >= 2.718281)
+          || (e <= 2.718282) => true
+        case _ if isMath(e, "E") => true
+        case _ => false
       }
 
       def getAbs(t: Tree): Option[Tree] = t match {
-        case Apply(abs, List(arg)) if (abs is "scala.math.`package`.abs") => Some(arg)
+        case Apply(abs, List(arg)) if isMath(abs, "abs") => Some(arg)
         case Select(Apply(scala_Predef_xWrapper, List(arg)), abs) 
           if (scala_Predef_xWrapper.toString endsWith "Wrapper") && (abs is "abs") => Some(arg)
         case _ => None
       }
       
+
       def isReturnStatement(t: Tree): Boolean = t match {
         case Return(_) => true
         case _ => false
@@ -399,55 +415,62 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// Tip to use log1p(x) and expm1(x), instead of log(1+x) and exp(x)-1 -- see http://www.johndcook.com/blog/2010/06/07/math-library-functions-that-seem-unnecessary/
           //TODO: maybe make checks to protect against potentially wrong fixes, e.g. log1p(a + 1) or log1p(a - 1)
           // also, check 1-exp(x) and other negated versions
-          case Apply(log, List(Apply(Select(Literal(Constant(1)), nme.ADD), _))) if log is "scala.math.`package`.log" => 
+          case Apply(log, List(Apply(Select(Literal(Constant(1)), nme.ADD), _))) if isMath(log, "log") => 
             warn(tree, UseLog1p)
-          case Apply(log, List(Apply(Select(_, nme.ADD), List(Literal(Constant(1)))))) if log is "scala.math.`package`.log" => 
+          case Apply(log, List(Apply(Select(_, nme.ADD), List(Literal(Constant(1)))))) if isMath(log, "log") => 
             warn(tree, UseLog1p)
             
-          case Apply(Select(Apply(exp, _), nme.SUB), List(Literal(Constant(1)))) if exp is "scala.math.`package`.exp" => 
+          case Apply(Select(Apply(exp, _), nme.SUB), List(Literal(Constant(1)))) if isMath(exp, "exp") => 
             warn(tree, UseExpm1)
-          case Apply(Select(Literal(Constant(-1)), nme.ADD), List(Apply(exp, _))) if exp is "scala.math.`package`.exp" =>
+          case Apply(Select(Literal(Constant(-1)), nme.ADD), List(Apply(exp, _))) if isMath(exp, "exp") =>
             warn(tree, UseExpm1)
             
           /// Suggest using hypot instead of sqrt(a*a, b*b)
           case Apply(sqrt, List(Apply(Select(pow1, nme.ADD), List(pow2))))
-            if (sqrt is "scala.math.`package`.sqrt") && isMathPow2(pow1, allowSquares = true) && isMathPow2(pow2, allowSquares = true) =>
+            if isMath(sqrt, "sqrt") 
+            && isMathPow2(pow1, allowSquares = true)
+            && isMathPow2(pow2, allowSquares = true) =>
             
             warn(tree, UseHypot)
           case Apply(sqrt, List(Select(Apply(Select(pow1, nme.ADD), List(pow2)), toDouble))) // Handle toDouble (implicit) converion
-            if (sqrt is "scala.math.`package`.sqrt") && isMathPow2(pow1, allowSquares = true) && isMathPow2(pow2, allowSquares = true) && (toDouble is "toDouble") =>
+            if isMath(sqrt, "sqrt")
+            && isMathPow2(pow1, allowSquares = true) 
+            && isMathPow2(pow2, allowSquares = true) 
+            && (toDouble is "toDouble") =>
             
             warn(tree, UseHypot)
 
           /// Suggest using cbrt instead of pow(a, 1/3)
-          case Apply(pow, List(_num, Literal(Constant(third)))) 
-            if (pow is "scala.math.`package`.pow")
-            && (third == 0.33333334 || third == 0.3333333432674408 || third == 0.3333333333333333) => // The second seems to happen on float.toDouble implicit widening o_O
+          case Apply(pow, List(_num, Literal(Constant(third: Double))))
+            if (isMath(pow, "pow"))
+            && (third >= 0.3333332)
+            && (third <= 0.3333334) =>
 
             warn(tree, UseCbrt)
           
           /// Suggest using sqrt instead of pow(a, 0.5)
-          case Apply(pow, List(_num, Literal(Constant(0.5)))) 
-            if (pow is "scala.math.`package`.pow") =>
+          case Apply(pow, List(_num, Literal(Constant(0.5)))) if isMath(pow, "pow") =>
 
             warn(tree, UseSqrt)
           
           /// Suggest using exp instead of pow(E, a)
-          case Apply(pow, List(e, num_))
-            if (pow is "scala.math.`package`.pow")
-            && (isMath_E(e)) =>
+          case Apply(pow, List(e, num_)) 
+            if isMath(pow, "pow")
+            && isMath_E(e) =>
 
             warn(tree, UseExp)
 
           /// Suggest using log10(x) instead of log(x)/log(10)
           case Apply(Select(Apply(log1, List(_num)), nme.DIV), List(Apply(log2, List(Literal(Constant(10.0)))))) 
-            if (log1 is "scala.math.`package`.log") && (log2 is "scala.math.`package`.log") =>
+            if isMath(log1, "log")
+            && isMath(log2, "log") =>
 
             warn(tree, UseLog10)
 
           /// Suggest using x.abs instead of doing it manually with sqrt(x^2)
           case Apply(sqrt, List(pow2))
-            if (sqrt is "scala.math.`package`.sqrt") && isMathPow2(pow2) =>
+            if isMath(sqrt, "sqrt")
+            && isMathPow2(pow2) =>
             
             warn(tree, UseAbsNotSqrtSquare)
 
@@ -464,8 +487,8 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           /// Use x.signum instead of doing it manually
           case pos @ Apply(Select(expr1, nme.DIV), List(expr2)) if ((expr1, expr2) match {
-              case (expr1, Apply(abs, List(expr2))) if (abs is "scala.math.`package`.abs") && (expr1 equalsStructure expr2) => true
-              case (Apply(abs, List(expr1)), expr2) if (abs is "scala.math.`package`.abs") && (expr1 equalsStructure expr2) => true
+              case (expr1, Apply(abs, List(expr2))) if isMath(abs, "abs") && (expr1 equalsStructure expr2) => true
+              case (Apply(abs, List(expr1)), expr2) if isMath(abs, "abs") && (expr1 equalsStructure expr2) => true
               case (expr1, Select(Apply(wrapper, List(expr2)), abs)) if (wrapper endsWith "Wrapper") && (abs is "abs") && (expr1 equalsStructure expr2) => true
               case (Select(Apply(wrapper, List(expr1)), abs), expr2) if (wrapper endsWith "Wrapper") && (abs is "abs") && (expr1 equalsStructure expr2) => true
               case _ => false
