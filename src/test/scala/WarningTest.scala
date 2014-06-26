@@ -6,7 +6,7 @@ import org.junit.Test
 class WarningTest extends JUnitMustMatchers {
   @Test
   def allIncludesAll() {
-    val count: Int = Warning.All.distinct.map { (_: Warning) match {
+    val count: Int = Warning.All.distinct.map {
       case AssigningOptionToNull => 1
       case AvoidOptionCollectionSize => 1
       case AvoidOptionMethod(_, _) => 1
@@ -14,9 +14,9 @@ class WarningTest extends JUnitMustMatchers {
       case BigDecimalNumberFormat => 1
       case BigDecimalPrecisionLoss => 1
       case CloseSourceFile => 1
-      case ContainsTypeMismatch(_,_) => 1
+      case ContainsTypeMismatch(_, _) => 1
       case NumberInstanceOf(_) => 1
-      case DecomposingEmptyCollection(_,_) => 1
+      case DecomposingEmptyCollection(_, _) => 1
       case DivideByOne => 1
       case ModuloByOne => 1
       case DivideByZero => 1
@@ -34,9 +34,9 @@ class WarningTest extends JUnitMustMatchers {
       case InvalidParamToRandomNextInt => 1
       case InvalidStringConversion(_) => 1
       case InvalidStringFormat(_, _) => 1
-      case InvariantCondition(_,_) => 1
-      case InvariantExtrema(_,_) => 1
-      case InvariantReturn(_,_) => 1
+      case InvariantCondition(_, _) => 1
+      case InvariantExtrema(_, _) => 1
+      case InvariantReturn(_, _) => 1
       case JavaConverters => 1
       case LikelyIndexOutOfBounds(_) => 1
       case MalformedSwap => 1
@@ -62,7 +62,7 @@ class WarningTest extends JUnitMustMatchers {
       case UnnecessaryStringIsEmpty => 1
       case UnnecessaryStringNonEmpty => 1
       case UnusedForLoopIteratorValue => 1
-      case UnusedParameter(_,_) => 1
+      case UnusedParameter(_, _) => 1
       case UseHypot => 1
       case UseCbrt => 1
       case UseSqrt => 1
@@ -72,7 +72,7 @@ class WarningTest extends JUnitMustMatchers {
       case UseConditionDirectly(_) => 1
       case UseIfExpression(_) => 1
       case UnnecessaryElseBranch => 1
-      case UseExistsOnOption(_,_) => 1
+      case UseExistsOnOption(_, _) => 1
       case UseExpm1 => 1
       case UseFilterNotFlatMap => 1
       case UseFlattenNotFilterOption => 1
@@ -98,7 +98,7 @@ class WarningTest extends JUnitMustMatchers {
       // If you get a warning here, it's likely because you added a new warning type but forgot to add it here. 
       // The real point is that you need to add the new Warning to Warning.All.
       // ------------------------------------------------------------------------------------------------------
-    } }.sum
+    }.sum
     val nonUnitResult = Warning.All.length must beEqualTo(count)
   }
 

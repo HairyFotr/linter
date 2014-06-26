@@ -21,7 +21,7 @@ import org.specs2.matcher.{StandardMatchResults, JUnitMustMatchers}
 import util.matching.Regex
 import collection.mutable
 
-// TODO: 
+//TODO:
 // * each test should have a positive and a negative case
 // * have longer tests, that maybe trigger several checks
 // * if it's worth it, error msgs could come from outside
