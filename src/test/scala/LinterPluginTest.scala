@@ -552,6 +552,15 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
         case 5 => println("hello") 
         case _ => println("how low") 
       }""")
+    should("""
+      val a = 7
+      import scala.annotation.switch
+      (a: @switch) match { 
+        case 3 => println("hello") 
+        case 4 => println("hello") 
+        case 5 => println("hello") 
+        case _ => println("how low") 
+      }""")
     shouldnt("""
       val a = 7
       a match { 
