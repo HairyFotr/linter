@@ -207,6 +207,8 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""{ val x = util.Random.nextDouble; math.pow(2.718281828459045, 1/x) }""")
     should("""val x = util.Random.nextDouble; math.pow(math.E, x/2f)""")
     should("""val x = util.Random.nextDouble; math.pow(math.E, 20*x+1)""")
+    shouldnt("""val x = util.Random.nextDouble; math.pow(2, 20*x+1)""")
+    shouldnt("""val x = util.Random.nextDouble; math.pow(3, 20*x+1)""")
   }
 
   @Test

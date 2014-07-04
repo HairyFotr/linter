@@ -366,7 +366,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       def isMath_E(e: Tree): Boolean = e match {
         case Literal(Constant(e: Double)) 
           if (e >= 2.718281)
-          || (e <= 2.718282) => true
+          && (e <= 2.718282) => true
         case _ if isMath(e, "E") => true
         case _ => false
       }
