@@ -1023,6 +1023,14 @@ class LinterPlugin(val global: Global) extends Plugin {
           case If(_cond1, If(_cond2, _body, else1), else2) if else1 equalsStructure else2 =>
             warn(tree, MergeNestedIfs)
           
+          /// ifdowhile loop (idea by OpenSSL Valhalla Rampage) :)
+          case If(cond1, LabelDef(doWhile1, List(), Block(body_, If(cond2, Apply(Ident(doWhile2), List()), Literal(Constant(()))))), Literal(Constant(())))
+            if (cond1 equalsStructure cond2) 
+            && (doWhile1.toString startsWith "doWhile")
+            && (doWhile1.toString == doWhile2.toString) =>
+            
+            warn(tree, IfDoWhile)
+          
           //// Multiple-statement checks
           case Block(init, last) =>
             val block = init :+ last

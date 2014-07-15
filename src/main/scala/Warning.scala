@@ -108,7 +108,8 @@ object Warning {
     EmptyStringInterpolator,
     new UnlikelyToString(""),
     UnthrownException,
-    SuspiciousMatches)
+    SuspiciousMatches,
+    IfDoWhile)
 
   final val AllNames = All.map(_.name)
 
@@ -280,3 +281,4 @@ case class UnlikelyToString(tpe: String) extends OneArgWarning("Using toString o
 case object UnthrownException extends NoArgWarning("This exception is likely meant to be thrown here.")
 case object SuspiciousMatches extends NoArgWarning("This regex starts with ^ or ends with $. The matches method always matches the entire string.")
 case object UseFindNotFilterHead extends NoArgWarning("Unless there are side-effects, .filter(...).headOption can be replaced by .find(...).")
+case object IfDoWhile extends NoArgWarning("The if and the do-while loop have the same condition. Use a while loop.")

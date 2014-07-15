@@ -421,7 +421,35 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     shouldnt(""" val a = util.Random.nextInt; if(a < 4 || a < 5) "k, wat" else "" """)
     shouldnt(""" if(util.Random.nextInt > 5 && util.Random.nextInt < 4) "k" else "" """)
   }
-
+  
+  @Test
+  def IfDoWhile(): Unit = {
+    implicit val msg = "do-while"
+    
+    should(""" 
+      val a = util.Random.nextInt;
+      if(a > 5) do { 
+        println("hello");
+        println("world")
+      } while(a > 5)
+    """)
+    shouldnt(""" 
+      val a = util.Random.nextInt;
+      if(a > 6) do { 
+        println("hello");
+        println("world")
+      } while(a > 5)
+    """)
+    // This one's actually about the same, but meh
+    shouldnt(""" 
+      val a = util.Random.nextInt;
+      if(a > 5) while(a > 5) {
+        println("hello");
+        println("world")
+      }
+    """)
+  }
+  
   // ^ New tests named after their Warning.scala name ^
   // ----------------- OLD TESTS ----------------------
 
