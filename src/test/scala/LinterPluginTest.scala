@@ -42,7 +42,7 @@ final object Compiler {
   //settings.deprecation.value = true // enable detailed deprecation warnings
   //settings.unchecked.value = true // enable detailed unchecked warnings    
   settings.Xwarnfatal.value = true // warnings cause compile failures too
-  if(Properties.versionString contains "2.10") settings.stopAfter.value = List("linter-refchecked") // fails in 2.11
+  //if(Properties.versionString contains "2.10") settings.stopAfter.value = List("linter-refchecked") // fails in 2.11
 
   val stringWriter = new StringWriter()
 
@@ -180,8 +180,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 26)""")
     shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(26 + x*x)""")
     shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 2147395601)""")
-    shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 2147395599)""")
-    
+    shouldnt("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 2147395599)""")    
   }
 
   @Test
@@ -191,6 +190,8 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""val x = util.Random.nextDouble; math.pow(x, 1/3d)""")
     should("""val x = util.Random.nextDouble; math.pow(x, 1/3f)""")
     should("""val x = util.Random.nextDouble; math.pow(20*x+1, 1/3f)""")
+    shouldnt("""val x = util.Random.nextDouble; math.pow(20*x+1, 0.75)""")
+    shouldnt("""val x = util.Random.nextDouble; math.pow(20*x+1, 0.25)""")
   }
   @Test
   def UseSqrt(): Unit = {
@@ -199,6 +200,8 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""val x = util.Random.nextDouble; math.pow(x, 1/2d)""")
     should("""val x = util.Random.nextDouble; math.pow(x, 1/2f)""")
     should("""val x = util.Random.nextDouble; math.pow(20*x+1, 0.5)""")
+    shouldnt("""val x = util.Random.nextDouble; math.pow(20*x+1, 0.75)""")
+    shouldnt("""val x = util.Random.nextDouble; math.pow(20*x+1, 0.25)""")
   }
   @Test
   def UseExp(): Unit = {
@@ -399,6 +402,24 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       val a = "*"
       java.util.regex.Pattern.compile("(pattern)"+a)
     """)
+  }
+  
+  @Test
+  def InvariantCondition(): Unit = {
+    implicit val msg = "This condition will"
+    
+    should(""" val a = util.Random.nextInt; if(a > 5 && a < 4) "wat" else "" """)
+    should(""" case class A(b: Int); val c = A(util.Random.nextInt); if(c.b > 5 && c.b < 4) "wat" else "" """)
+    should(""" val a = util.Random.nextInt; if(a > 5 || a < 6) "wat" else "" """)
+    shouldnt(""" val a = util.Random.nextInt; if(a > 5 && a < 6) "k" else "" """)
+    shouldnt(""" val a = util.Random.nextInt; if(a < 5 && a < 4) "k, wat" else "" """)
+    shouldnt(""" val a = util.Random.nextInt; if(a > 5 && a > 6) "k" else "" """)
+    shouldnt(""" val a = util.Random.nextInt; if(a > 6 && a > 5) "k" else "" """)
+    shouldnt(""" val a = util.Random.nextInt; if(a < 5 || a > 6) "k" else "" """)
+    shouldnt(""" val a = util.Random.nextInt; if(a > 5 || a > 4) "k, wat" else "" """)
+    shouldnt(""" val a = util.Random.nextInt; if(a < 5 || a < 4) "k, wat" else "" """)
+    shouldnt(""" val a = util.Random.nextInt; if(a < 4 || a < 5) "k, wat" else "" """)
+    shouldnt(""" if(util.Random.nextInt > 5 && util.Random.nextInt < 4) "k" else "" """)
   }
 
   // ^ New tests named after their Warning.scala name ^

@@ -274,6 +274,11 @@ class LinterPlugin(val global: Global) extends Plugin {
         case Literal(_) => true
         case _ => false
       }
+      def isIdent(t: Tree, recursive: Boolean = false): Boolean = t match {
+        case Ident(_) => true
+        case Select(t2, _TermName) if recursive => isIdent(t2, recursive)
+        case _ => false
+      }
       
       def getUsed(tree: Tree): Set[String] = (for(Ident(id) <- tree) yield id.toString).toSet
       def getAssigned(tree: Tree): Set[String] = {
@@ -410,6 +415,51 @@ class LinterPlugin(val global: Global) extends Plugin {
             }} => superTraverse = false; return
 
           //// Some numeric checks
+          /// Detects some invariant conditions
+          //TODO: Move to abstract interpreter, handle edge cases > / >=
+          
+          case Apply(Select(Apply(Select(term1, compareOp1), List(n1 @ Literal(Constant(num1)))), logicOp), List(Apply(Select(term2, compareOp2), List(n2 @ Literal(Constant(num2))))))
+            if (tree.tpe <:< BooleanClass.tpe)
+            && (term1 equalsStructure term2)
+            && isIdent(term1, recursive = true)
+            && (n1.tpe weak_<:< DoubleClass.tpe)
+            && (n2.tpe weak_<:< DoubleClass.tpe)
+            && {
+              // It still thinks num is Any...
+              def toDouble[T](x: T): Double = x match {
+                case a: Double => a
+                case a: Float  => a.toDouble
+                case a: Long   => a.toDouble
+                case a: Int    => a.toDouble
+                case a: Short  => a.toDouble
+                case a: Byte   => a.toDouble
+                case _ => Double.NaN
+              }
+              
+              def minmax(num: Double, compareOp: Name): (Double, Double) = compareOp match {
+                case nme.GE | nme.GT => (num, Double.PositiveInfinity)
+                case nme.LE | nme.LT => (Double.NegativeInfinity, num)
+                case _               => (Double.NaN, Double.NaN)
+              }
+              
+              val (min1, max1) = minmax(toDouble(num1), compareOp1)
+              val (min2, max2) = minmax(toDouble(num2), compareOp2)
+              
+              if(!min1.isNaN && !max1.isNaN && !min2.isNaN && !max2.isNaN) logicOp match {
+                case nme.ZAND 
+                  if (min1 > max2 || min2 > max1) => // Intervals don't cross
+                  warn(tree, new InvariantCondition(always = true, "return false"))
+                case nme.ZOR 
+                  if (min1 < max2 && min2 < max1) // Intervals cross, and span whole space
+                  && (math.min(min1, min2) == Double.NegativeInfinity)
+                  && (math.max(max1, max2) == Double.PositiveInfinity) =>
+                  warn(tree, new InvariantCondition(always = true, "return true"))
+                case _ =>
+              }
+              
+              false
+            } => //Fallthrough
+          
           /*case Apply(Select(lhs, nme.EQ), List(rhs))
             if isSubtype(lhs, DoubleClass.tpe) || isSubtype(lhs, FloatClass.tpe) || isSubtype(rhs, DoubleClass.tpe) || isSubtype(rhs, FloatClass.tpe) =>
             
