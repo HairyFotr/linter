@@ -2,16 +2,16 @@ name := "linter"
 
 organization := "com.foursquare.lint"
 
-//version := "0.1.4"
+//version := "0.1.5"
 
 scalaVersion := "2.10.4"
 
-crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.4", "2.11.1") }
+crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.4", "2.11.2") }
 
 resolvers ++= Seq("snapshots", "releases").map(Resolver.sonatypeRepo)
 
 libraryDependencies ++= Seq(
-  "org.specs2"     %% "specs2"         % "2.3.12" % "test",
+  "org.specs2"     %% "specs2"         % "2.4" % "test",
   "junit"          % "junit"           % "4.11"   % "test",
   "com.novocode"   % "junit-interface" % "0.10"   % "test")
 
