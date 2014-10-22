@@ -3,10 +3,10 @@ package com.foursquare.lint
 import org.specs2.matcher.JUnitMustMatchers
 import org.junit.Test
 
-class WarningTest extends JUnitMustMatchers {
+class ViolationTest extends JUnitMustMatchers {
   @Test
   def allIncludesAll() {
-    val count: Int = Warning.All.distinct.map {
+    val count: Int = Violation.All.distinct.map {
       case AssigningOptionToNull => 1
       case AvoidOptionCollectionSize => 1
       case AvoidOptionMethod(_, _) => 1
@@ -52,7 +52,7 @@ class WarningTest extends JUnitMustMatchers {
       case ProducesEmptyCollection => 1
       case ReflexiveAssignment => 1
       case ReflexiveComparison => 1
-      case RegexWarning(_, _) => 1
+      case RegexViolation(_, _) => 1
       case StringMultiplicationByNonPositive => 1
       case UndesirableTypeInference(_) => 1
       case UnextendedSealedTrait => 1
@@ -100,19 +100,19 @@ class WarningTest extends JUnitMustMatchers {
       // The real point is that you need to add the new Warning to Warning.All.
       // ------------------------------------------------------------------------------------------------------
     }.sum
-    val nonUnitResult = Warning.All.length must beEqualTo(count)
+    val nonUnitResult = Violation.All.length must beEqualTo(count)
   }
 
   @Test
   def warningNamesAreAlphaNumeric() {
-    Warning.AllNames.foreach { name =>
+    Violation.AllNames.foreach { name =>
       name must beMatching("^[a-zA-Z0-9]+$")
     }
   }
 
   @Test
   def warningNamesAreUnique() {
-    val warningsWithDuplicateNames = Warning.All.toList.groupBy(_.name).collect { case (_, warnings) if (warnings.length > 1) => warnings }
+    val warningsWithDuplicateNames = Violation.All.toList.groupBy(_.name).collect { case (_, warnings) if (warnings.length > 1) => warnings }
     warningsWithDuplicateNames.foreach(warnings => warnings.toString must beEqualTo("have duplicate names: " + warnings.head.name))
   }
 }

@@ -7,4 +7,5 @@
 *.log
 *.jar
 *.class
-
+.idea
+.idea_modules

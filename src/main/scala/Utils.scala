@@ -21,16 +21,22 @@ import collection.mutable
 
 object Utils {
   var disabledWarningNames: Seq[String] = Nil
+  var notificationLevel: NotificationLevel = Warn
   val nowarnPositions = mutable.HashSet[Global#Position]()
   
-  def warn(tree: Global#Tree, warning: Warning)(implicit unit: Global#CompilationUnit): Unit = { 
+  def notifyViolation(tree: Global#Tree, warning: Violation)(implicit unit: Global#CompilationUnit): Unit = {
     if((disabledWarningNames contains warning.name)
     || (tree.pos.lineContent matches ".*// *linter:(nowarn|ignore|disable)(:([a-zA-Z]+[+])*?"+warning.name+"([+][a-zA-Z]+)*?)? *(//.*)?")
     || (nowarnPositions contains tree.pos)) {
       // skip
     } else {
       // scalastyle:off regex
-      unit.warning(tree.pos, warning.message)
+      val notification: (Global#Position, String) => Unit = notificationLevel match {
+        case Error => unit.error
+        case Warn => unit.warning
+        case _ => throw new IllegalStateException(s"Invalid notification level $notificationLevel")
+      }
+      notification(tree.pos, warning.message)
       // scalastyle:on regex
     }
   }
