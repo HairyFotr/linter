@@ -59,6 +59,17 @@ If you think some instances of a warning are false positives, you can ignore the
                                     ^
     scala> val x = math.pow(5, 1/3d) + 1/0 // linter:disable // ignores all warnings
     
+### Choosing notification level
+
+Warn (default):
+
+    scalacOptions += "-P:linter:level:warn"
+
+Error:
+
+    scalacOptions += "-P:linter:level:error"
+
+
 ### Some examples of warnings
 
 ### If checks
@@ -198,7 +209,6 @@ If you think some instances of a warning are false positives, you can ignore the
 * Add more checks
 * Add more tests, report false positives
 * Pick and choose which warnings you want (configuration)
-* Choose whether they should be warnings or errors
 * Improve testing (larger samples, generated tests, ...)
 * Drop Scala 2.9 and check out new stuff such as quasiquotes
 
