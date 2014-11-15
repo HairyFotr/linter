@@ -7,7 +7,7 @@ Linter is a Scala compiler plugin that adds compile-time checks to help protect 
 __Note:__ If you have instructions for another build tool or IDE, or better instructions for current ones, please make a pull request.
 
 ### From sbt
-Add it as a compiler plugin to your project by editing your build.sbt file:
+Add it as a compiler plugin to your project by editing your `build.sbt` file:
 
     resolvers += "linter" at "http://hairyfotr.github.io/linteRepo/releases"
 
@@ -20,7 +20,7 @@ You can also use the snapshot with [sbt offline mode](http://www.scala-sbt.org/0
 ### Manually
 You can download the latest jars here:
 [Scala 2.10.x](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar?raw=true), 
-[Scala 2.11.0](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11.0/0.1-SNAPSHOT/linter_2.11.0-0.1-SNAPSHOT.jar?raw=true) (unstable), 
+[Scala 2.11.x](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11.0/0.1-SNAPSHOT/linter_2.11.0-0.1-SNAPSHOT.jar?raw=true) (unstable), 
 [Scala 2.9.3](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.9.3/0.1-SNAPSHOT/linter_2.9.3-0.1-SNAPSHOT.jar?raw=true) (outdated)
 
     terminal:
@@ -37,21 +37,23 @@ You can download the latest jars here:
       </configuration>
 
 
-## Currently supported warnings
+## Implemented checks
 
 UnextendedSealedTrait, UseLog, UseExpm, UnlikelyEquality, UseHypot, UseCbrt, UseSqrt, UseExp, UseLog, UseAbsNotSqrtSquare, UseIsNanNotSelfComparison, UseIsNanNotNanComparison, UseSignum, BigDecimalNumberFormat, BigDecimalPrecisionLoss, ReflexiveAssignment, CloseSourceFile, JavaConverters, ContainsTypeMismatch, NumberInstanceOf, PatternMatchConstant, PreferIfToBooleanMatch, IdenticalCaseBodies, IdenticalCaseConditions, ReflexiveComparison, YodaConditions, UseConditionDirectly, UseIfExpression, UnnecessaryElseBranch, DuplicateIfBranches, IdenticalIfElseCondition, MergeNestedIfs, VariableAssignedUnusedValue, MalformedSwap, IdenticalIfCondition, IdenticalStatements, IndexingWithNegativeNumber, OptionOfOption, UndesirableTypeInference, AssigningOptionToNull, WrapNullWithOption, UseGetOrElseOnOption, UseOptionOrNull, UseOptionGetOrElse, UseExistsOnOption, UseFilterNotFlatMap, AvoidOptionStringSize, AvoidOptionCollectionSize, AvoidOptionMethod, DuplicateKeyInMap, InefficientUseOfListSize, OnceEvaluatedStatementsInBlockReturningFunction, IntDivisionAssignedToFloat, UseFlattenNotFilterOption, PassPartialFunctionDirectly, UnitImplicitOrdering, RegexWarning, InvariantCondition, DecomposingEmptyCollection, InvariantExtrema, UnnecessaryMethodCall, ProducesEmptyCollection, OperationAlwaysProducesZero, ModuloByOne, DivideByOne, DivideByZero, ZeroDivideBy, UseUntilNotToMinusOne, InvalidParamToRandomNextInt, UnusedForLoopIteratorValue, StringMultiplicationByNonPositive, LikelyIndexOutOfBounds, UnnecessaryReturn, InvariantReturn, UnusedParameter, InvalidStringFormat, InvalidStringConversion, UnnecessaryStringNonEmpty, UnnecessaryStringIsEmpty, PossibleLossOfPrecision, UnsafeAbs, TypeToType, EmptyStringInterpolator, UnlikelyToString, UnthrownException, SuspiciousMatches, UseFindNotFilterHead, IfDoWhile
 
-### Turning warnings on and off
+### Turning checks on and off
 
-Warnings can be turned off using a plus-separated list of warning names:
+Checks can be turned off using a plus-separated list of check names:
 
     scalacOptions += "-P:linter:disable:UseHypot+CloseSourceFile+OptionOfOption"
 
-Or only specific warnings can be turned on using:
+Or only specific checks can be turned on using:
 
     scalacOptions += "-P:linter:enable-only:UseHypot+CloseSourceFile+OptionOfOption"
 
-If you think some instances of a warning are false positives, you can ignore them with a code comment:
+### Suppressing false positives
+
+If you believe some warnings to be false positives, you can ignore them with a code comment:
     
     scala> val x = math.pow(5, 1/3d) + 1/0 // linter:disable:UseCbrt+DivideByZero // ignores UseCbrt and DivideByZero
     <console>:8: warning: Integer division detected in an expression assigned to a floating point variable.
@@ -59,6 +61,8 @@ If you think some instances of a warning are false positives, you can ignore the
                                     ^
     scala> val x = math.pow(5, 1/3d) + 1/0 // linter:disable // ignores all warnings
     
+Please report false positives so they can be removed in future versions.
+
 ### Some examples of warnings
 
 ### If checks
@@ -195,14 +199,15 @@ If you think some instances of a warning are false positives, you can ignore the
 
 ## Future Work
 
+* Improve documentation (bug/style/optimization, most valuable checks, descriptions, ...)
+* Improve testing (larger samples, generated tests, link test names to check names, ...)
+* Choose whether specific checks should return warnings or errors
 * Add more checks
-* Add more tests, report false positives
-* Pick and choose which warnings you want (configuration)
-* Choose whether they should be warnings or errors
-* Improve testing (larger samples, generated tests, ...)
-* Drop Scala 2.9 and check out new stuff such as quasiquotes
+* Reduce false positive rate
+* Check out new stuff such as quasiquotes
+* Figure out why some tests fail on Scala 2.11
 
-### Ideas for new warnings
+### Ideas for new checks
 
 Feel free to add your own ideas, or implement these. Pull requests welcome!
 
@@ -218,9 +223,10 @@ Rule lists from other static analysis tools for inspiration:
 * ScalaStyle(Scala) - https://github.com/scalastyle/scalastyle/wiki
 * Scapegoat(Scala) - https://github.com/sksamuel/scalac-scapegoat-plugin#inspections
 * WartRemover(Scala) - https://github.com/typelevel/wartremover#warts
+* Scala Abide(Scala) - https://github.com/scala/scala-abide
 * Findbugs(JVM) - http://findbugs.sourceforge.net/bugDescriptions.html
 * CheckStyle(Java) - http://checkstyle.sourceforge.net/availablechecks.html
-* PMD(Java) - http://pmd.sourceforge.net/pmd-5.0.3/rules/index.html
+* PMD(Java) - http://pmd.sourceforge.net/snapshot/pmd-java/rules/index.html
 * Error-prone(Java) - https://code.google.com/p/error-prone/wiki/BugPatterns
 * CodeNarc(Groovy) - http://codenarc.sourceforge.net/codenarc-rule-index.html
 * PVS-Studio(C++) - http://www.viva64.com/en/d/

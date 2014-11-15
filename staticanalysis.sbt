@@ -26,6 +26,8 @@ scalacOptions ++= Seq(
 
 //scalacOptions += "-P:linter:disable:UseHypot+CloseSourceFile"
 
+// or...
+
 //scalacOptions += "-Xplugin:../linteRepo/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar"
 
 //scalacOptions += "-Xplugin:../linteRepo/releases/com/foursquare/lint/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar"
