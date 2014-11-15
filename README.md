@@ -37,13 +37,13 @@ You can download the latest jars here:
       </configuration>
 
 
-## Turning checks on and off
+## Enabling/disabling checks
 
-Checks can be turned off using a plus-separated list of check names:
+Checks can be disabled using a plus-separated list of check names:
 
     scalacOptions += "-P:linter:disable:UseHypot+CloseSourceFile+OptionOfOption"
 
-Or only specific checks can be turned on using:
+Or only specific checks can be enabled using:
 
     scalacOptions += "-P:linter:enable-only:UseHypot+CloseSourceFile+OptionOfOption"
 
