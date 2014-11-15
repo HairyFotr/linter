@@ -15,7 +15,7 @@ Add it as a compiler plugin to your project by editing your `build.sbt` file:
 
 If you have problems with the snapshot version when going offline, there are also 0.1.x versions being published - you can check build.sbt, or use the [sbt-updates plugin](https://github.com/rtimush/sbt-updates) to find the lastest version.
 
-You can also use the snapshot with [sbt offline mode](http://www.scala-sbt.org/0.12.4/docs/Detailed-Topics/Dependency-Management-Flow.html).
+You can also use the snapshot with [sbt offline mode](http://www.scala-sbt.org/0.13.5/docs/Detailed-Topics/Dependency-Management-Flow.html).
 
 ### Manually
 You can download the latest jars here:
@@ -37,11 +37,7 @@ You can download the latest jars here:
       </configuration>
 
 
-## Implemented checks
-
-UnextendedSealedTrait, UseLog, UseExpm, UnlikelyEquality, UseHypot, UseCbrt, UseSqrt, UseExp, UseLog, UseAbsNotSqrtSquare, UseIsNanNotSelfComparison, UseIsNanNotNanComparison, UseSignum, BigDecimalNumberFormat, BigDecimalPrecisionLoss, ReflexiveAssignment, CloseSourceFile, JavaConverters, ContainsTypeMismatch, NumberInstanceOf, PatternMatchConstant, PreferIfToBooleanMatch, IdenticalCaseBodies, IdenticalCaseConditions, ReflexiveComparison, YodaConditions, UseConditionDirectly, UseIfExpression, UnnecessaryElseBranch, DuplicateIfBranches, IdenticalIfElseCondition, MergeNestedIfs, VariableAssignedUnusedValue, MalformedSwap, IdenticalIfCondition, IdenticalStatements, IndexingWithNegativeNumber, OptionOfOption, UndesirableTypeInference, AssigningOptionToNull, WrapNullWithOption, UseGetOrElseOnOption, UseOptionOrNull, UseOptionGetOrElse, UseExistsOnOption, UseFilterNotFlatMap, AvoidOptionStringSize, AvoidOptionCollectionSize, AvoidOptionMethod, DuplicateKeyInMap, InefficientUseOfListSize, OnceEvaluatedStatementsInBlockReturningFunction, IntDivisionAssignedToFloat, UseFlattenNotFilterOption, PassPartialFunctionDirectly, UnitImplicitOrdering, RegexWarning, InvariantCondition, DecomposingEmptyCollection, InvariantExtrema, UnnecessaryMethodCall, ProducesEmptyCollection, OperationAlwaysProducesZero, ModuloByOne, DivideByOne, DivideByZero, ZeroDivideBy, UseUntilNotToMinusOne, InvalidParamToRandomNextInt, UnusedForLoopIteratorValue, StringMultiplicationByNonPositive, LikelyIndexOutOfBounds, UnnecessaryReturn, InvariantReturn, UnusedParameter, InvalidStringFormat, InvalidStringConversion, UnnecessaryStringNonEmpty, UnnecessaryStringIsEmpty, PossibleLossOfPrecision, UnsafeAbs, TypeToType, EmptyStringInterpolator, UnlikelyToString, UnthrownException, SuspiciousMatches, UseFindNotFilterHead, IfDoWhile
-
-### Turning checks on and off
+## Turning checks on and off
 
 Checks can be turned off using a plus-separated list of check names:
 
@@ -51,7 +47,7 @@ Or only specific checks can be turned on using:
 
     scalacOptions += "-P:linter:enable-only:UseHypot+CloseSourceFile+OptionOfOption"
 
-### Suppressing false positives
+## Suppressing false positives
 
 If you believe some warnings to be false positives, you can ignore them with a code comment:
     
@@ -63,7 +59,11 @@ If you believe some warnings to be false positives, you can ignore them with a c
     
 Please report false positives so they can be removed in future versions.
 
-### Some examples of warnings
+## List of implemented checks
+
+UnextendedSealedTrait, UseLog, UseExpm, UnlikelyEquality, UseHypot, UseCbrt, UseSqrt, UseExp, UseLog, UseAbsNotSqrtSquare, UseIsNanNotSelfComparison, UseIsNanNotNanComparison, UseSignum, BigDecimalNumberFormat, BigDecimalPrecisionLoss, ReflexiveAssignment, CloseSourceFile, JavaConverters, ContainsTypeMismatch, NumberInstanceOf, PatternMatchConstant, PreferIfToBooleanMatch, IdenticalCaseBodies, IdenticalCaseConditions, ReflexiveComparison, YodaConditions, UseConditionDirectly, UseIfExpression, UnnecessaryElseBranch, DuplicateIfBranches, IdenticalIfElseCondition, MergeNestedIfs, VariableAssignedUnusedValue, MalformedSwap, IdenticalIfCondition, IdenticalStatements, IndexingWithNegativeNumber, OptionOfOption, UndesirableTypeInference, AssigningOptionToNull, WrapNullWithOption, UseGetOrElseOnOption, UseOptionOrNull, UseOptionGetOrElse, UseExistsOnOption, UseFilterNotFlatMap, AvoidOptionStringSize, AvoidOptionCollectionSize, AvoidOptionMethod, DuplicateKeyInMap, InefficientUseOfListSize, OnceEvaluatedStatementsInBlockReturningFunction, IntDivisionAssignedToFloat, UseFlattenNotFilterOption, PassPartialFunctionDirectly, UnitImplicitOrdering, RegexWarning, InvariantCondition, DecomposingEmptyCollection, InvariantExtrema, UnnecessaryMethodCall, ProducesEmptyCollection, OperationAlwaysProducesZero, ModuloByOne, DivideByOne, DivideByZero, ZeroDivideBy, UseUntilNotToMinusOne, InvalidParamToRandomNextInt, UnusedForLoopIteratorValue, StringMultiplicationByNonPositive, LikelyIndexOutOfBounds, UnnecessaryReturn, InvariantReturn, UnusedParameter, InvalidStringFormat, InvalidStringConversion, UnnecessaryStringNonEmpty, UnnecessaryStringIsEmpty, PossibleLossOfPrecision, UnsafeAbs, TypeToType, EmptyStringInterpolator, UnlikelyToString, UnthrownException, SuspiciousMatches, UseFindNotFilterHead, IfDoWhile
+
+## Examples of reported warnings
 
 ### If checks
 #### Repeated condition in an else-if chain
