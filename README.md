@@ -20,7 +20,7 @@ You can also use the snapshot with [sbt offline mode](http://www.scala-sbt.org/0
 ### Manually
 You can download the latest jars here:
 [Scala 2.10.x](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar?raw=true), 
-[Scala 2.11.x](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11.0/0.1-SNAPSHOT/linter_2.11.0-0.1-SNAPSHOT.jar?raw=true) (unstable), 
+[Scala 2.11.x](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar?raw=true) (unstable), 
 [Scala 2.9.3](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.9.3/0.1-SNAPSHOT/linter_2.9.3-0.1-SNAPSHOT.jar?raw=true) (outdated)
 
     terminal:
