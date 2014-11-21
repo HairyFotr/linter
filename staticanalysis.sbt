@@ -20,7 +20,7 @@ scalacOptions ++= Seq(
   "-Ywarn-value-discard")
 
 // Linter
-//resolvers += "linter" at "http://hairyfotr.github.io/linteRepo/releases"
+//resolvers += "Linter Repository" at "https://hairyfotr.github.io/linteRepo/releases"
 
 //addCompilerPlugin("com.foursquare.lint" %% "linter" % "0.1-SNAPSHOT")
 

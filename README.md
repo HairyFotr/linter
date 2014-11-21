@@ -7,13 +7,13 @@ Linter is a Scala compiler plugin that adds compile-time checks to help protect 
 __Note:__ If you have instructions for another build tool or IDE, or better instructions for current ones, please make a pull request.
 
 ### From sbt
-Add it as a compiler plugin to your project by editing your `build.sbt` file:
+Add Linter to your project by appending these two lines to your `build.sbt`:
 
-    resolvers += "linter" at "http://hairyfotr.github.io/linteRepo/releases"
+    resolvers += "Linter Repository" at "https://hairyfotr.github.io/linteRepo/releases"
 
     addCompilerPlugin("com.foursquare.lint" %% "linter" % "0.1-SNAPSHOT")
 
-If you have problems with the snapshot version when going offline, there are also 0.1.x versions being published - you can check build.sbt, or use the [sbt-updates plugin](https://github.com/rtimush/sbt-updates) to find the lastest version.
+If you have problems with the snapshot version when going offline, there are also 0.1.x versions being published - see Linter's `build.sbt`, or use the [sbt-updates plugin](https://github.com/rtimush/sbt-updates) to find the lastest published version.
 
 You can also use the snapshot with [sbt offline mode](http://www.scala-sbt.org/0.13.5/docs/Detailed-Topics/Dependency-Management-Flow.html).
 
@@ -37,7 +37,7 @@ You can download the latest jars here:
       </configuration>
 
 
-## Enabling/disabling checks
+## Enabling/Disabling checks
 
 Checks can be disabled using a plus-separated list of check names:
 
@@ -49,7 +49,7 @@ Or only specific checks can be enabled using:
 
 ## Suppressing false positives
 
-If you believe some warnings to be false positives, you can ignore them with a code comment:
+If you believe some warnings are false positives, you can ignore them with a code comment:
     
     scala> val x = math.pow(5, 1/3d) + 1/0 // linter:disable:UseCbrt+DivideByZero // ignores UseCbrt and DivideByZero
     <console>:8: warning: Integer division detected in an expression assigned to a floating point variable.
