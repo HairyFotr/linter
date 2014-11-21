@@ -3,7 +3,7 @@
 Linter is a Scala compiler plugin that adds compile-time checks to help protect against various possible bugs and style problems.
 
 ## Usage from sbt
-Add Linter to your project by appending these two lines to your `build.sbt`:
+Add Linter to your project by appending these lines to your `build.sbt`:
 
     resolvers += "Linter Repository" at "https://hairyfotr.github.io/linteRepo/releases"
 
