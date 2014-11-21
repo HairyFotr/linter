@@ -1,6 +1,6 @@
 # Linter Compiler Plugin [![Build Status](https://travis-ci.org/HairyFotr/linter.png)](https://travis-ci.org/HairyFotr/linter)
 
-Linter is a Scala static analysis compiler plugin which adds compile-time checks to help you detect various possible bugs, inefficiencies, and style problems.
+Linter is a Scala static analysis compiler plugin which adds compile-time checks for various possible bugs, inefficiencies, and style problems.
 
 ## Usage from sbt
 Add Linter to your project by appending these lines to your `build.sbt`:
