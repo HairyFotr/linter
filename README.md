@@ -55,7 +55,7 @@ If you believe some warnings are false positives, you can ignore them with a cod
                                     ^
     scala> val x = math.pow(5, 1/3d) + 1/0 // linter:disable // ignores all warnings
     
-Please report false positives so they can be removed in future versions.
+__Note:__ Please consider reporting false positives so they can be removed in future versions.
 
 ## List of implemented checks
 
