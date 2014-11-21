@@ -2,8 +2,7 @@
 
 Linter is a Scala compiler plugin that adds compile-time checks to help protect against various possible bugs and style problems.
 
-## Usage
-### From sbt
+## Usage from sbt
 Add Linter to your project by appending these two lines to your `build.sbt`:
 
     resolvers += "Linter Repository" at "https://hairyfotr.github.io/linteRepo/releases"
@@ -14,7 +13,7 @@ If you have problems with the snapshot version when going offline, there are als
 
 You can also use the snapshot with [sbt offline mode](http://www.scala-sbt.org/0.13.5/docs/Detailed-Topics/Dependency-Management-Flow.html).
 
-### Manually
+## Manual usage
 Another possible way to use linter is to manually download and use these jars:<br>
 [Scala 2.11.x](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar?raw=true) (unstable), <br>
 [Scala 2.10.x](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar?raw=true), <br>
