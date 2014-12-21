@@ -22,6 +22,7 @@ class WarningTest extends JUnitMustMatchers {
       case DivideByZero => 1
       case ZeroDivideBy => 1
       case DuplicateIfBranches => 1
+      case TransformNotMap => 1
       case DuplicateKeyInMap => 1
       case IdenticalCaseBodies(_) => 1
       case IdenticalCaseConditions => 1

@@ -75,7 +75,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   def should(code: String, not: Boolean = false)(implicit expectedMsg: String) {
     val unitResult = (expectedMsg, Compiler.compileAndLint(code)) must beLike {
       case (expected, actual) if (not ^ actual.contains(expected)) => ok
-      case _ => ko("in "+(if(not) "negative case" else "positive case")+":\n" + code + "\n ")
+      case _ => ko((if(not) "false positive" else "false negative")+":\n" + code + "\n ")
     }
   }
   def shouldnt(code: String)(implicit expectedMsg: String) { should(code, not = true)(expectedMsg) }
@@ -447,6 +447,41 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
         println("hello");
         println("world")
       }
+    """)
+  }
+  
+  @Test
+  def TransformNotMap(): Unit = {
+    implicit val msg = ".transform"
+    
+    should(""" 
+      var a = collection.mutable.ListBuffer(1,2,3);
+      a = a.map{_ + 1}
+    """)
+    should(""" 
+      var a = Seq(1,2,3);
+      a = a.map{_ + 1}
+    """)
+
+    shouldnt(""" 
+      var a = collection.mutable.ListBuffer(1,2,3);
+      a = a.map{_ + 1}.filter{_ > 1}
+    """)
+    shouldnt(""" 
+      var a = collection.mutable.ListBuffer(1,2,3);
+      a = a.filter{_ > 1}.map{_ + 1}
+    """)
+    shouldnt(""" 
+      var a = collection.immutable.Seq(1,2,3);
+      a = a.map{_ + 1}
+    """)
+    shouldnt(""" 
+      var a = List(1,2,3);
+      a = a.map{_ + 1}
+    """)
+    shouldnt(""" 
+      var a = Vector(1,2,3);
+      a = a.map{_ + 1}
     """)
   }
   

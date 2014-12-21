@@ -39,6 +39,7 @@ object Warning {
     ZeroDivideBy,
     DuplicateIfBranches,
     DuplicateKeyInMap,
+    TransformNotMap,
     new IdenticalCaseBodies(""),
     IdenticalCaseConditions,
     IdenticalIfCondition,
@@ -204,6 +205,7 @@ case object AvoidOptionCollectionSize extends NoArgWarning("Did you mean to take
 case class AvoidOptionMethod(method: String, explanation: String = "") extends TwoArgWarning("Using Option.%s is not recommended. %s", method, explanation) {
   def name = "AvoidOptionMethod"
 }
+case object TransformNotMap extends NoArgWarning("Use x.transform(...) instead of x = x.map(...).")
 case object DuplicateKeyInMap extends NoArgWarning("This key has already been defined, and will override the previous mapping.")
 case class InefficientUseOfListSize(replacement: String) extends OneArgWarning("Use %s instead of comparing to List.size.", replacement) {
   def name = "InefficientUseOfListSize"

@@ -1335,6 +1335,14 @@ class LinterPlugin(val global: Global) extends Plugin {
               else
                 warn(t, AvoidOptionMethod("size", "use Option.isDefined instead."))
               
+          /// Use x.transform instead of x = x.map(...)
+          //TODO: Improvements: detect array, detect map chaining
+          case Assign(id1, Apply(Apply(TypeApply(Select(id2, map), List(_, _)), List(func)), List(col)))
+            if (id1.toString == id2.toString) && (map is "map")
+            && ((col.toString startsWith "mutable.this") || (col.toString startsWith "collection.this.Seq.")) =>
+            
+            warn(tree, TransformNotMap)
+          
           /// Checks for duplicate mappings in a Map
           case Apply(TypeApply(Select(map, apply), _), args)
             if (apply is "apply")
