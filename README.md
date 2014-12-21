@@ -1,27 +1,22 @@
 # Linter Compiler Plugin [![Build Status](https://travis-ci.org/HairyFotr/linter.png)](https://travis-ci.org/HairyFotr/linter)
 
-Linter is a Scala compiler plugin that adds compile-time checks to help protect against various possible bugs and style problems.
+Linter is a Scala static analysis compiler plugin which adds compile-time checks for various possible bugs, inefficiencies, and style problems.
 
-## Usage
+## Usage from sbt
+Add Linter to your project by appending these lines to your `build.sbt`:
 
-__Note:__ If you have instructions for another build tool or IDE, or better instructions for current ones, please make a pull request.
-
-### From sbt
-Add it as a compiler plugin to your project by editing your build.sbt file:
-
-    resolvers += "linter" at "http://hairyfotr.github.io/linteRepo/releases"
+    resolvers += "Linter Repository" at "https://hairyfotr.github.io/linteRepo/releases"
 
     addCompilerPlugin("com.foursquare.lint" %% "linter" % "0.1-SNAPSHOT")
 
-If you have problems with the snapshot version when going offline, there are also 0.1.x versions being published - you can check build.sbt, or use the [sbt-updates plugin](https://github.com/rtimush/sbt-updates) to find the lastest version.
+If you have problems with the snapshot version when working offline, there are also 0.1.x versions being published - see Linter's `build.sbt`, or use the [sbt-updates plugin](https://github.com/rtimush/sbt-updates), to find the lastest published version. You can also try using the [sbt offline mode](http://www.scala-sbt.org/0.13.5/docs/Detailed-Topics/Dependency-Management-Flow.html).
 
-You can also use the snapshot with [sbt offline mode](http://www.scala-sbt.org/0.12.4/docs/Detailed-Topics/Dependency-Management-Flow.html).
-
-### Manually
-You can download the latest jars here:
-[Scala 2.10.x](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar?raw=true), 
-[Scala 2.11.0](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11.0/0.1-SNAPSHOT/linter_2.11.0-0.1-SNAPSHOT.jar?raw=true) (unstable), 
+## Manual usage
+Another possible way to use Linter is to manually download and use these jars:<br>
+[Scala 2.11.x](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar?raw=true) (unstable), <br>
+[Scala 2.10.x](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar?raw=true), <br>
 [Scala 2.9.3](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.9.3/0.1-SNAPSHOT/linter_2.9.3-0.1-SNAPSHOT.jar?raw=true) (outdated)
+
 
     terminal:
       scalac -Xplugin:<path-to-linter-jar>.jar ...
@@ -36,22 +31,21 @@ You can download the latest jars here:
         </args>
       </configuration>
 
+__Note:__ If you have instructions for another build tool or IDE, please make a pull request.
 
-## Currently supported warnings
+## Enabling/Disabling checks
 
-UnextendedSealedTrait, UseLog, UseExpm, UnlikelyEquality, UseHypot, UseCbrt, UseSqrt, UseExp, UseLog, UseAbsNotSqrtSquare, UseIsNanNotSelfComparison, UseIsNanNotNanComparison, UseSignum, BigDecimalNumberFormat, BigDecimalPrecisionLoss, ReflexiveAssignment, CloseSourceFile, JavaConverters, ContainsTypeMismatch, NumberInstanceOf, PatternMatchConstant, PreferIfToBooleanMatch, IdenticalCaseBodies, IdenticalCaseConditions, ReflexiveComparison, YodaConditions, UseConditionDirectly, UseIfExpression, UnnecessaryElseBranch, DuplicateIfBranches, IdenticalIfElseCondition, MergeNestedIfs, VariableAssignedUnusedValue, MalformedSwap, IdenticalIfCondition, IdenticalStatements, IndexingWithNegativeNumber, OptionOfOption, UndesirableTypeInference, AssigningOptionToNull, WrapNullWithOption, UseGetOrElseOnOption, UseOptionOrNull, UseOptionGetOrElse, UseExistsOnOption, UseFilterNotFlatMap, AvoidOptionStringSize, AvoidOptionCollectionSize, AvoidOptionMethod, TransformNotMap, DuplicateKeyInMap, InefficientUseOfListSize, OnceEvaluatedStatementsInBlockReturningFunction, IntDivisionAssignedToFloat, UseFlattenNotFilterOption, PassPartialFunctionDirectly, UnitImplicitOrdering, RegexWarning, InvariantCondition, DecomposingEmptyCollection, InvariantExtrema, UnnecessaryMethodCall, ProducesEmptyCollection, OperationAlwaysProducesZero, ModuloByOne, DivideByOne, DivideByZero, ZeroDivideBy, UseUntilNotToMinusOne, InvalidParamToRandomNextInt, UnusedForLoopIteratorValue, StringMultiplicationByNonPositive, LikelyIndexOutOfBounds, UnnecessaryReturn, InvariantReturn, UnusedParameter, InvalidStringFormat, InvalidStringConversion, UnnecessaryStringNonEmpty, UnnecessaryStringIsEmpty, PossibleLossOfPrecision, UnsafeAbs, TypeToType, EmptyStringInterpolator, UnlikelyToString, UnthrownException, SuspiciousMatches, UseFindNotFilterHead, IfDoWhile
-
-### Turning warnings on and off
-
-Warnings can be turned off using a plus-separated list of warning names:
+Checks can be disabled using a plus-separated list of check names:
 
     scalacOptions += "-P:linter:disable:UseHypot+CloseSourceFile+OptionOfOption"
 
-Or only specific warnings can be turned on using:
+Or only specific checks can be enabled using:
 
     scalacOptions += "-P:linter:enable-only:UseHypot+CloseSourceFile+OptionOfOption"
 
-If you think some instances of a warning are false positives, you can ignore them with a code comment:
+## Suppressing false positives
+
+If you believe some warnings are false positives, you can ignore them with a code comment:
     
     scala> val x = math.pow(5, 1/3d) + 1/0 // linter:disable:UseCbrt+DivideByZero // ignores UseCbrt and DivideByZero
     <console>:8: warning: Integer division detected in an expression assigned to a floating point variable.
@@ -59,7 +53,13 @@ If you think some instances of a warning are false positives, you can ignore the
                                     ^
     scala> val x = math.pow(5, 1/3d) + 1/0 // linter:disable // ignores all warnings
     
-### Some examples of warnings
+__Note:__ Please consider reporting false positives so they can be removed in future versions.
+
+## List of implemented checks
+
+UnextendedSealedTrait, UseLog, UseExpm, UnlikelyEquality, UseHypot, UseCbrt, UseSqrt, UseExp, UseLog, UseAbsNotSqrtSquare, UseIsNanNotSelfComparison, UseIsNanNotNanComparison, UseSignum, BigDecimalNumberFormat, BigDecimalPrecisionLoss, ReflexiveAssignment, CloseSourceFile, JavaConverters, ContainsTypeMismatch, NumberInstanceOf, PatternMatchConstant, PreferIfToBooleanMatch, IdenticalCaseBodies, IdenticalCaseConditions, ReflexiveComparison, YodaConditions, UseConditionDirectly, UseIfExpression, UnnecessaryElseBranch, DuplicateIfBranches, IdenticalIfElseCondition, MergeNestedIfs, VariableAssignedUnusedValue, MalformedSwap, IdenticalIfCondition, IdenticalStatements, IndexingWithNegativeNumber, OptionOfOption, UndesirableTypeInference, AssigningOptionToNull, WrapNullWithOption, UseGetOrElseOnOption, UseOptionOrNull, UseOptionGetOrElse, UseExistsOnOption, UseFilterNotFlatMap, AvoidOptionStringSize, AvoidOptionCollectionSize, AvoidOptionMethod, DuplicateKeyInMap, InefficientUseOfListSize, OnceEvaluatedStatementsInBlockReturningFunction, IntDivisionAssignedToFloat, UseFlattenNotFilterOption, PassPartialFunctionDirectly, UnitImplicitOrdering, RegexWarning, InvariantCondition, DecomposingEmptyCollection, InvariantExtrema, UnnecessaryMethodCall, ProducesEmptyCollection, OperationAlwaysProducesZero, ModuloByOne, DivideByOne, DivideByZero, ZeroDivideBy, UseUntilNotToMinusOne, InvalidParamToRandomNextInt, UnusedForLoopIteratorValue, StringMultiplicationByNonPositive, LikelyIndexOutOfBounds, UnnecessaryReturn, InvariantReturn, UnusedParameter, InvalidStringFormat, InvalidStringConversion, UnnecessaryStringNonEmpty, UnnecessaryStringIsEmpty, PossibleLossOfPrecision, UnsafeAbs, TypeToType, EmptyStringInterpolator, UnlikelyToString, UnthrownException, SuspiciousMatches, UseFindNotFilterHead, IfDoWhile
+
+## Examples of reported warnings
 
 ### If checks
 #### Repeated condition in an else-if chain
@@ -195,14 +195,15 @@ If you think some instances of a warning are false positives, you can ignore the
 
 ## Future Work
 
+* Improve documentation (bug/style/optimization, most valuable checks, descriptions, ...)
+* Improve testing (larger samples, generated tests, link test names to check names, ...)
+* Choose whether specific checks should return warnings or errors
 * Add more checks
-* Add more tests, report false positives
-* Pick and choose which warnings you want (configuration)
-* Choose whether they should be warnings or errors
-* Improve testing (larger samples, generated tests, ...)
-* Drop Scala 2.9 and check out new stuff such as quasiquotes
+* Reduce false positive rate
+* Check out new stuff such as quasiquotes
+* Figure out why some tests fail on Scala 2.11
 
-### Ideas for new warnings
+### Ideas for new checks
 
 Feel free to add your own ideas, or implement these. Pull requests welcome!
 
@@ -218,9 +219,10 @@ Rule lists from other static analysis tools for inspiration:
 * ScalaStyle(Scala) - https://github.com/scalastyle/scalastyle/wiki
 * Scapegoat(Scala) - https://github.com/sksamuel/scalac-scapegoat-plugin#inspections
 * WartRemover(Scala) - https://github.com/typelevel/wartremover#warts
+* Scala Abide(Scala) - https://github.com/scala/scala-abide
 * Findbugs(JVM) - http://findbugs.sourceforge.net/bugDescriptions.html
 * CheckStyle(Java) - http://checkstyle.sourceforge.net/availablechecks.html
-* PMD(Java) - http://pmd.sourceforge.net/pmd-5.0.3/rules/index.html
+* PMD(Java) - http://pmd.sourceforge.net/snapshot/pmd-java/rules/index.html
 * Error-prone(Java) - https://code.google.com/p/error-prone/wiki/BugPatterns
 * CodeNarc(Groovy) - http://codenarc.sourceforge.net/codenarc-rule-index.html
 * PVS-Studio(C++) - http://www.viva64.com/en/d/
