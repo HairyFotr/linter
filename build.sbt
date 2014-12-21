@@ -12,7 +12,7 @@ resolvers ++= Seq("snapshots", "releases").map(Resolver.sonatypeRepo)
 
 libraryDependencies ++= Seq(
   "org.specs2"     %% "specs2"         % "2.4" % "test",
-  "junit"          % "junit"           % "4.11"   % "test",
+  "junit"          % "junit"           % "4.12"   % "test",
   "com.novocode"   % "junit-interface" % "0.11"   % "test")
 
 libraryDependencies <+= (scalaVersion) { (scalaVersion) =>
@@ -22,7 +22,7 @@ libraryDependencies <+= (scalaVersion) { (scalaVersion) =>
 libraryDependencies := {
   CrossVersion.partialVersion(scalaVersion.value) match {
     case Some((2, scalaMajor)) if scalaMajor >= 11 =>
-      libraryDependencies.value :+ "org.scala-lang.modules" %% "scala-xml" % "1.0.2"
+      libraryDependencies.value :+ "org.scala-lang.modules" %% "scala-xml" % "1.0.3"
     case _ =>
       libraryDependencies.value
   }

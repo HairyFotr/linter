@@ -472,6 +472,10 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       a = a.filter{_ > 1}.map{_ + 1}
     """)
     shouldnt(""" 
+      var a = collection.mutable.Set(1,2,3);
+      a = a.filter{_ > 1}.map{_ + 1}
+    """)
+    shouldnt(""" 
       var a = collection.immutable.Seq(1,2,3);
       a = a.map{_ + 1}
     """)
