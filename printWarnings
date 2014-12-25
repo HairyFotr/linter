@@ -1,1 +1,11 @@
-grep -Po 'case (class|object) [a-zA-Z]+' src/main/scala/Warning.scala | cut -d' ' -f3 | tr '\n' ',' | sed "s/,/, /g"; echo
+warnings=$(grep -Po 'case (class|object) [a-zA-Z0-9_]+' src/main/scala/Warning.scala | cut -d' ' -f3 | tr '\n' ' ')
+for w in $warnings; do
+  test=$(grep -Pn "def $w[(][)]" src/test/scala/LinterPluginTest.scala)
+  if [[ "$test" != "" ]]; then
+    echo -n "[$w](test/scala/LinterPluginTest.scala#L$(echo $test | cut -d':' -f1)), "
+  else
+    echo -n "$w, "
+  fi
+done
+
+echo

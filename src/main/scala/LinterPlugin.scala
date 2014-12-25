@@ -1336,7 +1336,14 @@ class LinterPlugin(val global: Global) extends Plugin {
                 warn(t, AvoidOptionMethod("size", "use Option.isDefined instead."))
               
           /// Use x.transform instead of x = x.map(...)
-          //TODO: Improvements: detect array, detect map chaining
+          //TODO: Improvements: detect map chaining
+          case Assign(id1, Apply(Apply(TypeApply(Select(Apply(xArrayOps, List(id2)), map), List(_, _)), List(func)), List(Apply(TypeApply(canBuildFrom, List(_)), List(typeTag)))))
+            if (id1.toString == id2.toString) && (map is "map")
+            && (xArrayOps.toString.contains("ArrayOps"))
+            && (canBuildFrom.toString == "scala.this.Array.canBuildFrom") =>
+          
+            warn(tree, TransformNotMap)            
+          
           case Assign(id1, Apply(Apply(TypeApply(Select(id2, map), List(_, _)), List(func)), List(col)))
             if (id1.toString == id2.toString) && (map is "map")
             && ((col.toString startsWith "mutable.this") || (col.toString startsWith "collection.this.Seq.")) =>

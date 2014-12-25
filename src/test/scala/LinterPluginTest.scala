@@ -462,6 +462,14 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       var a = Seq(1,2,3);
       a = a.map{_ + 1}
     """)
+    should(""" 
+      var a = Seq("1","2","3");
+      a = a.map{_ + 1}
+    """)
+    should(""" 
+      var a = Array("1","2","3");
+      a = a.map{_ + 1}
+    """)
 
     shouldnt(""" 
       var a = collection.mutable.ListBuffer(1,2,3);
@@ -489,19 +497,8 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     """)
   }
   
-  // ^ New tests named after their Warning.scala name ^
-  // ----------------- OLD TESTS ----------------------
-
-  @Test
-  def caseClass__NoWarn() {//commented because they crash if stopAfter is set.
-    //noWarnings("""case class A()""")
-    //noWarnings("""case class A(a: Float)""")
-    //noWarnings("""case class A(a: Float*)""")
-    //noWarnings("""class A(a: Float, b: String)""")
-  }
-
   @Test 
-  def Source_FromFile__close(): Unit = {
+  def CloseSourceFile(): Unit = {
     implicit val msg = "You should close the file stream after use."
      
     should("""scala.io.Source.fromFile("README.md").mkString""")
@@ -512,7 +509,13 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def contains__types(): Unit = {
+  def JavaConverters(): Unit = {
+    implicit val msg = "Consider using the explicit collection.JavaConverters"
+    should("import scala.collection.JavaConversions._;")
+  }
+
+  @Test
+  def ContainsTypeMismatch(): Unit = {
     implicit val msg = "will probably return false"
 
     should("""val x = List(4); x.contains("foo")""")
@@ -522,59 +525,8 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     shouldnt("""val x = Map(4 -> 5); x.contains(3)""")
   }
 
-
   @Test
-  def import__JavaConversions(): Unit = {
-    implicit val msg = "Consider using the explicit collection.JavaConverters"
-    should("import scala.collection.JavaConversions._;")
-  }
-
-  @Test
-  @Ignore
-  def import__wildcard(): Unit = {
-    implicit val msg = "Wildcard imports should be avoided. Favor import selector clauses."
-
-    should("import collection._;")
-    shouldnt("import collection.mutable.HashSet;")
-    shouldnt("import collection.mutable.{HashSet, ListBuffer};")
-    shouldnt("import util.Random;")
-  }
-
-  @Test
-  def equals__types(): Unit = {
-    implicit val msg = "Comparing with == on instances of different types"//(%s, %s) will probably return false.
-
-    should("Nil == None")
-    should("""
-      val x: List[Int] = Nil
-      val y: List[String] = Nil
-      x == y""")//TODO: returns true, not false
-
-    shouldnt(""" "foo" == "bar" """)
-    shouldnt("""
-      val x: List[Int] = Nil
-      val y: List[Int] = Nil
-      x == y""")
-    shouldnt("""
-      val x: String = "foo"
-      val y: String = "bar"
-      x == y""")
-    shouldnt("""
-      val x: String = "foo"
-      x == "bar" """)
-  }
-
-  @Test
-  @Ignore
-  def null__check(): Unit = {
-    implicit val msg = "Using null is considered dangerous."
-    
-    should("""val a = null""")    
-    shouldnt("""val a = 5""")
-  }
-
-  @Test
-  def if__useCondition(): Unit = {
+  def UseConditionDirectly(): Unit = {
     implicit val msg = "Remove the if and just use the"
     
     should("""
@@ -597,9 +549,9 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       else
         true""")
   }
-  
+
   @Test
-  def if__sameBranches(): Unit = {
+  def DuplicateIfBranches(): Unit = {
     implicit val msg = "If statement branches have the same structure"
     should("""
       val a,b = 10
@@ -621,18 +573,9 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       else if(b > 7)
         (2,a)""")      
   }
-  
-  @Test
-  @Ignore
-  def if__condition(): Unit = {
-    should("""if(1 > 5) 7 else 8""")("This condition will always be false.")
-    should("""if(1 < 5) 7 else 8""")("This condition will always be true.")
-
-    shouldnt("""while(1 < 5) { 7; 8 """)("This condition will always be true.")
-  }
 
   @Test
-  def case__neigbouringCases(): Unit = {
+  def IdenticalCaseBodies(): Unit = {
     implicit val msg = "neighbouring cases are identical"
     should("""
       val a = 7
@@ -676,21 +619,9 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       future { 1+1 } andThen { case Success(a) => println("win") case Failure(s) => println("fail") }
     """)
   }
-  
+
   @Test
-  def case__unreachable(): Unit = {
-    implicit val msg = "Identical case condition detected above. This case will never match."
-    
-    should("""val a = 5; a match { case a if a == 5 => "f" case a if a == 5 => "d" }""")
-    shouldnt("""val a = 5; a match { case a if a == 6 => "f" case a if a == 5 => "d" }""")
-    
-    should("""val x = 5; (x,8) match { case (a,8) if a == 5 => "f" case (b,8) if b == 5 => "d" }""")
-    shouldnt("""val x = 5; (x,8) match { case (a,8) if a == 5 => "f" case (b,8) if b == 6 => "d" }""")
-    shouldnt("""val x = 5; (x,8) match { case (a,8) if a == 5 => "f" case (b,7) if b == 6 => "d" }""")
-  }
-  
-  @Test
-  def case__constantValue(): Unit = {
+  def PatternMatchConstant(): Unit = {
     implicit val msg = "Pattern matching on a constant value"
     
     should("""
@@ -708,65 +639,9 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
         case _ => "hi"
       }""")
   }
-  
-  @Test
-  @Ignore
-  def case__ifStatement(): Unit = {
-    implicit val msg = "This is probably better written as an if statement."
-    
-    should("""
-      val a = true;
-      a match {
-        case true => 0
-        case false => 1
-      }""")
-  }
 
   @Test
-  @Ignore
-  def case__useMonadic(): Unit = {
-    implicit val msg = "There are probably better ways of handling an Option"
-    
-    should("""
-      val a = Option("")
-      a match {
-        case Some(x) => x
-        case _ => null
-      }""")
-  }
-
-  @Test
-  @Ignore
-  def option__get(): Unit = {
-    implicit val msg = "Calling .get on Option will throw an exception if the Option is None."
-
-    should("""Option(10).get""")
-    should("""val x: Option[Int] = None ; x.get""")
-    should("""val x: Option[Int] = Some(3); x.get""")
-    should("""val x = None ; x.get""")
-    should("""val x = Some(3) ; x.get""")
-
-    shouldnt("""Map(1 -> "1", 2 -> "2").get(1)""")
-  }
-
-  @Test
-  @Ignore
-  def implicit__returnType(): Unit = {
-    implicit val msg = "needs explicit return type"
-    
-    should("""
-      import scala.language.implicitConversions
-      implicit def int2string(a: Int) = a.toString
-    """)
-    
-    shouldnt("""
-      import scala.language.implicitConversions
-      implicit def int2string(a: Int): String = a.toString
-    """)
-  }
-
-  @Test
-  def def__unusedParameters(): Unit = {
+  def UnusedParameter(): Unit = {
     implicit val msg = "not used in method"
     
     should("""def func(a:Int, b:Int) = { val c = a+1; c } """)
@@ -789,7 +664,225 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  @Ignore
+  def UseLog1p(): Unit = {
+    implicit val msg = "Use math.log1p(x) instead of"// math.log(1 + x) for added accuracy"
+    should("""
+      val a = 4d
+      math.log(1 + a)
+    """)
+    should("""
+      val a = 4d
+      math.log(1d + a)
+    """)
+    shouldnt("""
+      val a = 4d
+      math.log(2d + a)
+    """)
+    shouldnt("""
+      val a = 4d
+      math.log1p(1 + a)
+    """)
+    
+    should("""
+      val a = 4d
+      math.log(1d + a)
+    """)
+    should("""
+      val a,b = 4d
+      math.log((a+b) + 1)
+    """)
+    shouldnt("""
+      val a = 4d
+      math.log(a + 2d)
+    """)
+    shouldnt("""
+      val a = 4d
+      math.log1p(a + 1)
+    """)
+
+    should("""
+      val a = 4d
+      Math.log(1 + a)
+    """)
+    should("""
+      val a = 4d
+      StrictMath.log(1 + a)
+    """)
+  }
+
+  def UseExpm1(): Unit = {
+    implicit val msg = "Use math.expm1(x) instead of"// math.exp(x) - 1 for added accuracy (if x is near 1).
+    should("""
+      val a = 4d
+      math.exp(a) - 1
+    """)
+    should("""
+      val a = 4d
+      math.exp(a) - 1d
+    """)
+    shouldnt("""
+      val a = 4d
+      math.exp(a) - 2d
+    """)
+    shouldnt("""
+      val a = 4d
+      math.expm1(a) - 1d
+    """)
+    
+    should("""
+      val a = 4d
+      -1 + math.exp(a)
+    """)
+    should("""
+      val a,b = 4d
+      -1 + math.exp(a + b)
+    """)
+    shouldnt("""
+      val a = 4d
+      -2 + math.exp(a)
+    """)
+    shouldnt("""
+      val a = 4d
+      -1 + math.exp1m(a)
+    """)
+  }
+  
+  // ^ New tests named after their Warning.scala name ^
+  // ----------------- OLD TESTS ----------------------
+
+  /* //commented because they crash if stopAfter is set.
+  @Test
+  def caseClass__NoWarn() {
+    noWarnings("""case class A()""")
+    noWarnings("""case class A(a: Float)""")
+    noWarnings("""case class A(a: Float*)""")
+    noWarnings("""class A(a: Float, b: String)""")
+  }*/
+  
+  @Test
+  def equals__types(): Unit = {
+    implicit val msg = "Comparing with == on instances of different types"//(%s, %s) will probably return false.
+
+    should("Nil == None")
+    should("""
+      val x: List[Int] = Nil
+      val y: List[String] = Nil
+      x == y""")//TODO: returns true, not false
+
+    shouldnt(""" "foo" == "bar" """)
+    shouldnt("""
+      val x: List[Int] = Nil
+      val y: List[Int] = Nil
+      x == y""")
+    shouldnt("""
+      val x: String = "foo"
+      val y: String = "bar"
+      x == y""")
+    shouldnt("""
+      val x: String = "foo"
+      x == "bar" """)
+  }
+  
+  @Test
+  @Ignore //disabled check
+  def import__wildcard(): Unit = {
+    implicit val msg = "Wildcard imports should be avoided. Favor import selector clauses."
+
+    should("import collection._;")
+    shouldnt("import collection.mutable.HashSet;")
+    shouldnt("import collection.mutable.{HashSet, ListBuffer};")
+    shouldnt("import util.Random;")
+  }
+
+  @Test
+  @Ignore //disabled check
+  def null__check(): Unit = {
+    implicit val msg = "Using null is considered dangerous."
+    
+    should("""val a = null""")    
+    shouldnt("""val a = 5""")
+  }
+  
+  @Test
+  @Ignore //disabled check
+  def if__condition(): Unit = {
+    should("""if(1 > 5) 7 else 8""")("This condition will always be false.")
+    should("""if(1 < 5) 7 else 8""")("This condition will always be true.")
+
+    shouldnt("""while(1 < 5) { 7; 8 """)("This condition will always be true.")
+  }
+
+  
+  @Test
+  def case__unreachable(): Unit = {
+    implicit val msg = "Identical case condition detected above. This case will never match."
+    
+    should("""val a = 5; a match { case a if a == 5 => "f" case a if a == 5 => "d" }""")
+    shouldnt("""val a = 5; a match { case a if a == 6 => "f" case a if a == 5 => "d" }""")
+    
+    should("""val x = 5; (x,8) match { case (a,8) if a == 5 => "f" case (b,8) if b == 5 => "d" }""")
+    shouldnt("""val x = 5; (x,8) match { case (a,8) if a == 5 => "f" case (b,8) if b == 6 => "d" }""")
+    shouldnt("""val x = 5; (x,8) match { case (a,8) if a == 5 => "f" case (b,7) if b == 6 => "d" }""")
+  }
+  
+  @Test
+  @Ignore //disabled check
+  def case__ifStatement(): Unit = {
+    implicit val msg = "This is probably better written as an if statement."
+    
+    should("""
+      val a = true;
+      a match {
+        case true => 0
+        case false => 1
+      }""")
+  }
+
+  @Test
+  @Ignore //disabled check
+  def case__useMonadic(): Unit = {
+    implicit val msg = "There are probably better ways of handling an Option"
+    
+    should("""
+      val a = Option("")
+      a match {
+        case Some(x) => x
+        case _ => null
+      }""")
+  }
+
+  @Test
+  @Ignore //disabled check
+  def option__get(): Unit = {
+    implicit val msg = "Calling .get on Option will throw an exception if the Option is None."
+
+    should("""Option(10).get""")
+    should("""val x: Option[Int] = None ; x.get""")
+    should("""val x: Option[Int] = Some(3); x.get""")
+    should("""val x = None ; x.get""")
+    should("""val x = Some(3) ; x.get""")
+
+    shouldnt("""Map(1 -> "1", 2 -> "2").get(1)""")
+  }
+
+  @Test
+  @Ignore //disabled check
+  def implicit__returnType(): Unit = {
+    implicit val msg = "needs explicit return type"
+    
+    should("""
+      import scala.language.implicitConversions
+      implicit def int2string(a: Int) = a.toString
+    """)
+    
+    shouldnt("""
+      import scala.language.implicitConversions
+      implicit def int2string(a: Int): String = a.toString
+    """)
+  }
+
+  @Test
+  @Ignore //disabled check
   def string__duplicatedLiterals(): Unit = {
     implicit val msg = "String literal"
     
@@ -819,7 +912,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
-  @Ignore
+  @Ignore //disabled check
   def string__alreadyDefined(): Unit = {
     implicit val msg = "You have defined that string as a val already"
     
@@ -1116,7 +1209,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
     
   @Test
-  @Ignore
+  @Ignore //disabled check
   def instanceOf__check(): Unit = {
     implicit val msg = "Avoid using asInstanceOf"
     
@@ -1131,7 +1224,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     """)
    }
    
-  @Test
+  @Test //UseIsNanNotSelfComparison, UseIsNanNotNanComparison
   def numeric_isNan(): Unit = {
     implicit val msg = "Use .isNan instead"
 
@@ -1155,90 +1248,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     shouldnt("""
       var a = 4
       if(a != a) "foo"
-    """)
-  }
-  
-  @Test
-  def numeric_log1p(): Unit = {
-    implicit val msg = "Use math.log1p(x) instead of"// math.log(1 + x) for added accuracy"
-    should("""
-      val a = 4d
-      math.log(1 + a)
-    """)
-    should("""
-      val a = 4d
-      math.log(1d + a)
-    """)
-    shouldnt("""
-      val a = 4d
-      math.log(2d + a)
-    """)
-    shouldnt("""
-      val a = 4d
-      math.log1p(1 + a)
-    """)
-    
-    should("""
-      val a = 4d
-      math.log(1d + a)
-    """)
-    should("""
-      val a,b = 4d
-      math.log((a+b) + 1)
-    """)
-    shouldnt("""
-      val a = 4d
-      math.log(a + 2d)
-    """)
-    shouldnt("""
-      val a = 4d
-      math.log1p(a + 1)
-    """)
-
-    should("""
-      val a = 4d
-      Math.log(1 + a)
-    """)
-    should("""
-      val a = 4d
-      StrictMath.log(1 + a)
-    """)
-  }
-
-  def numeric_exp1m(): Unit = {
-    implicit val msg = "Use math.expm1(x) instead of"// math.exp(x) - 1 for added accuracy (if x is near 1).
-    should("""
-      val a = 4d
-      math.exp(a) - 1
-    """)
-    should("""
-      val a = 4d
-      math.exp(a) - 1d
-    """)
-    shouldnt("""
-      val a = 4d
-      math.exp(a) - 2d
-    """)
-    shouldnt("""
-      val a = 4d
-      math.expm1(a) - 1d
-    """)
-    
-    should("""
-      val a = 4d
-      -1 + math.exp(a)
-    """)
-    should("""
-      val a,b = 4d
-      -1 + math.exp(a + b)
-    """)
-    shouldnt("""
-      val a = 4d
-      -2 + math.exp(a)
-    """)
-    shouldnt("""
-      val a = 4d
-      -1 + math.exp1m(a)
     """)
   }
 
