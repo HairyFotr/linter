@@ -459,14 +459,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       a = a.map{_ + 1}
     """)
     should(""" 
-      var a = Seq(1,2,3);
-      a = a.map{_ + 1}
-    """)
-    should(""" 
-      var a = Seq("1","2","3");
-      a = a.map{_ + 1}
-    """)
-    should(""" 
       var a = Array("1","2","3");
       a = a.map{_ + 1}
     """)
@@ -475,16 +467,17 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       var a = collection.mutable.ListBuffer(1,2,3);
       a = a.map{_ + 1}.filter{_ > 1}
     """)
+    //although this one could be flagged too... anything of the form a = a.(...).map
     shouldnt(""" 
       var a = collection.mutable.ListBuffer(1,2,3);
       a = a.filter{_ > 1}.map{_ + 1}
     """)
     shouldnt(""" 
       var a = collection.mutable.Set(1,2,3);
-      a = a.filter{_ > 1}.map{_ + 1}
+      a = a.map{_ + 1}
     """)
     shouldnt(""" 
-      var a = collection.immutable.Seq(1,2,3);
+      var a = Seq(1,2,3);
       a = a.map{_ + 1}
     """)
     shouldnt(""" 

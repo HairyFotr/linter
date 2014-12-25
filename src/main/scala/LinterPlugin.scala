@@ -223,6 +223,8 @@ class LinterPlugin(val global: Global) extends Plugin {
       import definitions.{ OptionClass, SeqClass, TraversableClass, ListClass, StringClass }
       import definitions.{ DoubleClass, FloatClass, CharClass, ByteClass, ShortClass, IntClass, LongClass, BooleanClass }
       
+      val MutableSeqLike: Symbol = rootMirror.getClassByName(newTermName("scala.collection.mutable.SeqLike"))
+
       val ExceptionClass = rootMirror.getClassByName(newTermName("java.lang.Exception"))
       
       val JavaConversionsModule: Symbol = rootMirror.getModuleByName(newTermName("scala.collection.JavaConversions"))
@@ -1344,9 +1346,9 @@ class LinterPlugin(val global: Global) extends Plugin {
           
             warn(tree, TransformNotMap)            
           
-          case Assign(id1, Apply(Apply(TypeApply(Select(id2, map), List(_, _)), List(func)), List(col)))
+          case Assign(id1, collection @ Apply(Apply(TypeApply(Select(id2, map), List(_, _)), List(func)), List(_)))
             if (id1.toString == id2.toString) && (map is "map")
-            && ((col.toString startsWith "mutable.this") || (col.toString startsWith "collection.this.Seq.")) =>
+            && collection.tpe.baseClasses.exists(_.tpe =:= MutableSeqLike.tpe) =>
             
             warn(tree, TransformNotMap)
           
