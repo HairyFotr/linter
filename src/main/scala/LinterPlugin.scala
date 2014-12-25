@@ -1450,6 +1450,14 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             warn(tree, new UseExistsNotFilterEmpty(bang = true))
 
+          /// col.count(...) instead of col.filter(...).size/length (idea from pippi)
+          case Select(Apply(Select(col, filter), List(func)), size_length)
+            if col.tpe.widen.baseClasses.exists(_.tpe =:= TraversableClass.tpe)
+            && (filter is "filter")
+            && ((size_length is "size") || (size_length is "length")) =>
+
+            warn(tree, new UseCountNotFilterLength(size_length.toString))
+
           /// Use partial function directly - temporary variable is unnecessary (idea by yzgw)
           case Apply(_, List(Function(List(ValDef(mods, x_1, typeTree: TypeTree, EmptyTree)), Match(x_1_, _))))
             if (((x_1 is "x$1") && (x_1_ is "x$1") && (mods.isSynthetic) && (mods.isParameter)) // _ match { ... }

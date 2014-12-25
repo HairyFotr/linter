@@ -93,6 +93,7 @@ object Warning {
     UseFilterNotFlatMap,
     UseFlattenNotFilterOption,
     new UseExistsNotFilterEmpty(bang = false),
+    new UseCountNotFilterLength(""),
     UseGetOrElseOnOption,
     UseFindNotFilterHead,
     UseIsNanNotNanComparison,
@@ -216,6 +217,9 @@ case object IntDivisionAssignedToFloat extends NoArgWarning("Integer division de
 case object UseFlattenNotFilterOption extends NoArgWarning("Use col.flatten instead of col.filter(_.isDefined).map(_.get).")
 case class UseExistsNotFilterEmpty(bang: Boolean) extends OneArgWarning("Use col.exists(...) instead of %s.", (if (bang) "!col.filter(...).isEmpty" else "col.filter(...).nonEmpty")) {
   def name = "UseExistsNotFilterEmpty"
+}
+case class UseCountNotFilterLength(func: String) extends OneArgWarning("Use col.count(...) instead of col.filter(...).%s", func) {
+  def name = "UseCountNotFilterLength"
 }
 case class PassPartialFunctionDirectly(matchVar: String) extends OneArgWarning("You can pass the partial function in directly. (Remove \"%s match {\").", matchVar) {
   def name = "PassPartialFunctionDirectly"

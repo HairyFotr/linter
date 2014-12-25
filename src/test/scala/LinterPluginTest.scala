@@ -503,6 +503,20 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       val b = !a.filter{ _ > 1 }.isEmpty
     """)
   }
+
+  @Test
+  def UseCountNotFilterLength(): Unit = {
+    implicit val msg = "col.count"
+    
+    should(""" 
+      var a = Seq(1,2,3);
+      val b = a.filter{ _ > 1 }.length
+    """)
+    should(""" 
+      var a = Seq(1,2,3);
+      val b = a.filter{ _ > 1 }.size
+    """)
+  }
   
   @Test 
   def CloseSourceFile(): Unit = {
