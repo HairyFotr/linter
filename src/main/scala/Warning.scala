@@ -94,6 +94,7 @@ object Warning {
     UseFlattenNotFilterOption,
     new UseExistsNotFilterEmpty(bang = false),
     new UseCountNotFilterLength(""),
+    UseExistsNotCountCompare,
     UseGetOrElseOnOption,
     UseFindNotFilterHead,
     UseIsNanNotNanComparison,
@@ -221,6 +222,7 @@ case class UseExistsNotFilterEmpty(bang: Boolean) extends OneArgWarning("Use col
 case class UseCountNotFilterLength(func: String) extends OneArgWarning("Use col.count(...) instead of col.filter(...).%s", func) {
   def name = "UseCountNotFilterLength"
 }
+case object UseExistsNotCountCompare extends NoArgWarning("Use col.exists(...) instead of col.count(...) compare.")
 case class PassPartialFunctionDirectly(matchVar: String) extends OneArgWarning("You can pass the partial function in directly. (Remove \"%s match {\").", matchVar) {
   def name = "PassPartialFunctionDirectly"
 }

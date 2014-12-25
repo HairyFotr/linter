@@ -365,7 +365,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
       def isMathPow2(pow: Tree, detectSquareNumbers: Boolean = false): Boolean = pow match { 
         case Apply(pow, List(_, Literal(Constant(2.0)))) if isMath(pow, "pow") => true   // math.pow(x, 2)
-        case Apply(Select(id1, nme.MUL), List(id2)) if (id1 equalsStructure id2) => true                  // x*x
+        case Apply(Select(id1, nme.MUL), List(id2)) if (id1 equalsStructure id2) => true // x*x
         case Literal(Constant(x: Int)) if (detectSquareNumbers) && (x > 1) && (math.sqrt(x.toDouble) == math.sqrt(x.toDouble).toInt) => true  // Square numbers
         case _ => /*println(showRaw(pow));*/ false
       }
@@ -383,6 +383,11 @@ class LinterPlugin(val global: Global) extends Plugin {
         case Select(Apply(scala_Predef_xWrapper, List(arg)), abs) 
           if (scala_Predef_xWrapper.toString endsWith "Wrapper") && (abs is "abs") => Some(arg)
         case _ => None
+      }
+      
+      def isEmptyCompare(x: Any, op: Name): Boolean = {
+        ((x == 0 && (op == nme.EQ || op == nme.GT || op == nme.LE || op == nme.NE))
+          || (x == 1 && (op == nme.LT || op == nme.GE)))
       }
       
 
@@ -1387,8 +1392,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Apply(Select(pos @ Select(obj, size), op), List(Literal(Constant(x))))
             if (size isAny ("size", "length"))
             && (obj.tpe.widen.baseClasses.exists(_.tpe =:= ListClass.tpe) || obj.tpe.widen <:< StringClass.tpe)
-            && ((x == 0 && (op == nme.EQ || op == nme.GT || op == nme.LE || op == nme.NE))
-            || (x == 1 && (op == nme.LT || op == nme.GE))) =>
+            && (isEmptyCompare(x, op)) =>
           
             if(op == nme.EQ || op == nme.LE || op == nme.LT)
               warn(pos, new InefficientUseOfListSize("isEmpty"))
@@ -1457,6 +1461,14 @@ class LinterPlugin(val global: Global) extends Plugin {
             && ((size_length is "size") || (size_length is "length")) =>
 
             warn(tree, new UseCountNotFilterLength(size_length.toString))
+
+          /// col.exists(...) instead of col.count(...) == 0 (or similar)
+          case Apply(Select(Apply(Select(col, count), List(func)), op), List(Literal(Constant(x))))
+            if col.tpe.widen.baseClasses.exists(_.tpe =:= TraversableClass.tpe)
+            && (count is "count") && (isEmptyCompare(x, op)) =>
+          
+            if(!(op == nme.EQ || op == nme.LE || op == nme.LT))
+              warn(tree, UseExistsNotCountCompare)
 
           /// Use partial function directly - temporary variable is unnecessary (idea by yzgw)
           case Apply(_, List(Function(List(ValDef(mods, x_1, typeTree: TypeTree, EmptyTree)), Match(x_1_, _))))

@@ -518,6 +518,33 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     """)
   }
   
+  @Test
+  def UseExistsNotCountCompare(): Unit = {
+    implicit val msg = "col.exists"
+    
+    should(""" 
+      var a = Seq(1,2,3);
+      val b = a.count{ _ > 1 } > 0
+    """)
+    should(""" 
+      var a = Seq(1,2,3);
+      val b = a.count{ _ > 1 } >= 1
+    """)
+    should(""" 
+      var a = Seq(1,2,3);
+      val b = a.count{ _ > 1 } != 0
+    """)
+
+    shouldnt(""" 
+      var a = Seq(1,2,3);
+      val b = a.count{ _ > 1 } == 0
+    """)
+    shouldnt(""" 
+      var a = Seq(1,2,3);
+      val b = a.count{ _ > 1 } >= 0
+    """)
+  }
+  
   @Test 
   def CloseSourceFile(): Unit = {
     implicit val msg = "You should close the file stream after use."
