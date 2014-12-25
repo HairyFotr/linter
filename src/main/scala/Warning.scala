@@ -92,6 +92,7 @@ object Warning {
     UseExpm1,
     UseFilterNotFlatMap,
     UseFlattenNotFilterOption,
+    new UseExistsNotFilterEmpty(bang = false),
     UseGetOrElseOnOption,
     UseFindNotFilterHead,
     UseIsNanNotNanComparison,
@@ -213,6 +214,9 @@ case class InefficientUseOfListSize(replacement: String) extends OneArgWarning("
 case object OnceEvaluatedStatementsInBlockReturningFunction extends NoArgWarning("You're passing a block that returns a function. The statements in this block, except the last one, will only be executed once.")
 case object IntDivisionAssignedToFloat extends NoArgWarning("Integer division detected in an expression assigned to a floating point variable.")
 case object UseFlattenNotFilterOption extends NoArgWarning("Use col.flatten instead of col.filter(_.isDefined).map(_.get).")
+case class UseExistsNotFilterEmpty(bang: Boolean) extends OneArgWarning("Use col.exists(...) instead of %s.", (if (bang) "!col.filter(...).isEmpty" else "col.filter(...).nonEmpty")) {
+  def name = "UseExistsNotFilterEmpty"
+}
 case class PassPartialFunctionDirectly(matchVar: String) extends OneArgWarning("You can pass the partial function in directly. (Remove \"%s match {\").", matchVar) {
   def name = "PassPartialFunctionDirectly"
 }

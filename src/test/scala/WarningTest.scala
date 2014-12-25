@@ -77,6 +77,7 @@ class WarningTest extends JUnitMustMatchers {
       case UseExpm1 => 1
       case UseFilterNotFlatMap => 1
       case UseFlattenNotFilterOption => 1
+      case UseExistsNotFilterEmpty(_) => 1
       case UseGetOrElseOnOption => 1
       case UseIsNanNotNanComparison => 1
       case UseIsNanNotSelfComparison => 1

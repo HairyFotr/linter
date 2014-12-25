@@ -1437,6 +1437,19 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             warn(tree, UseFlattenNotFilterOption)
 
+          /// col.exists(...) instead of !col.filter(...).isEmpty / col.filter(...).nonEmpty (idea from pippi)
+          case Select(Apply(Select(col, filter), List(func)), nonEmpty)
+            if col.tpe.widen.baseClasses.exists(_.tpe =:= TraversableClass.tpe)
+            && (filter is "filter") && (nonEmpty is "nonEmpty") =>
+
+            warn(tree, new UseExistsNotFilterEmpty(bang = false))
+
+          case Select(Select(Apply(Select(col, filter), List(func)), isEmpty), unaryBang)
+            if col.tpe.widen.baseClasses.exists(_.tpe =:= TraversableClass.tpe)
+            && (filter is "filter") && (isEmpty is "isEmpty") && (unaryBang is "unary_$bang") =>
+
+            warn(tree, new UseExistsNotFilterEmpty(bang = true))
+
           /// Use partial function directly - temporary variable is unnecessary (idea by yzgw)
           case Apply(_, List(Function(List(ValDef(mods, x_1, typeTree: TypeTree, EmptyTree)), Match(x_1_, _))))
             if (((x_1 is "x$1") && (x_1_ is "x$1") && (mods.isSynthetic) && (mods.isParameter)) // _ match { ... }
