@@ -321,6 +321,13 @@ class LinterPlugin(val global: Global) extends Plugin {
       implicit class richTree(n: Tree) extends RichToStr[Tree](n)
       implicit class richName(n: Name) extends RichToStr[Name](n)
       
+      
+      def identOrDefault(tree: Tree, default: String): String = {
+        if (tree.isInstanceOf[Ident] && !tree.toString.contains(".")) tree.toString else default;
+      }
+      def identOrCol(tree: Tree): String = identOrDefault(tree, "col")
+      def identOrOpt(tree: Tree): String = identOrDefault(tree, "opt")
+      
       // Returns the string subtree of a string.length/size subtree
       def getStringFromLength(t: Tree): Option[Tree] = t match {
         case Apply(Select(str, length), Nil) 
@@ -647,7 +654,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             
           /// Comparing with == on instances of different types: 5 == "5"
           //TODO: Scala 2.10 has a similar check "comparing values of types Int and String using `==' will always yield false"
-          case Apply(eqeq @ Select(lhs, nme.EQ), List(rhs))
+          case Apply(eqeq @ Select(lhs, op @ (nme.EQ | nme.NE)), List(rhs))
             if methodImplements(eqeq.symbol, Object_==)
             && !isSubtype(lhs, rhs) && !isSubtype(rhs, lhs)
             && lhs.tpe.widen.toString != "Null" && rhs.tpe.widen.toString != "Null" 
@@ -662,7 +669,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               ((lhsHigher != rhsHigher) && !generic(lhsHigher) && !generic(rhsHigher))
             }) =>
             
-            warn(eqeq, new UnlikelyEquality(lhs.tpe.widen.toString, rhs.tpe.widen.toString))
+            warn(eqeq, new UnlikelyEquality(lhs.tpe.widen.toString, rhs.tpe.widen.toString, if (op == nme.EQ) "==" else "!="))
 
           /// Warn agains importing from collection.JavaConversions
           case Import(pkg, selectors) if (pkg.symbol == JavaConversionsModule) && (selectors exists isGlobalImport) =>
@@ -732,7 +739,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
               //println((tpe.tpe.widen, toTpe.toString))
 
-              ((toTyp == toTpe.toString) || ((toTyp stripPrefix toTpe.toString) matches "\\[.*\\]"))
+              ((toTyp matches "to[A-Z][^.]+") && ((toTyp == toTpe.toString) || ((toTyp stripPrefix toTpe.toString) matches "\\[.*\\]")))
             } =>
             
             warn(tree, new TypeToType(toTpe.toString stripPrefix "to"))
@@ -1238,78 +1245,78 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, "Use .isDefined instead of comparing to None")*/
 
           /// filter(...).headOption is better written as find(...)
-          case Select(Apply(Select(_col, filter), List(Function(List(ValDef(_, _, _, _)), _))), headOption)
+          case Select(Apply(Select(col, filter), List(Function(List(ValDef(_, _, _, _)), _))), headOption)
             if (filter is "filter") && (headOption is "headOption") =>
-
-            warn(tree, UseFindNotFilterHead)
+            
+            warn(tree, UseFindNotFilterHead(identOrCol(col)))
 
           /// orElse(Some(...)).get is better written as getOrElse(...)
-          case Select(Apply(TypeApply(Select(_option, orElse), _), List(Apply(scala_Some_apply, List(_value)))), get)
+          case Select(Apply(TypeApply(Select(option, orElse), _), List(Apply(scala_Some_apply, List(_value)))), get)
             if (orElse is "orElse") && (get is "get") && (scala_Some_apply startsWith "scala.Some.apply") =>
             
-            warn(scala_Some_apply, UseGetOrElseOnOption)
+            warn(scala_Some_apply, new UseGetOrElseOnOption(identOrOpt(option)))
 
           /// if(opt.isDefined) opt.get else something is better written as getOrElse(something) and similar warnings
           //TODO: improve the warning text, and curb the code duplication
           case If(Select(opt1, isDefined), getCase @ Select(opt2, get), elseCase) //duplication
             if (isDefined is "isDefined") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull("opt.isDefined"))
-            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse("opt.isDefined"))
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + ".isDefined"))
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + ".isDefined"))
 
           case If(Select(Select(opt1, isDefined), nme.UNARY_!), elseCase, getCase @ Select(opt2, get)) //duplication
             if (isDefined is "isDefined") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull("!opt.isDefined"))
-            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse("!opt.isDefined"))
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isDefined"))
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isDefined"))
 
           case If(Select(opt1, isEmpty), elseCase, getCase @ Select(opt2, get)) //duplication
             if (isEmpty is "isEmpty") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull("opt.isEmpty"))
-            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse("opt.isEmpty"))
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + ".isEmpty"))
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + ".isEmpty"))
 
           case If(Select(Select(opt1, isEmpty), nme.UNARY_!), getCase @ Select(opt2, get), elseCase) //duplication
             if (isEmpty is "isEmpty") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull("!opt.isEmpty"))
-            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse("!opt.isEmpty"))
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isEmpty"))
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isEmpty"))
 
           case If(Apply(Select(opt1, nme.NE), List(scala_None)), getCase @ Select(opt2, get), elseCase) //duplication
             if (scala_None is "scala.None") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull("opt != None"))
-            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse("opt != None"))
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + "!= None"))
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + "!= None"))
 
           case If(Apply(Select(opt1, nme.EQ), List(scala_None)), elseCase, getCase @ Select(opt2, get)) //duplication
             if (scala_None is "scala.None") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull("opt == None"))
-            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse("opt == None"))
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + "== None"))
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + "== None"))
           
           /// find(...).isDefined is better written as exists(...)
           /// filter(...).isEmpty is better written as exists(...)
-          case Select(Apply(pos @ Select(collection, find_filter), _func), isEmpty_isDefined) 
+          case Select(Apply(pos @ Select(col, find_filter), _func), isEmpty_isDefined) 
             if ((find_filter isAny ("find", "filter")) && (isEmpty_isDefined isAny ("isEmpty", "isDefined")))
-            && (collection startsWithAny ("scala.", "immutable.")) =>
+            && (col startsWithAny ("scala.", "immutable.")) =>
             
-            warn(pos, new UseExistsOnOption(find_filter.toString, isEmpty_isDefined.toString))
+            warn(pos, new UseExistsOnOption(identOrCol(col), find_filter.toString, isEmpty_isDefined.toString))
 
           /// flatMap(if(...) x else Nil/None) is better written as filter(...)
-          case Apply(TypeApply(Select(collection, flatMap), _), List(Function(List(ValDef(_, param, _, _)), If(_, e1, e2))))
+          case Apply(TypeApply(Select(col, flatMap), _), List(Function(List(ValDef(_, param, _, _)), If(_, e1, e2))))
             if flatMap is "flatMap" =>
 
             // Swap branches, to simplify the matching
             val (expr1, expr2) = if(e1 endsWithAny (".Nil", ".None")) (e1, e2) else (e2, e1)
 
             (expr1, expr2) match {
-              case (nil, Apply(TypeApply(Select(collection, apply), _), List(Ident(id))))
-                if (collection.toString matches "((scala[.])?collection[.])?immutable[.].*")
+              case (nil, Apply(TypeApply(Select(col, apply), _), List(Ident(id)))) // <- col is shadowing
+                if (col.toString matches "((scala[.])?collection[.])?immutable[.].*")
                 && (apply is "apply")
                 && (nil endsWith ".Nil") 
                 && (id.toString == param.toString) =>
                 
-                warn(tree, UseFilterNotFlatMap)
+                warn(tree, new UseFilterNotFlatMap(identOrCol(col)))
 
               case (Apply(_Option2Iterable1, List(none)), Apply(_Option2Iterable2, List(Apply(TypeApply(Select(some, apply), _), List(Ident(id))))))
                 if (none is "scala.None")
@@ -1317,7 +1324,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 && (apply is "apply")
                 && (id.toString == param.toString) =>
                 
-                warn(tree, UseFilterNotFlatMap)
+                warn(tree, new UseFilterNotFlatMap(identOrCol(col)))
                 
               case _ => 
                 //println((showRaw(expr1), showRaw(expr2)))
@@ -1349,13 +1356,13 @@ class LinterPlugin(val global: Global) extends Plugin {
             && (xArrayOps.toString.contains("ArrayOps"))
             && (canBuildFrom.toString == "scala.this.Array.canBuildFrom") =>
           
-            warn(tree, TransformNotMap)            
+            warn(tree, new TransformNotMap("col")) // FIXME name's inside xArrayOps, right?
           
-          case Assign(id1, collection @ Apply(Apply(TypeApply(Select(id2, map), List(_, _)), List(func)), List(_)))
+          case Assign(id1, col @ Apply(Apply(TypeApply(Select(id2, map), List(_, _)), List(func)), List(_)))
             if (id1.toString == id2.toString) && (map is "map")
-            && collection.tpe.baseClasses.exists(_.tpe =:= MutableSeqLike.tpe) =>
+            && col.tpe.baseClasses.exists(_.tpe =:= MutableSeqLike.tpe) =>
             
-            warn(tree, TransformNotMap)
+            warn(tree, new TransformNotMap(identOrCol(col)))
           
           /// Checks for duplicate mappings in a Map
           case Apply(TypeApply(Select(map, apply), _), args)
@@ -1389,15 +1396,15 @@ class LinterPlugin(val global: Global) extends Plugin {
             
           //// Inefficient use of .size, instead of is/nonEmpty (Idea by non)
           /// Inefficient use of List.size, instead of is/nonEmpty
-          case Apply(Select(pos @ Select(obj, size), op), List(Literal(Constant(x))))
-            if (size isAny ("size", "length"))
+          case Apply(Select(pos @ Select(obj, size_length), op), List(Literal(Constant(x))))
+            if (size_length isAny ("size", "length"))
             && (obj.tpe.widen.baseClasses.exists(_.tpe =:= ListClass.tpe) || obj.tpe.widen <:< StringClass.tpe)
             && (isEmptyCompare(x, op)) =>
           
             if(op == nme.EQ || op == nme.LE || op == nme.LT)
-              warn(pos, new InefficientUseOfListSize("isEmpty"))
+              warn(pos, new InefficientUseOfListSize(identOrCol(obj), "isEmpty", size_length.toString))
             else
-              warn(pos, new InefficientUseOfListSize("nonEmpty"))
+              warn(pos, new InefficientUseOfListSize(identOrCol(obj), "nonEmpty", size_length.toString))
 
           /// Inefficient use of String.size, instead of is/nonEmpty (disabled)
           /*case Apply(Select(obj, op), List(Literal(Constant(""))))
@@ -1439,20 +1446,20 @@ class LinterPlugin(val global: Global) extends Plugin {
               (p2.toString == p2_.toString) && (p2_.tpe.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe)) &&
               (filter is "filter") && (isDefined is "isDefined") && (map is "map") && (get is "get")) =>
 
-            warn(tree, UseFlattenNotFilterOption)
+            warn(tree, new UseFlattenNotFilterOption(identOrCol(col)))
 
           /// col.exists(...) instead of !col.filter(...).isEmpty / col.filter(...).nonEmpty (idea from pippi)
           case Select(Apply(Select(col, filter), List(func)), nonEmpty)
             if col.tpe.widen.baseClasses.exists(_.tpe =:= TraversableClass.tpe)
             && (filter is "filter") && (nonEmpty is "nonEmpty") =>
 
-            warn(tree, new UseExistsNotFilterEmpty(bang = false))
+            warn(tree, new UseExistsNotFilterEmpty(identOrCol(col), bang = false))
 
           case Select(Select(Apply(Select(col, filter), List(func)), isEmpty), unaryBang)
             if col.tpe.widen.baseClasses.exists(_.tpe =:= TraversableClass.tpe)
             && (filter is "filter") && (isEmpty is "isEmpty") && (unaryBang is "unary_$bang") =>
 
-            warn(tree, new UseExistsNotFilterEmpty(bang = true))
+            warn(tree, new UseExistsNotFilterEmpty(identOrCol(col), bang = true))
 
           /// col.count(...) instead of col.filter(...).size/length (idea from pippi)
           case Select(Apply(Select(col, filter), List(func)), size_length)
@@ -1460,7 +1467,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             && (filter is "filter")
             && ((size_length is "size") || (size_length is "length")) =>
 
-            warn(tree, new UseCountNotFilterLength(size_length.toString))
+            warn(tree, new UseCountNotFilterLength(identOrCol(col), size_length.toString))
 
           /// col.exists(...) instead of col.count(...) == 0 (or similar)
           case Apply(Select(Apply(Select(col, count), List(func)), op), List(Literal(Constant(x))))
@@ -1468,7 +1475,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             && (count is "count") && (isEmptyCompare(x, op)) =>
           
             if(!(op == nme.EQ || op == nme.LE || op == nme.LT))
-              warn(tree, UseExistsNotCountCompare)
+              warn(tree, new UseExistsNotCountCompare(identOrCol(col)))
 
           /// Use partial function directly - temporary variable is unnecessary (idea by yzgw)
           case Apply(_, List(Function(List(ValDef(mods, x_1, typeTree: TypeTree, EmptyTree)), Match(x_1_, _))))
@@ -2481,6 +2488,9 @@ class LinterPlugin(val global: Global) extends Plugin {
             case "$times" =>
               Left(str * intParam)
 
+            case "intern" =>
+              Left(str)
+
             case f @ ("head"|"last") =>
               if(str.maxLength == 0) {
                 warn(treePosHolder, new DecomposingEmptyCollection(f, "string"))
@@ -2527,11 +2537,21 @@ class LinterPlugin(val global: Global) extends Plugin {
                 Right(Values.empty.addConditions(_ >= -1))
               }
 
-            // These come in (Char/String) versions
+            // These also come in (Char/String) versions
             case "stringPrefix" if paramsSize == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stringPrefix)))
             case "stripLineEnd" if paramsSize == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stripLineEnd)))
             case "stripMargin"  if paramsSize == 0 && str.exactValue.isDefined => Left(new StringAttrs(str.exactValue.map(_.stripMargin)))
             
+            // 
+            case "mkString" if paramsSize == 0 =>
+                warn(treePosHolder, new UnnecessaryMethodCall("mkString"))
+                
+                Left(str)
+            case "mkString" if paramsSize == 1 && str.exactValue.isDefined && stringParam.exactValue.isDefined =>
+                val p0 = stringParam.exactValue.get
+                
+                Left(new StringAttrs(Some(str.exactValue.get.mkString(p0))))
+            //
             case "toUpperCase" => Left(str.toUpperCase)
             case "toLowerCase" => Left(str.toLowerCase)
             case "trim" =>  Left(str.trim)
@@ -2575,7 +2595,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
               //println((string, param))
               
-              //TODO: use reflection, dummy :)
+              //TODO: use reflection maybe?
               //TODO: could do some prefix/suffix enhancements
               try f match {
                 case "charAt"|"apply" => 
@@ -2668,6 +2688,19 @@ class LinterPlugin(val global: Global) extends Plugin {
               Left(empty)
               
             //str.func(String, String)
+            case "replace" if stringParams.size == 2 && stringParams.forall(_.exactValue.isDefined) =>
+              val (p0, p1) = (stringParams(0).exactValue.get, stringParams(1).exactValue.get)
+              
+              if (p0 == p1) {
+                warn(treePosHolder, new UnnecessaryMethodCall("replace"))
+                
+                Left(str)
+              } else if(str.exactValue.isDefined) {
+                Left(new StringAttrs(Some(str.exactValue.get.replace(p0, p1))))
+              } else {
+                Left(empty)
+              }
+            
             case f @ ("replaceAll"|"replaceFirst") if stringParams.size == 2 && stringParams.forall(_.exactValue.isDefined) =>
               val (p0, p1) = (stringParams(0).exactValue.get, stringParams(1).exactValue.get)
               
@@ -2788,6 +2821,9 @@ class LinterPlugin(val global: Global) extends Plugin {
         }
 
         
+        // avoids an undebugged infinite loop
+        val cache = mutable.Map[Tree, StringAttrs]()
+        
         //// Try to convert an AST into a String value
         def apply(tree: Tree): StringAttrs = {
           def traverseString(tree: Tree): StringAttrs = tree match {
@@ -2863,7 +2899,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             // Pass on functions on strings
             //TODO: maybe check if some return string and can be computed
             case Apply(Select(str, func), params) => 
-              stringFunc(str, func, params).left.getOrElse(empty)
+              cache.getOrElseUpdate(tree, stringFunc(str, func, params).left.getOrElse(empty))
 
             case Select(Apply(scala_augmentString, List(string)), func) if (scala_augmentString.toString endsWith "augmentString") =>
               stringFunc(string, func).left.getOrElse(empty)
@@ -3346,7 +3382,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             StringAttrs(regExpr).exactValue.foreach(checkRegex)
             if(func.toString == "matches") computeExpr(tree)
             
-          case Apply(Select(str, func), List(regExpr, _str)) if (str.tpe.widen <:< StringClass.tpe) && (func.toString matches "replace(All|First)") =>
+          case Apply(Select(str, func), List(regExpr, _str)) if (str.tpe.widen <:< StringClass.tpe) && (func.toString matches "replace(All|First)?") =>
             treePosHolder = regExpr
             StringAttrs(regExpr).exactValue.foreach(checkRegex)
             computeExpr(tree)

@@ -59,7 +59,7 @@ __Note:__ Please consider reporting false positives so they can be removed in fu
 
 __Note:__ Links currently go to the test for that check.
 
-UnextendedSealedTrait, [UseLog1p](src/test/scala/LinterPluginTest.scala#L715), [UseExpm1](src/test/scala/LinterPluginTest.scala#L761), UnlikelyEquality, [UseHypot](src/test/scala/LinterPluginTest.scala#L165), [UseCbrt](src/test/scala/LinterPluginTest.scala#L187), [UseSqrt](src/test/scala/LinterPluginTest.scala#L197), [UseExp](src/test/scala/LinterPluginTest.scala#L207), [UseLog10](src/test/scala/LinterPluginTest.scala#L218), UseAbsNotSqrtSquare, UseIsNanNotSelfComparison, UseIsNanNotNanComparison, UseSignum, BigDecimalNumberFormat, BigDecimalPrecisionLoss, ReflexiveAssignment, [CloseSourceFile](src/test/scala/LinterPluginTest.scala#L549), [JavaConverters](src/test/scala/LinterPluginTest.scala#L560), [ContainsTypeMismatch](src/test/scala/LinterPluginTest.scala#L566), [NumberInstanceOf](src/test/scala/LinterPluginTest.scala#L144), [PatternMatchConstant](src/test/scala/LinterPluginTest.scala#L672), PreferIfToBooleanMatch, [IdenticalCaseBodies](src/test/scala/LinterPluginTest.scala#L626), IdenticalCaseConditions, ReflexiveComparison, YodaConditions, [UseConditionDirectly](src/test/scala/LinterPluginTest.scala#L577), [UseIfExpression](src/test/scala/LinterPluginTest.scala#L102), [UnnecessaryElseBranch](src/test/scala/LinterPluginTest.scala#L112), [DuplicateIfBranches](src/test/scala/LinterPluginTest.scala#L602), IdenticalIfElseCondition, MergeNestedIfs, VariableAssignedUnusedValue, MalformedSwap, IdenticalIfCondition, IdenticalStatements, IndexingWithNegativeNumber, OptionOfOption, UndesirableTypeInference, AssigningOptionToNull, WrapNullWithOption, UseGetOrElseOnOption, UseOptionOrNull, UseOptionGetOrElse, UseExistsOnOption, UseFilterNotFlatMap, AvoidOptionStringSize, AvoidOptionCollectionSize, AvoidOptionMethod, [TransformNotMap](src/test/scala/LinterPluginTest.scala#L454), DuplicateKeyInMap, InefficientUseOfListSize, OnceEvaluatedStatementsInBlockReturningFunction, IntDivisionAssignedToFloat, UseFlattenNotFilterOption, [UseExistsNotFilterEmpty](src/test/scala/LinterPluginTest.scala#L494), [UseCountNotFilterLength](src/test/scala/LinterPluginTest.scala#L508), [UseExistsNotCountCompare](src/test/scala/LinterPluginTest.scala#L522), PassPartialFunctionDirectly, [UnitImplicitOrdering](src/test/scala/LinterPluginTest.scala#L243), [RegexWarning](src/test/scala/LinterPluginTest.scala#L372), [InvariantCondition](src/test/scala/LinterPluginTest.scala#L408), DecomposingEmptyCollection, InvariantExtrema, UnnecessaryMethodCall, ProducesEmptyCollection, OperationAlwaysProducesZero, ModuloByOne, DivideByOne, DivideByZero, ZeroDivideBy, UseUntilNotToMinusOne, InvalidParamToRandomNextInt, UnusedForLoopIteratorValue, StringMultiplicationByNonPositive, LikelyIndexOutOfBounds, UnnecessaryReturn, InvariantReturn, [UnusedParameter](src/test/scala/LinterPluginTest.scala#L692), [InvalidStringFormat](src/test/scala/LinterPluginTest.scala#L302), InvalidStringConversion, UnnecessaryStringNonEmpty, UnnecessaryStringIsEmpty, [PossibleLossOfPrecision](src/test/scala/LinterPluginTest.scala#L228), [UnsafeAbs](src/test/scala/LinterPluginTest.scala#L255), [TypeToType](src/test/scala/LinterPluginTest.scala#L271), [EmptyStringInterpolator](src/test/scala/LinterPluginTest.scala#L319), [UnlikelyToString](src/test/scala/LinterPluginTest.scala#L328), [UnthrownException](src/test/scala/LinterPluginTest.scala#L338), [SuspiciousMatches](src/test/scala/LinterPluginTest.scala#L347), [UseFindNotFilterHead](src/test/scala/LinterPluginTest.scala#L363), [IfDoWhile](src/test/scala/LinterPluginTest.scala#L426)
+UnextendedSealedTrait, [UnlikelyEquality](src/test/scala/LinterPluginTest.scala#L896), [UseLog1p](src/test/scala/LinterPluginTest.scala#L715), [UseLog10](src/test/scala/LinterPluginTest.scala#L219), [UseExpm1](src/test/scala/LinterPluginTest.scala#L761), [UseHypot](src/test/scala/LinterPluginTest.scala#L166), [UseCbrt](src/test/scala/LinterPluginTest.scala#L188), [UseSqrt](src/test/scala/LinterPluginTest.scala#L198), [UseExp](src/test/scala/LinterPluginTest.scala#L208), [UseAbsNotSqrtSquare](src/test/scala/LinterPluginTest.scala#L831), UseIsNanNotSelfComparison, UseIsNanNotNanComparison, UseSignum, BigDecimalNumberFormat, BigDecimalPrecisionLoss, ReflexiveAssignment, [CloseSourceFile](src/test/scala/LinterPluginTest.scala#L549), [JavaConverters](src/test/scala/LinterPluginTest.scala#L560), [ContainsTypeMismatch](src/test/scala/LinterPluginTest.scala#L566), [NumberInstanceOf](src/test/scala/LinterPluginTest.scala#L145), [PatternMatchConstant](src/test/scala/LinterPluginTest.scala#L672), PreferIfToBooleanMatch, [IdenticalCaseBodies](src/test/scala/LinterPluginTest.scala#L626), IdenticalCaseConditions, ReflexiveComparison, YodaConditions, [UseConditionDirectly](src/test/scala/LinterPluginTest.scala#L577), [UseIfExpression](src/test/scala/LinterPluginTest.scala#L103), [UnnecessaryElseBranch](src/test/scala/LinterPluginTest.scala#L113), [DuplicateIfBranches](src/test/scala/LinterPluginTest.scala#L602), IdenticalIfElseCondition, MergeNestedIfs, VariableAssignedUnusedValue, MalformedSwap, IdenticalIfCondition, IdenticalStatements, IndexingWithNegativeNumber, OptionOfOption, UndesirableTypeInference, AssigningOptionToNull, WrapNullWithOption, AvoidOptionStringSize, AvoidOptionCollectionSize, UseGetOrElseOnOption, UseOptionOrNull, UseOptionGetOrElse, UseExistsOnOption, [UseFindNotFilterHead](src/test/scala/LinterPluginTest.scala#L364), [UseFilterNotFlatMap](src/test/scala/LinterPluginTest.scala#L845), AvoidOptionMethod, [TransformNotMap](src/test/scala/LinterPluginTest.scala#L456), DuplicateKeyInMap, [InefficientUseOfListSize](src/test/scala/LinterPluginTest.scala#L806), OnceEvaluatedStatementsInBlockReturningFunction, IntDivisionAssignedToFloat, [UseFlattenNotFilterOption](src/test/scala/LinterPluginTest.scala#L799), [UseExistsNotFilterEmpty](src/test/scala/LinterPluginTest.scala#L496), [UseCountNotFilterLength](src/test/scala/LinterPluginTest.scala#L510), [UseExistsNotCountCompare](src/test/scala/LinterPluginTest.scala#L522), PassPartialFunctionDirectly, [UnitImplicitOrdering](src/test/scala/LinterPluginTest.scala#L244), [RegexWarning](src/test/scala/LinterPluginTest.scala#L373), [InvariantCondition](src/test/scala/LinterPluginTest.scala#L410), DecomposingEmptyCollection, InvariantExtrema, [UnnecessaryMethodCall](src/test/scala/LinterPluginTest.scala#L821), ProducesEmptyCollection, OperationAlwaysProducesZero, ModuloByOne, DivideByOne, DivideByZero, ZeroDivideBy, UseUntilNotToMinusOne, InvalidParamToRandomNextInt, UnusedForLoopIteratorValue, StringMultiplicationByNonPositive, LikelyIndexOutOfBounds, UnnecessaryReturn, InvariantReturn, [UnusedParameter](src/test/scala/LinterPluginTest.scala#L692), [InvalidStringFormat](src/test/scala/LinterPluginTest.scala#L303), InvalidStringConversion, UnnecessaryStringNonEmpty, UnnecessaryStringIsEmpty, [PossibleLossOfPrecision](src/test/scala/LinterPluginTest.scala#L229), [UnsafeAbs](src/test/scala/LinterPluginTest.scala#L256), [TypeToType](src/test/scala/LinterPluginTest.scala#L272), [EmptyStringInterpolator](src/test/scala/LinterPluginTest.scala#L320), [UnlikelyToString](src/test/scala/LinterPluginTest.scala#L329), [UnthrownException](src/test/scala/LinterPluginTest.scala#L339), [SuspiciousMatches](src/test/scala/LinterPluginTest.scala#L348), [IfDoWhile](src/test/scala/LinterPluginTest.scala#L428)
 
 ## Examples of reported warnings
 
@@ -78,7 +78,7 @@ UnextendedSealedTrait, [UseLog1p](src/test/scala/LinterPluginTest.scala#L715), [
 
 #### Unnecessary if
     scala> if(a == b) true else false
-    <console>:9: warning: Remove the if and just use the condition.
+    <console>:9: warning: Remove the if expression and use the condition directly.
             if(a == b) true else false
             ^
 
@@ -97,7 +97,7 @@ UnextendedSealedTrait, [UseLog1p](src/test/scala/LinterPluginTest.scala#L715), [
 
 #### Match better written as if
     scala> bool match { case true => 0 case false => 1 }
-    <console>:9: warning: This is probably better written as an if statement.
+    <console>:9: warning: Pattern matching on Boolean is probably better written as an if statement.
                   a match { case true => 0 case false => 1 }
                     ^
 
@@ -141,7 +141,7 @@ UnextendedSealedTrait, [UseLog1p](src/test/scala/LinterPluginTest.scala#L715), [
 ### Numeric checks
 #### Using `log(1 + a)` instead of `log1p(a)`
     scala> math.log(1d + a)
-    <console>:9: warning: Use math.log1p(x) instead of math.log(1 + x) for added accuracy when x is near 0
+    <console>:9: warning: Use math.log1p(x), instead of math.log(1 + x) for added accuracy when x is near 0.
                   math.log(1 + a)
                           ^
 
@@ -160,20 +160,20 @@ UnextendedSealedTrait, [UseLog1p](src/test/scala/LinterPluginTest.scala#L715), [
 
 #### Using if-else instead of getOrElse
     scala> if(strOption.isDefined) strOption.get else ""
-    <console>:9: warning: Use opt.getOrElse(...) instead of if(opt.isDefined) opt.get else ...
+    <console>:9: warning: Use strOption.getOrElse(...) instead of if(strOption.isDefined) strOption.get else ...
                   if(strOption.isDefined) strOption.get else ""
                                           ^
 
 ### Collection checks
 #### Use exists(...) instead of find(...).isDefined
     scala> List(1,2,3,4).find(x => x % 2 == 0).isDefined
-    <console>:8: warning: Use exists(...) instead of find(...).isDefined
+    <console>:8: warning: Use col.exists(...) instead of col.find(...).isDefined.
                   List(1,2,3,4).find(x => x % 2 == 0).isDefined
                                 ^
 
 #### Use filter(...) instead of flatMap(...)
     scala> List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)
-    <console>:8: warning: Use filter(x => condition) instead of flatMap(x => if(condition) ... else ...)
+    <console>:8: warning: Use col.filter(x => condition) instead of col.flatMap(x => if(condition) ... else ...).
                   List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)
                                        ^
 
@@ -186,12 +186,12 @@ UnextendedSealedTrait, [UseLog1p](src/test/scala/LinterPluginTest.scala#L715), [
 
 #### Unsafe `contains`
     scala> List(1, 2, 3).contains("4")
-    <console>:29: warning: List[Int].contains(String) will probably return false because the collection and target element are of different types.
+    <console>:29: warning: List[Int].contains(String) will probably return false, since the collection and target element are of unrelated types.
                   List(1, 2, 3).contains("4")
                                 ^
 #### Unsafe `==`
     scala> Nil == None
-    <console>:29: warning: Comparing with == on instances of different types (scala.collection.immutable.Nil.type, None.type) will probably return false.
+    <console>:29: warning: Comparing with == on instances of unrelated types (scala.collection.immutable.Nil.type, None.type) will probably return false.
                   Nil == None
                       ^
 

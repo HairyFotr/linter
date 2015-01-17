@@ -22,7 +22,7 @@ class WarningTest extends JUnitMustMatchers {
       case DivideByZero => 1
       case ZeroDivideBy => 1
       case DuplicateIfBranches => 1
-      case TransformNotMap => 1
+      case TransformNotMap(_) => 1
       case DuplicateKeyInMap => 1
       case IdenticalCaseBodies(_) => 1
       case IdenticalCaseConditions => 1
@@ -30,7 +30,7 @@ class WarningTest extends JUnitMustMatchers {
       case IdenticalIfElseCondition => 1
       case IdenticalStatements => 1
       case IndexingWithNegativeNumber => 1
-      case InefficientUseOfListSize(_) => 1
+      case InefficientUseOfListSize(_, _, _) => 1
       case IntDivisionAssignedToFloat => 1
       case InvalidParamToRandomNextInt => 1
       case InvalidStringConversion(_) => 1
@@ -57,7 +57,7 @@ class WarningTest extends JUnitMustMatchers {
       case StringMultiplicationByNonPositive => 1
       case UndesirableTypeInference(_) => 1
       case UnextendedSealedTrait => 1
-      case UnlikelyEquality(_, _) => 1
+      case UnlikelyEquality(_, _, _) => 1
       case UnnecessaryMethodCall(_) => 1
       case UnnecessaryReturn => 1
       case UnnecessaryStringIsEmpty => 1
@@ -73,19 +73,19 @@ class WarningTest extends JUnitMustMatchers {
       case UseConditionDirectly(_) => 1
       case UseIfExpression(_) => 1
       case UnnecessaryElseBranch => 1
-      case UseExistsOnOption(_, _) => 1
+      case UseExistsOnOption(_, _, _) => 1
       case UseExpm1 => 1
-      case UseFilterNotFlatMap => 1
-      case UseFlattenNotFilterOption => 1
-      case UseExistsNotFilterEmpty(_) => 1
-      case UseCountNotFilterLength(_) => 1
-      case UseExistsNotCountCompare => 1
-      case UseGetOrElseOnOption => 1
+      case UseFilterNotFlatMap(_) => 1
+      case UseFlattenNotFilterOption(_) => 1
+      case UseExistsNotFilterEmpty(_, _) => 1
+      case UseCountNotFilterLength(_, _) => 1
+      case UseExistsNotCountCompare(_) => 1
+      case UseGetOrElseOnOption(_) => 1
       case UseIsNanNotNanComparison => 1
       case UseIsNanNotSelfComparison => 1
       case UseLog1p => 1
-      case UseOptionGetOrElse(_) => 1
-      case UseOptionOrNull(_) => 1
+      case UseOptionGetOrElse(_, _) => 1
+      case UseOptionOrNull(_, _) => 1
       case UseSignum => 1
       case UseUntilNotToMinusOne => 1
       case VariableAssignedUnusedValue(_) => 1
@@ -97,7 +97,7 @@ class WarningTest extends JUnitMustMatchers {
       case UnlikelyToString(_) => 1
       case UnthrownException => 1
       case SuspiciousMatches => 1
-      case UseFindNotFilterHead => 1
+      case UseFindNotFilterHead(_) => 1
       case IfDoWhile => 1
       // ------------------------------------------------------------------------------------------------------
       // If you get a warning here, it's likely because you added a new warning type but forgot to add it here. 

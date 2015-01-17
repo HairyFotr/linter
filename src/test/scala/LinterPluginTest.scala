@@ -42,6 +42,7 @@ final object Compiler {
   //settings.deprecation.value = true // enable detailed deprecation warnings
   //settings.unchecked.value = true // enable detailed unchecked warnings    
   settings.Xwarnfatal.value = true // warnings cause compile failures too
+  //settings.stopAfter.value = List("linter-refchecked")
   //if(Properties.versionString contains "2.10") settings.stopAfter.value = List("linter-refchecked") // fails in 2.11
 
   val stringWriter = new StringWriter()
@@ -336,7 +337,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   
   @Test
   def UnthrownException(): Unit = {
-    implicit val msg = "This exception is likely meant to be thrown here."
+    implicit val msg = "This exception was likely meant to be thrown here."
     
     should(""" def a: Int = { println(""); new Exception(); 5 } """)
     shouldnt(""" def a: Int = { println(""); throw new Exception(); 5 } """)
@@ -361,7 +362,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     
   @Test
   def UseFindNotFilterHead(): Unit = {
-    implicit val msg = ".headOption can be replaced by .find"
+    implicit val msg = ".headOption can be replaced by "
     
     should(""" val a = List(1,2,3); a.filter( _ >= 2).headOption """)
     shouldnt(""" val a = List(1,2,3); a.filter( _ >= 2) """)
@@ -402,6 +403,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       val a = "*"
       java.util.regex.Pattern.compile("(pattern)"+a)
     """)
+    
   }
   
   @Test
@@ -492,7 +494,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   
   @Test
   def UseExistsNotFilterEmpty(): Unit = {
-    implicit val msg = "col.exists"
+    implicit val msg = ".exists(...) instead of "
     
     should(""" 
       var a = Seq(1,2,3);
@@ -506,21 +508,19 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
   @Test
   def UseCountNotFilterLength(): Unit = {
-    implicit val msg = "col.count"
-    
     should(""" 
       var a = Seq(1,2,3);
       val b = a.filter{ _ > 1 }.length
-    """)
+    """)("Use a.count(...) instead of a.filter(...).length")
     should(""" 
       var a = Seq(1,2,3);
       val b = a.filter{ _ > 1 }.size
-    """)
+    """)("Use a.count(...) instead of a.filter(...).size")
   }
   
   @Test
   def UseExistsNotCountCompare(): Unit = {
-    implicit val msg = "col.exists"
+    implicit val msg = ".exists(...) instead of "
     
     should(""" 
       var a = Seq(1,2,3);
@@ -575,7 +575,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
   @Test
   def UseConditionDirectly(): Unit = {
-    implicit val msg = "Remove the if and just use the"
+    implicit val msg = "Remove the if expression and use the "
     
     should("""
       val a,b = 5
@@ -713,7 +713,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
   @Test
   def UseLog1p(): Unit = {
-    implicit val msg = "Use math.log1p(x) instead of"// math.log(1 + x) for added accuracy"
+    implicit val msg = "Use math.log1p(x), instead of "// math.log(1 + x) for added accuracy"
     should("""
       val a = 4d
       math.log(1 + a)
@@ -795,6 +795,91 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     """)
   }
   
+  @Test
+  def UseFlattenNotFilterOption(): Unit = {
+    implicit val msg = ".flatten instead of "//.filter(_.isDefined).map(_.get)"
+    
+    should("""val a = List[Option[String]](Some("a"), None, Some("b")); a.filter(_.isDefined).map(_.get)""")
+  }
+  
+  @Test
+  def InefficientUseOfListSize(): Unit = {
+    implicit val msg = "Empty instead of comparing to"//slow for lists, etc
+    
+    should(""" val a = List(1,2,3); if(a.size > 0) "" """)
+    should(""" val a = List(1,2,3); if(a.size == 0) "" """)
+    should(""" val a = List(1,2,3); if(a.size != 0) "" """)
+
+    shouldnt(""" val a = List(1,2,3); if(a.size > 1) "" """)
+    shouldnt(""" val a = List(1,2,3); if(a.size == 1) "" """)
+    shouldnt(""" val a = List(1,2,3); if(a.size != 1) "" """)
+    shouldnt(""" val a = List(1,2,3); if(a.isEmpty) "" """)
+    shouldnt(""" val a = List(1,2,3); if(a.nonEmpty) "" """)
+  }
+  
+  @Test
+  def UnnecessaryMethodCall(): Unit = { // TODO there's more
+    implicit val msg = "unnecessary."
+  
+    should(""" "ffasd".replace(" ", " ") """)
+    should(""" "ffasd".replace("ff", "ff") """)
+    shouldnt(""" "ffasd".replace(" ", "") """)
+    shouldnt(""" "ffasd".replace("  ", " ") """)
+  }
+
+  @Test
+  def UseAbsNotSqrtSquare(): Unit = {
+    implicit val msg = "Use math.abs(x) instead of math.sqrt(x^2)"
+    
+    should("""math.sqrt(math.pow(15, 2))""")
+    should("""math.sqrt(math.pow(15d, 2d))""")
+    should("""val a = 14d; math.sqrt(math.pow(a, 2))""")
+    should("""val a = 14d; math.sqrt(a*a)""")
+
+    shouldnt("""math.sqrt(math.pow(15, 3))""")
+    shouldnt("""val a = 14d; math.sqrt(math.pow(a, 3))""")
+    shouldnt("""val a = 14d; math.sqrt(a*(a-1))""")
+  }
+
+  @Test
+  def UseFilterNotFlatMap(): Unit = {
+    implicit val msg = "Use col.filter(x => condition) instead of col.flatMap(x => if(condition) ... else ...)"
+    
+    should(""" List(1,2,3).flatMap(x => if(x == 2) Some(x) else None) """)
+    should(""" List(1,2,3).flatMap(x => if(x == 2) Nil else List(x)) """)
+    should(""" val col = List(1,2,3); col.flatMap(x => if(x == 2) Nil else List(x)) """)
+
+    shouldnt(""" List(1,2,3).flatMap(x => if(x == 2) Some(x+1) else None) """)
+    shouldnt(""" List(1,2,3).flatMap(x => if(x == 2) Nil else List(x+1)) """)
+  }
+
+  @Test
+  def UseExistsNotFindIsDefined(): Unit = {
+    implicit var msg = ".exists(...) instead of "
+    //find.isDefined    
+    should("""List(1,2,3).find(_ == 2).isDefined""")
+    should("""Set(1,2,3).find(_ == 2).isDefined""")
+    should("""collection.mutable.HashSet(1,2,3).find(_ == 2).isDefined""")
+    should("""Array(1,2,3).find(_ == 2).isDefined""")
+    should("""def a(x:Int) = x == 2; List(1,2,3).find(a).isDefined""")
+
+    should("""List(1,2,3).find(_ == 2).isEmpty""")
+    should("""Set(1,2,3).find(_ == 2).isEmpty""")
+
+    shouldnt("""List(1,2,3).headOption.isDefined""")
+    shouldnt("""List(1,2,3).exists(_ == 2)""")
+
+    shouldnt("""List(1,2,3).headOption.isEmpty""")
+    shouldnt("""List(1,2,3).exists(_ == 2)""")
+
+    // find.isEmpty    
+    should("""List(1,2,3).filter(_ == 2).isEmpty""")
+    should("""Set(1,2,3).filter(_ == 2).isEmpty""")
+    should("""collection.mutable.HashSet(1,2,3).filter(_ == 2).isEmpty""")
+    //should("""Array(1,2,3).filter(_ == 2).isEmpty""") gets wrapped probably... don't care
+    should("""def a(x:Int) = x == 2; List(1,2,3).filter(a).isEmpty""")
+  }
+
   // ^ New tests named after their Warning.scala name ^
   // ----------------- OLD TESTS ----------------------
 
@@ -808,8 +893,8 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }*/
   
   @Test
-  def equals__types(): Unit = {
-    implicit val msg = "Comparing with == on instances of different types"//(%s, %s) will probably return false.
+  def UnlikelyEquality(): Unit = {
+    implicit val msg = "Comparing with == on instances of unrelated types"//(%s, %s) will probably return false.
 
     should("Nil == None")
     should("""
@@ -831,6 +916,33 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       x == "bar" """)
   }
   
+  @Test //UseIsNanNotSelfComparison, UseIsNanNotNanComparison
+  def numeric_isNan(): Unit = {
+    implicit val msg = "Use x.isNan instead"
+
+    should("""
+      var a = Double.NaN
+      if(a != a) "foo"
+    """)
+    should("""
+      var a = 4f
+      if(a != a) "foo"
+    """)
+    should("""
+      var a = Double.NaN
+      if(a == Double.NaN) "foo"
+    """)
+    should("""
+      var a = Double.NaN
+      if(a == a) "foo"
+    """)
+
+    shouldnt("""
+      var a = 4
+      if(a != a) "foo"
+    """)
+  }
+
   @Test
   @Ignore //disabled check
   def import__wildcard(): Unit = {
@@ -1272,33 +1384,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     """)
    }
    
-  @Test //UseIsNanNotSelfComparison, UseIsNanNotNanComparison
-  def numeric_isNan(): Unit = {
-    implicit val msg = "Use .isNan instead"
-
-    should("""
-      var a = Double.NaN
-      if(a != a) "foo"
-    """)
-    should("""
-      var a = 4f
-      if(a != a) "foo"
-    """)
-    should("""
-      var a = Double.NaN
-      if(a == Double.NaN) "foo"
-    """)
-    should("""
-      var a = Double.NaN
-      if(a == a) "foo"
-    """)
-
-    shouldnt("""
-      var a = 4
-      if(a != a) "foo"
-    """)
-  }
-
   @Test
   def probableBugs__selfAssign(): Unit = {
     implicit val msg = "Assigning a variable to itself?"
@@ -1889,45 +1974,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def style__find_isDefined_to_exists(): Unit = {
-    implicit var msg = "Use exists(...) instead of find(...)."
-    
-    should("""List(1,2,3).find(_ == 2).isDefined""")
-    should("""Set(1,2,3).find(_ == 2).isDefined""")
-    should("""collection.mutable.HashSet(1,2,3).find(_ == 2).isDefined""")
-    should("""Array(1,2,3).find(_ == 2).isDefined""")
-    should("""def a(x:Int) = x == 2; List(1,2,3).find(a).isDefined""")
-
-    should("""List(1,2,3).find(_ == 2).isEmpty""")
-    should("""Set(1,2,3).find(_ == 2).isEmpty""")
-
-    shouldnt("""List(1,2,3).headOption.isDefined""")
-    shouldnt("""List(1,2,3).exists(_ == 2)""")
-
-    shouldnt("""List(1,2,3).headOption.isEmpty""")
-    shouldnt("""List(1,2,3).exists(_ == 2)""")
-
-    msg = "Use exists(...) instead of filter(...)."
-    
-    should("""List(1,2,3).filter(_ == 2).isEmpty""")
-    should("""Set(1,2,3).filter(_ == 2).isEmpty""")
-    should("""collection.mutable.HashSet(1,2,3).filter(_ == 2).isEmpty""")
-    //should("""Array(1,2,3).filter(_ == 2).isEmpty""") gets wrapped probably... don't care
-    should("""def a(x:Int) = x == 2; List(1,2,3).filter(a).isEmpty""")
-  }
-
-  @Test
-  def style__flatMap_to_filter(): Unit = {
-    implicit val msg = /*filter*/"instead of flatMap"
-    
-    should(""" List(1,2,3).flatMap(x => if(x == 2) Some(x) else None) """)
-    should(""" List(1,2,3).flatMap(x => if(x == 2) Nil else List(x)) """)
-
-    shouldnt(""" List(1,2,3).flatMap(x => if(x == 2) Some(x+1) else None) """)
-    shouldnt(""" List(1,2,3).flatMap(x => if(x == 2) Nil else List(x+1)) """)
-  }
-  
-  @Test
   def style__if_to_optstuff(): Unit = {
     implicit val msg = " instead of if" //use getOrElse, orNull, ... instead of if
     
@@ -1955,20 +2001,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     shouldnt("""val a = Option("str"); if(a == None) a.get else null""")    
   }
 
-
-  @Test
-  def numeric__badAbs(): Unit = {
-    implicit val msg = "Use abs instead of"
-    
-    should("""math.sqrt(math.pow(15, 2))""")
-    should("""math.sqrt(math.pow(15d, 2d))""")
-    should("""val a = 14d; math.sqrt(math.pow(a, 2))""")
-    should("""val a = 14d; math.sqrt(a*a)""")
-
-    shouldnt("""math.sqrt(math.pow(15, 3))""")
-    shouldnt("""val a = 14d; math.sqrt(math.pow(a, 3))""")
-    shouldnt("""val a = 14d; math.sqrt(a*(a-1))""")
-  }
 
   @Test
   def style__useUntil(): Unit = {
@@ -2038,10 +2070,12 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
   @Test 
   def random__checks(): Unit = {
-    should("""util.Random.nextInt(-1)""")("""The parameter of this nextInt might be lower than 1 here.""")
-    shouldnt("""util.Random.nextInt(1)""")("""The parameter of this nextInt might be lower than 1 here.""")
-    should("""var a = new util.Random; a.nextInt(-1)""")("""The parameter of this nextInt might be lower than 1 here.""")
-    shouldnt("""var a = new util.Random; a.nextInt(1)""")("""The parameter of this nextInt might be lower than 1 here.""")
+    implicit val msg = """The parameter of this .nextInt might be lower than 1 here."""
+    
+    should("""util.Random.nextInt(-1)""")
+    shouldnt("""util.Random.nextInt(1)""")
+    should("""var a = new util.Random; a.nextInt(-1)""")
+    shouldnt("""var a = new util.Random; a.nextInt(1)""")
   }
     
   @Test
@@ -2055,21 +2089,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     shouldnt(""" Map(1 -> 2, 2 -> 3, 3 -> 4) """)
     shouldnt(""" val a = 5; Map(a -> 5, 2 -> 4, (a+1) -> 2) """)
     shouldnt(""" val a = 5; collection.mutable.HashMap(a -> 5, 2 -> 4, (a-1) -> 2) """)
-  }
-
-  @Test
-  def list__isEmpty(): Unit = {
-    implicit val msg = "instead of comparing to List.size"//slow for lists, etc
-    
-    should(""" val a = List(1,2,3); if(a.size > 0) "" """)
-    should(""" val a = List(1,2,3); if(a.size == 0) "" """)
-    should(""" val a = List(1,2,3); if(a.size != 0) "" """)
-
-    shouldnt(""" val a = List(1,2,3); if(a.size > 1) "" """)
-    shouldnt(""" val a = List(1,2,3); if(a.size == 1) "" """)
-    shouldnt(""" val a = List(1,2,3); if(a.size != 1) "" """)
-    shouldnt(""" val a = List(1,2,3); if(a.isEmpty) "" """)
-    shouldnt(""" val a = List(1,2,3); if(a.nonEmpty) "" """)
   }
 
   @Test
@@ -2107,10 +2126,10 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   
     should(defs+"""if(a == 10 || b == 10) 0 else if(a == 20 && b == 10) 1 else 2""")("""This condition has appeared earlier in the if-else chain and will never hold here.""")
     should(defs+"""if(b > 4) (2,a) else (2,a)""")("""If statement branches have the same structure.""")
-    should(defs+"""if(a == b) true else false""")("""Remove the if and just use the condition.""")
+    should(defs+"""if(a == b) true else false""")("""Remove the if expression and use the condition directly.""")
     should(defs+"""(x,y) match { case (a,5) if a > 5 => 0 case (c,5) if c > 5 => 1 }""")("""Identical case condition detected above. This case will never match.""")
     should(defs+"""a match { case 3 => "hello" case 4 => "hello" case 5 => "hello" case _ => "how low" }""")("""Bodies of 3 neighbouring cases are identical and could be merged.""")
-    should(defs+"""bool match { case true => 0 case false => 1 }""")("""This is probably better written as an if statement.""")
+    should(defs+"""bool match { case true => 0 case false => 1 }""")("""Pattern matching on Boolean is probably better written as an if statement.""")
     should(defs+"""for(i <- 10 to 20) { if(i > 20) "" }""")("""This condition will never hold.""")
     should(defs+"""for(i <- 1 to 10) { 1/(i-1)  }""")("""Possible division by zero.""")
     should(defs+"""{ val a = List(1,2,3); for(i <- 1 to 10) { println(a(i)) } }""")("""You will likely use a too large index.""")
@@ -2119,17 +2138,17 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s startsWith "hell") ""; """)("""This startsWith always returns the same value: true""")
     should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s endsWith "!") ""; """)("""This endsWith always returns the same value: true""")
     should(defs+"""str.replaceAll("?", ".")""")("""Regex pattern syntax error: Dangling meta character '?'""")
-    should(defs+"""math.log(1d + a)""")("""Use math.log1p(x) instead of math.log(1 + x) for added accuracy when x is near 0""")
+    should(defs+"""math.log(1d + a)""")("""Use math.log1p(x), instead of math.log(1 + x) for added accuracy when x is near 0.""")
     should(defs+"""BigDecimal(0.555555555555555555555555555)""")("""Possible loss of precision.""")
     should(defs+"""{val a = Some(List(1,2,3)); if(a.size > 3) ""}""")("""Did you mean to take the size of the collection inside the Option?""")
-    should(defs+"""if(strOption.isDefined) strOption.get else """"")("""Use opt.getOrElse(...) instead of if(opt.isDefined) opt.get else ...""")
-    should(defs+"""List(1,2,3,4).find(x => x % 2 == 0).isDefined""")("""Use exists(...) instead of find(...).isDefined""")
-    should(defs+"""List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)""")("""Use filter(x => condition) instead of flatMap(x => if(condition) ... else ...)""")
+    should(defs+"""if(strOption.isDefined) strOption.get else """"")("""Use strOption.getOrElse(...) instead of if(strOption.isDefined) strOption.get else ...""")
+    should(defs+"""List(1,2,3,4).find(x => x % 2 == 0).isDefined""")("""Use col.exists(...) instead of col.find(...).isDefined""")
+    should(defs+"""List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)""")("""Use col.filter(x => condition) instead of col.flatMap(x => if(condition) ... else ...).""")
     should(defs+"""def func(b: Int, c: String, d: String) = { println(b); b+c }""")("""Parameter d is not used in method func""")
     //should(defs+"""List(1, 2, 3).contains("4")""")("""List[Int].contains(String) will probably return false because the collection and target element are of different types.""")
     //should(defs+"""Nil == None""")("""Comparing with == on instances of different types (scala.collection.immutable.Nil.type, None.type) will probably return false.""")
-    should(defs+"""List(1, 2, 3).contains("4")""")("""will probably return false because the collection and target element are of different types.""")
-    should(defs+"""Nil == None""")("""Comparing with == on instances of different types""")
+    should(defs+"""List(1, 2, 3).contains("4")""")("""will probably return false, since the collection and target element are of unrelated types.""")
+    should(defs+"""Nil == None""")("""Comparing with == on instances of unrelated types""")
   }
   
   @Test
@@ -2142,11 +2161,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
     //should("""object o1 { val a = 5 }; object o2 { def d = { if(a == 6) "" }; val a = 6 }""")("This condition will never hold.")
     should("""for(i <- 1 to 10) { for(j <- 1 to i-1) { }}""")("Use (low until high) instead of (low to high-1)")
-  }
-
-  @Test
-  def style__flatten(): Unit = {
-    should("""val a = List[Option[String]](Some("a"), None, Some("b")); a.filter(_.isDefined).map(_.get)""")("Use col.flatten instead of col.filter(_.isDefined).map(_.get)")
   }
 
   @Test
