@@ -97,6 +97,7 @@ object Warning {
     new UseExistsNotCountCompare(""),
     new UseGetOrElseOnOption(""),
     new UseFindNotFilterHead(""),
+    new UseQuantifierFuncNotFold("", ""),
     UseIsNanNotNanComparison,
     UseIsNanNotSelfComparison,
     new UseOptionGetOrElse("", ""),
@@ -215,6 +216,8 @@ case class UseExistsOnOption(varName: String, find_filter: String, isEmpty_isDef
   Warning(s"Use ${varName}.exists(...) instead of ${varName}.${find_filter}(...).${isEmpty_isDefined}.")
 case class UseFindNotFilterHead(varName: String) extends
   Warning(s"Unless there are side-effects, ${varName}.filter(...).headOption can be replaced by ${varName}.find(...).")
+case class UseQuantifierFuncNotFold(varName: String, method: String) extends
+  Warning(s"Unless there are side-effects, this ${varName}.fold can be replaced by ${varName}.${method}.")
 case class UseFilterNotFlatMap(varName: String) extends
   Warning(s"Use ${varName}.filter(x => condition) instead of ${varName}.flatMap(x => if(condition) ... else ...).") // Clean up warning
 case class AvoidOptionMethod(method: String, explanation: String = "") extends

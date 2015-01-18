@@ -99,6 +99,7 @@ class WarningTest extends JUnitMustMatchers {
       case SuspiciousMatches => 1
       case UseFindNotFilterHead(_) => 1
       case IfDoWhile => 1
+      case UseQuantifierFuncNotFold(_, _) => 1
       // ------------------------------------------------------------------------------------------------------
       // If you get a warning here, it's likely because you added a new warning type but forgot to add it here. 
       // The real point is that you need to add the new Warning to Warning.All.
@@ -110,7 +111,7 @@ class WarningTest extends JUnitMustMatchers {
   @Test
   def warningNamesAreAlphaNumeric() {
     Warning.AllNames.foreach { name =>
-      name must beMatching("^[a-zA-Z0-9]+$")
+      name must beMatching("^[A-Z][a-zA-Z0-9]+$")
     }
   }
 

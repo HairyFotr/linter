@@ -545,6 +545,15 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     """)
   }
   
+  @Test
+  def UseQuantifierFuncNotFold(): Unit = {
+    implicit val msg = ".fold can be replaced by "
+    
+    should(""" val a = List(true, true, false); a.foldLeft(true)((acc, n) => acc && n) """)
+    should(""" val a = Array.fill(10)(scala.util.Random.nextInt(20)); a.foldLeft(false)((acc, n) => acc || n > 5) """)
+ 
+  }
+  
   @Test 
   def CloseSourceFile(): Unit = {
     implicit val msg = "You should close the file stream after use."

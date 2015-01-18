@@ -1302,6 +1302,13 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             warn(pos, new UseExistsOnOption(identOrCol(col), find_filter.toString, isEmpty_isDefined.toString))
 
+          case Apply(Apply(TypeApply(Select(col, foldLeft), List(_)), List(Literal(Constant(start)))), List(Function(List(ValDef(_, acc1, _, _), ValDef(_, next, _, _)), Apply(Select(acc2, barbar_andand), List(right))))) 
+            if ((foldLeft is "foldLeft") || (foldLeft is "foldRight") || (foldLeft is "fold"))
+            && (acc1.toString == acc2.toString) && (acc2.tpe.widen <:< BooleanClass.tpe)
+            && (((true == start) && (barbar_andand is "$amp$amp")) || ((false == start) && (barbar_andand is "$bar$bar"))) =>
+            
+            warn(tree, new UseQuantifierFuncNotFold(identOrCol(col), if ((barbar_andand is "$bar$bar")) "exists" else "forall"))
+
           /// flatMap(if(...) x else Nil/None) is better written as filter(...)
           case Apply(TypeApply(Select(col, flatMap), _), List(Function(List(ValDef(_, param, _, _)), If(_, e1, e2))))
             if flatMap is "flatMap" =>
