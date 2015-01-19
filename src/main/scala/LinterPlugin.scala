@@ -1302,12 +1302,40 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             warn(pos, new UseExistsOnOption(identOrCol(col), find_filter.toString, isEmpty_isDefined.toString))
 
-          case Apply(Apply(TypeApply(Select(col, foldLeft), List(_)), List(Literal(Constant(start)))), List(Function(List(ValDef(_, acc1, _, _), ValDef(_, next, _, _)), Apply(Select(acc2, barbar_andand), List(right))))) 
-            if ((foldLeft is "foldLeft") || (foldLeft is "foldRight") || (foldLeft is "fold"))
-            && (acc1.toString == acc2.toString) && (acc2.tpe.widen <:< BooleanClass.tpe)
-            && (((true == start) && (barbar_andand is "$amp$amp")) || ((false == start) && (barbar_andand is "$bar$bar"))) =>
+          /// fold(true)(acc && xxx) => forall
+          /// fold(false)(acc || xxx) => exists
+          //TODO: fix foldRight, reduceRight
+          case Apply(Apply(TypeApply(Select(col, fold), List(_)), List(lit @ Literal(Constant(start)))), List(Function(List(ValDef(_, arg1, _, _), ValDef(_, arg2, _, _)), Apply(Select(arg1u, barbar_andand), List(arg2u))))) 
+            if (lit.tpe.widen <:< BooleanClass.tpe)
+            && (true == start || false == start)
+            && (((fold is "foldLeft") || (fold is "fold")) && ((arg1.toString == arg1u.toString) || (arg1.toString == arg2u.toString)))
+              //|| ((fold is "foldRight") && ((arg2.toString == arg1u.toString) || (arg2.toString == arg2u.toString))))
+            && ((barbar_andand is "$amp$amp") || (barbar_andand is "$bar$bar")) =>
             
-            warn(tree, new UseQuantifierFuncNotFold(identOrCol(col), if ((barbar_andand is "$bar$bar")) "exists" else "forall"))
+            if (start == true && (barbar_andand is "$amp$amp")) {
+              warn(tree, new UseQuantifierFuncNotFold(identOrCol(col), "forall", fold.toString))
+            } else if (start == false && (barbar_andand is "$bar$bar")) {
+              warn(tree, new UseQuantifierFuncNotFold(identOrCol(col), "exists", fold.toString))
+            } else {
+              warn(tree, new InvariantReturn(fold.toString, start.toString))
+            }
+
+          /// reduce(acc && xxx) => forall
+          /// reduce(acc || xxx) => exists
+          case Apply(TypeApply(Select(col, reduce), List(_)), List(Function(List(ValDef(_, arg1, _, _), ValDef(_, arg2, _, _)), Apply(Select(arg1u, barbar_andand), List(arg2u)))))
+            if (((reduce is "reduceLeft") || (reduce is "reduce"))
+              && ((arg1.toString == arg1u.toString) && (arg1u.tpe.widen <:< BooleanClass.tpe)
+                ||(arg1.toString == arg2u.toString) && (arg2u.tpe.widen <:< BooleanClass.tpe)))
+            /*|| ((reduce is "reduceRight")
+              && ((arg2.toString == arg1u.toString) && (arg1u.tpe.widen <:< BooleanClass.tpe)
+                ||(arg2.toString == arg2u.toString) && (arg2u.tpe.widen <:< BooleanClass.tpe))))*/
+            && ((barbar_andand is "$amp$amp") || (barbar_andand is "$bar$bar")) =>
+            
+            if (barbar_andand is "$amp$amp") {
+              warn(tree, new UseQuantifierFuncNotFold(identOrCol(col), "forall", reduce.toString))
+            } else if (barbar_andand is "$bar$bar") {
+              warn(tree, new UseQuantifierFuncNotFold(identOrCol(col), "exists", reduce.toString))
+            }
 
           /// flatMap(if(...) x else Nil/None) is better written as filter(...)
           case Apply(TypeApply(Select(col, flatMap), _), List(Function(List(ValDef(_, param, _, _)), If(_, e1, e2))))

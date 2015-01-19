@@ -547,10 +547,15 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   
   @Test
   def UseQuantifierFuncNotFold(): Unit = {
-    implicit val msg = ".fold can be replaced by "
+    implicit val msg = " can be replaced by "
     
-    should(""" val a = List(true, true, false); a.foldLeft(true)((acc, n) => acc && n) """)
+    should(""" val a = List(true, true, false); a.fold(true)((acc, n) => acc && !n) """)
+    should(""" val a = List(true, true, false); a.fold(true)((acc, n) => !n && acc) """)
     should(""" val a = Array.fill(10)(scala.util.Random.nextInt(20)); a.foldLeft(false)((acc, n) => acc || n > 5) """)
+    should(""" val a = Array.fill(10)(scala.util.Random.nextInt(20)); a.foldLeft(false)((acc, n) => n > 5 || acc) """)
+    should(""" val a = List(true, true, false); a.reduce((acc, n) => acc && !n) """)
+    should(""" val a = List(true, true, false); a.reduce((acc, n) => !n || acc) """)
+    should(""" val a = List(true, true, false); a.reduceLeft((acc, n) => !n || acc) """)
  
   }
   
