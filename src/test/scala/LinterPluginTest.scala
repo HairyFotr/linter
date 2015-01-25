@@ -559,6 +559,51 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
  
   }
   
+  @Test
+  def UseFuncNotFold(): Unit = {
+    {
+      should(""" val a = List(1, 2, 3); a.fold(0)((a, b) => a + b) """)(".sum instead of ")
+      should(""" val a = List(1.0, 2.0, 3.0); a.foldLeft(2.0)((a, b) => b + a) """)(".sum + 2.0 instead of ")
+      shouldnt(""" val a = List(1.0, 2.0, 3.0); a.foldLeft(2.0)((a, b) => b + (a * 4)) """)(".sum + 2.0 instead of ")
+    }
+    {
+      should(""" val a = List(1, 2, 3); a.fold(1)((a, b) => a * b) """)(".product instead of ")
+      should(""" val a = List(1.0, 2.0, 3.0); a.foldLeft(2d)((a, b) => b * a) """)(".product * 2.0 instead of ")
+    }
+  }
+
+  @Test
+  def UseFuncNotReduce(): Unit = {
+    {
+      implicit val msg = ".sum instead of "
+      
+      should(""" val a = List(1, 2, 3); a.reduce((a, b) => a + b) """)
+      should(""" val a = List(1.0, 2.0, 3.0); a.reduceLeft((a, b) => b + a) """)
+      shouldnt(""" val a = List(1.0, 2.0, 3.0); a.reduceLeft((a, b) => b + (a * 2)) """)
+    }
+    {
+      implicit val msg = ".product instead of "
+      
+      should(""" val a = List(1, 2, 3); a.reduce((a, b) => a * b) """)
+      should(""" val a = List(1.0, 2.0, 3.0); a.reduceLeft((a, b) => b * a) """)
+      shouldnt(""" val a = List(1.0, 2.0, 3.0); a.reduceLeft((a, b) => b * (a * 2)) """)
+    }
+    {
+      implicit val msg = ".min instead of "
+      
+      should(""" val a = List(1, 2, 3); a.reduce((a, b) => a min b) """)
+      should(""" val a = List(1.0, 2.0, 3.0); a.reduceLeft(_ min _) """)
+      shouldnt(""" val a = List(1, 2, 3); a.reduce((a, b) => a min (b + 2)) """)
+    }
+    {
+      implicit val msg = ".max instead of "
+      
+      should(""" val a = List(1, 2, 3); a.reduce((a, b) => a max b) """)
+      should(""" val a = List(1.0, 2.0, 3.0); a.reduceLeft(_ max _) """)
+      shouldnt(""" val a = List(1, 2, 3); a.reduce((a, b) => a max (b / 2)) """)
+    }
+  }
+  
   @Test 
   def CloseSourceFile(): Unit = {
     implicit val msg = "You should close the file stream after use."

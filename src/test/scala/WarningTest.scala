@@ -100,6 +100,8 @@ class WarningTest extends JUnitMustMatchers {
       case UseFindNotFilterHead(_) => 1
       case IfDoWhile => 1
       case UseQuantifierFuncNotFold(_, _, _) => 1
+      case UseFuncNotReduce(_, _, _) => 1
+      case UseFuncNotFold(_, _, _) => 1
       // ------------------------------------------------------------------------------------------------------
       // If you get a warning here, it's likely because you added a new warning type but forgot to add it here. 
       // The real point is that you need to add the new Warning to Warning.All.

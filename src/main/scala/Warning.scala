@@ -98,6 +98,8 @@ object Warning {
     new UseGetOrElseOnOption(""),
     new UseFindNotFilterHead(""),
     new UseQuantifierFuncNotFold("", "", ""),
+    new UseFuncNotReduce("", "", ""),
+    new UseFuncNotFold("", "", ""),
     UseIsNanNotNanComparison,
     UseIsNanNotSelfComparison,
     new UseOptionGetOrElse("", ""),
@@ -218,6 +220,10 @@ case class UseFindNotFilterHead(varName: String) extends
   Warning(s"Unless there are side-effects, ${varName}.filter(...).headOption can be replaced by ${varName}.find(...).")
 case class UseQuantifierFuncNotFold(varName: String, method: String, func: String) extends
   Warning(s"Unless there are side-effects, this ${varName}.${func} can be replaced by ${varName}.${method}.")
+case class UseFuncNotReduce(varName: String, f: String, func: String) extends
+  Warning(s"Use ${varName}.${f} instead of ${varName}.${func}.")
+case class UseFuncNotFold(varName: String, f: String, func: String) extends
+  Warning(s"Use ${varName}.${f} instead of ${varName}.${func}.")
 case class UseFilterNotFlatMap(varName: String) extends
   Warning(s"Use ${varName}.filter(x => condition) instead of ${varName}.flatMap(x => if(condition) ... else ...).") // Clean up warning
 case class AvoidOptionMethod(method: String, explanation: String = "") extends

@@ -189,7 +189,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               && (strLiteral matches ".*[0-9].*") && (actualLiteral matches ".*[0-9].*")
               && cleanString(strLiteral) != cleanString(actualLiteral)
               && ((if(strLiteral.toDouble < 0) "-" else "") + actualLiteral) != strLiteral)
-                warn(treeLiteral, new PossibleLossOfPrecision("Literal cannot be represented exactly by "+tpe+". ("+(if(strLiteral.toDouble < 0) "-" else "") + actualLiteral+" != "+strLiteral+")"))
+                warn(treeLiteral, PossibleLossOfPrecision("Literal cannot be represented exactly by "+tpe+". ("+(if(strLiteral.toDouble < 0) "-" else "") + actualLiteral+" != "+strLiteral+")"))
                 
             } catch {
               case e: NumberFormatException => //Ignore
@@ -392,6 +392,11 @@ class LinterPlugin(val global: Global) extends Plugin {
         case _ => None
       }
       
+      def unwrapNumber(t: Tree): Tree = t match {
+        case Apply(xWrapper, List(num)) if xWrapper.toString endsWith "Wrapper" => num
+        case _ => t
+      }
+      
       def isEmptyCompare(x: Any, op: Name): Boolean = {
         ((x == 0 && (op == nme.EQ || op == nme.GT || op == nme.LE || op == nme.NE))
           || (x == 1 && (op == nme.LT || op == nme.GE)))
@@ -462,12 +467,12 @@ class LinterPlugin(val global: Global) extends Plugin {
               if(!min1.isNaN && !max1.isNaN && !min2.isNaN && !max2.isNaN) logicOp match {
                 case nme.ZAND 
                   if (min1 > max2 || min2 > max1) => // Intervals don't cross
-                  warn(tree, new InvariantCondition(always = true, "return false"))
+                  warn(tree, InvariantCondition(always = true, "return false"))
                 case nme.ZOR 
                   if (min1 < max2 && min2 < max1) // Intervals cross, and span whole space
                   && (math.min(min1, min2) == Double.NegativeInfinity)
                   && (math.max(max1, max2) == Double.PositiveInfinity) =>
-                  warn(tree, new InvariantCondition(always = true, "return true"))
+                  warn(tree, InvariantCondition(always = true, "return true"))
                 case _ =>
               }
               
@@ -570,7 +575,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 if (rand.tpe.widen.toString startsWith "scala.util.Random")
                 && ((nextX is "nextInt") || (nextX is "nextLong")) =>
                 
-                warn(pos, new UnsafeAbs("Use nextInt(MaxValue) instead."))
+                warn(pos, UnsafeAbs("Use nextInt(MaxValue) instead."))
               case _ => //Ignore
             }
             
@@ -626,7 +631,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               def cleanString(s: String): String = s.replaceAll("^-|[.]|[Ee].*$|(0[.])?0*", "")
               
               val bd = if(mathContext.isDefined) BigDecimal(strLiteral, mathContext.get) else BigDecimal(strLiteral)
-              if(cleanString(bd.toString) != cleanString(actualLiteral)) warn(treeLiteral, new PossibleLossOfPrecision(improvement))
+              if(cleanString(bd.toString) != cleanString(actualLiteral)) warn(treeLiteral, PossibleLossOfPrecision(improvement))
             } catch {
               case e: NumberFormatException =>
                 warn(treeLiteral, BigDecimalNumberFormat)
@@ -669,7 +674,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               ((lhsHigher != rhsHigher) && !generic(lhsHigher) && !generic(rhsHigher))
             }) =>
             
-            warn(eqeq, new UnlikelyEquality(lhs.tpe.widen.toString, rhs.tpe.widen.toString, if (op == nme.EQ) "==" else "!="))
+            warn(eqeq, UnlikelyEquality(lhs.tpe.widen.toString, rhs.tpe.widen.toString, if (op == nme.EQ) "==" else "!="))
 
           /// Warn agains importing from collection.JavaConversions
           case Import(pkg, selectors) if (pkg.symbol == JavaConversionsModule) && (selectors exists isGlobalImport) =>
@@ -687,14 +692,14 @@ class LinterPlugin(val global: Global) extends Plugin {
             if methodImplements(contains.symbol, SeqLikeContains) 
             && !(target.tpe weak_<:< seqMemberType(seq.tpe)) =>
             
-            warn(contains, new ContainsTypeMismatch(seq.tpe.widen.toString, target.tpe.widen.toString))
+            warn(contains, ContainsTypeMismatch(seq.tpe.widen.toString, target.tpe.widen.toString))
 
           /// Using toString on an Array
           case Apply(Select(array, toString), Nil) 
             if (toString is "toString")
             && (array.tpe.widen.toString startsWith "Array[") =>
 
-            warn(tree, new UnlikelyToString("Array"))
+            warn(tree, UnlikelyToString("Array"))
           
           /// Warn about using .asInstanceOf[T] (disabled)
           //TODO: false positives in case class A(), and in the interpreter init
@@ -708,7 +713,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             if methodImplements(asInstanceOf.symbol, AsInstanceOf) 
             && !(num.tpe.widen <:< tree.tpe.widen || tree.tpe.widen <:< num.tpe.widen)
             && ((num.tpe.widen weak_<:< tree.tpe.widen) || (tree.tpe.widen weak_<:< num.tpe.widen)) =>
-              warn(tree, new NumberInstanceOf(tree.tpe.widen.toString))
+              warn(tree, NumberInstanceOf(tree.tpe.widen.toString))
 
           /*case TypeApply(instanceOf @ Select(a, funcName), t) 
             if methodImplements(instanceOf.symbol, AsInstanceOf) 
@@ -742,7 +747,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               ((toTyp matches "to[A-Z][^.]+") && ((toTyp == toTpe.toString) || ((toTyp stripPrefix toTpe.toString) matches "\\[.*\\]")))
             } =>
             
-            warn(tree, new TypeToType(toTpe.toString stripPrefix "to"))
+            warn(tree, TypeToType(toTpe.toString stripPrefix "to"))
 
           //// String checks 
           /// Repeated string literals (disabled)
@@ -853,7 +858,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 // This one always turns out to be a false positive :)
                 //warn(tree, "All "+cases.size+" cases will return "+cases.head.body+", regardless of pattern value") 
               } else if(streak.streak > 1) {
-                warn(streak.tree.body, new IdenticalCaseBodies(streak.streak.toString))
+                warn(streak.tree.body, IdenticalCaseBodies(streak.streak.toString))
               }
             }
             
@@ -966,15 +971,15 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           /// Unnecessary Ifs
           case If(cond, Literal(Constant(true)), Literal(Constant(false))) =>
-            warn(cond, new UseConditionDirectly())
+            warn(cond, UseConditionDirectly())
           case If(cond, Literal(Constant(false)), Literal(Constant(true))) =>
-            warn(cond, new UseConditionDirectly(negated = true))
+            warn(cond, UseConditionDirectly(negated = true))
           case If(cond, Assign(id1, _), Assign(id2, _)) //TODO: .this workaround for object-local variables sucks... false negatives
             if (id1.toString == id2.toString) && !(id1.toString contains ".this") =>
-            warn(cond, new UseIfExpression(id1.toString))
+            warn(cond, UseIfExpression(id1.toString))
           case If(cond, Apply(Select(id1, setter1), List(_)), Apply(Select(id2, setter2), List(_)))
             if (setter1 endsWith "_$eq") && (setter2 endsWith "_$eq") && (id1.toString == id2.toString) && !(id1.toString contains ".this") =>
-            warn(cond, new UseIfExpression(id1.toString))
+            warn(cond, UseIfExpression(id1.toString))
           case If(cond, Block(block, ret), Block(_, _)) if (block :+ ret) exists isReturnStatement => // Idea from oclint
             warn(cond, UnnecessaryElseBranch)
           case If(_cond, a, b) if (a equalsStructure b) && (a.children.nonEmpty) => 
@@ -1023,7 +1028,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                       && (((a equalsStructure t) && (b equalsStructure e)) || ((a equalsStructure e) && (b equalsStructure t))) => true
                     case _ => false
                   } foreach { subCond =>
-                    warn(subCond, new InvariantCondition(always = true, "cause the same return value"))
+                    warn(subCond, InvariantCondition(always = true, "cause the same return value"))
                   }
                 case _ => //Ignore
               }
@@ -1083,7 +1088,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                     case Unknown => //Ignore
                     case Defined => assigns(id) = Unused
                     case Used    => assigns(id) = Unused
-                    case Unused  => warn(tree, new VariableAssignedUnusedValue(id.toString))
+                    case Unused  => warn(tree, VariableAssignedUnusedValue(id.toString))
                   }
                   
                 case Ident(id) =>
@@ -1205,7 +1210,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
             
             if(!exceptions)
-              warn(tree, new UndesirableTypeInference(tpe.tpe.toString))
+              warn(tree, UndesirableTypeInference(tpe.tpe.toString))
 
           /// Putting null into Option (idea by Smotko)
           case DefDef(_, _, _, _, tpe, body) if (tpe.toString matches "Option\\[.*\\]") &&
@@ -1254,45 +1259,45 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Select(Apply(TypeApply(Select(option, orElse), _), List(Apply(scala_Some_apply, List(_value)))), get)
             if (orElse is "orElse") && (get is "get") && (scala_Some_apply startsWith "scala.Some.apply") =>
             
-            warn(scala_Some_apply, new UseGetOrElseOnOption(identOrOpt(option)))
+            warn(scala_Some_apply, UseGetOrElseOnOption(identOrOpt(option)))
 
           /// if(opt.isDefined) opt.get else something is better written as getOrElse(something) and similar warnings
           //TODO: improve the warning text, and curb the code duplication
           case If(Select(opt1, isDefined), getCase @ Select(opt2, get), elseCase) //duplication
             if (isDefined is "isDefined") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + ".isDefined"))
-            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + ".isDefined"))
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + ".isDefined"))
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + ".isDefined"))
 
           case If(Select(Select(opt1, isDefined), nme.UNARY_!), elseCase, getCase @ Select(opt2, get)) //duplication
             if (isDefined is "isDefined") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isDefined"))
-            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isDefined"))
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, UseOptionOrNull(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isDefined"))
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, UseOptionGetOrElse(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isDefined"))
 
           case If(Select(opt1, isEmpty), elseCase, getCase @ Select(opt2, get)) //duplication
             if (isEmpty is "isEmpty") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + ".isEmpty"))
-            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + ".isEmpty"))
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + ".isEmpty"))
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + ".isEmpty"))
 
           case If(Select(Select(opt1, isEmpty), nme.UNARY_!), getCase @ Select(opt2, get), elseCase) //duplication
             if (isEmpty is "isEmpty") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isEmpty"))
-            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isEmpty"))
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, UseOptionOrNull(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isEmpty"))
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, UseOptionGetOrElse(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isEmpty"))
 
           case If(Apply(Select(opt1, nme.NE), List(scala_None)), getCase @ Select(opt2, get), elseCase) //duplication
             if (scala_None is "scala.None") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + "!= None"))
-            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + "!= None"))
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + "!= None"))
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + "!= None"))
 
           case If(Apply(Select(opt1, nme.EQ), List(scala_None)), elseCase, getCase @ Select(opt2, get)) //duplication
             if (scala_None is "scala.None") && (get is "get") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
             
-            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, new UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + "== None"))
-            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, new UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + "== None"))
+            if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + "== None"))
+            else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + "== None"))
           
           /// find(...).isDefined is better written as exists(...)
           /// filter(...).isEmpty is better written as exists(...)
@@ -1300,42 +1305,70 @@ class LinterPlugin(val global: Global) extends Plugin {
             if ((find_filter isAny ("find", "filter")) && (isEmpty_isDefined isAny ("isEmpty", "isDefined")))
             && (col startsWithAny ("scala.", "immutable.")) =>
             
-            warn(pos, new UseExistsOnOption(identOrCol(col), find_filter.toString, isEmpty_isDefined.toString))
+            warn(pos, UseExistsOnOption(identOrCol(col), find_filter.toString, isEmpty_isDefined.toString))
 
           /// fold(true)(acc && xxx) => forall
           /// fold(false)(acc || xxx) => exists
           //TODO: fix foldRight, reduceRight
-          case Apply(Apply(TypeApply(Select(col, fold), List(_)), List(lit @ Literal(Constant(start)))), List(Function(List(ValDef(_, arg1, _, _), ValDef(_, arg2, _, _)), Apply(Select(arg1u, barbar_andand), List(arg2u))))) 
-            if (lit.tpe.widen <:< BooleanClass.tpe)
-            && (true == start || false == start)
-            && (((fold is "foldLeft") || (fold is "fold")) && ((arg1.toString == arg1u.toString) || (arg1.toString == arg2u.toString)))
-              //|| ((fold is "foldRight") && ((arg2.toString == arg1u.toString) || (arg2.toString == arg2u.toString))))
-            && ((barbar_andand is "$amp$amp") || (barbar_andand is "$bar$bar")) =>
+          case Apply(Apply(TypeApply(Select(col, fold), List(_)), List(lit @ Literal(Constant(start)))), List(Function(List(ValDef(_, arg1, _, _), ValDef(_, arg2, _, _)), Apply(Select(arg1u, op), List(arg2u))))) 
+            if ((fold is "foldLeft") || (fold is "fold"))
+            && (((true == start || false == start)
+                && ((arg1.toString == arg1u.toString) || (arg1.toString == arg2u.toString))
+                && (op.isAny("$amp$amp", "$bar$bar")))
+              || ((lit.tpe.widen weak_<:< DoubleClass.tpe)
+                && (arg2u.tpe.widen =:= lit.tpe.widen)
+                && ((arg1u.tpe.widen weak_<:< DoubleClass.tpe) || (arg2u.tpe.widen weak_<:< DoubleClass.tpe))
+                && (Set(arg1.toString, arg2.toString) == Set(arg1u.toString, arg2u.toString))
+                && ((op.isAny("$plus", "$times"))))) =>
             
-            if (start == true && (barbar_andand is "$amp$amp")) {
-              warn(tree, new UseQuantifierFuncNotFold(identOrCol(col), "forall", fold.toString))
-            } else if (start == false && (barbar_andand is "$bar$bar")) {
-              warn(tree, new UseQuantifierFuncNotFold(identOrCol(col), "exists", fold.toString))
+            if (op.isAny("$amp$amp", "$bar$bar")) {
+              if (start == true && (op is "$amp$amp")) {
+                warn(tree, UseQuantifierFuncNotFold(identOrCol(col), "forall", fold.toString))
+              } else if (start == false && (op is "$bar$bar")) {
+                warn(tree, UseQuantifierFuncNotFold(identOrCol(col), "exists", fold.toString))
+              } else {
+                warn(tree, InvariantReturn(fold.toString, start.toString))
+              }
             } else {
-              warn(tree, new InvariantReturn(fold.toString, start.toString))
+              if (op is "$plus") {
+                val replacement = (if (start == 0) "sum" else "sum + " + start)
+                warn(tree, UseFuncNotFold(identOrCol(col), replacement, fold.toString))
+              } else if (op is "$times") {
+                if (start == 0) {
+                  warn(tree, InvariantReturn(fold.toString, start.toString))
+                } else {
+                  val replacement = (if (start == 1) "product" else "product * " + start)
+                  warn(tree, UseFuncNotFold(identOrCol(col), replacement, fold.toString))
+                }
+              }
             }
 
           /// reduce(acc && xxx) => forall
           /// reduce(acc || xxx) => exists
-          case Apply(TypeApply(Select(col, reduce), List(_)), List(Function(List(ValDef(_, arg1, _, _), ValDef(_, arg2, _, _)), Apply(Select(arg1u, barbar_andand), List(arg2u)))))
-            if (((reduce is "reduceLeft") || (reduce is "reduce"))
-              && ((arg1.toString == arg1u.toString) && (arg1u.tpe.widen <:< BooleanClass.tpe)
-                ||(arg1.toString == arg2u.toString) && (arg2u.tpe.widen <:< BooleanClass.tpe)))
-            /*|| ((reduce is "reduceRight")
-              && ((arg2.toString == arg1u.toString) && (arg1u.tpe.widen <:< BooleanClass.tpe)
-                ||(arg2.toString == arg2u.toString) && (arg2u.tpe.widen <:< BooleanClass.tpe))))*/
-            && ((barbar_andand is "$amp$amp") || (barbar_andand is "$bar$bar")) =>
+          case Apply(TypeApply(Select(col, reduce), List(_)), List(Function(List(ValDef(_, arg1, _, _), ValDef(_, arg2, _, _)), Apply(Select(arg1u, op), List(arg2u)))))
+            if ((reduce is "reduceLeft") || (reduce is "reduce"))
+            && ((((arg1.toString == arg1u.toString) && (arg1u.tpe.widen <:< BooleanClass.tpe)
+                ||(arg1.toString == arg2u.toString) && (arg2u.tpe.widen <:< BooleanClass.tpe))
+                && ((op is "$amp$amp") || (op is "$bar$bar")))
+              || (((arg1u.tpe.widen weak_<:< DoubleClass.tpe) || (arg2u.tpe.widen weak_<:< DoubleClass.tpe))
+                && (Set(arg1.toString, arg2.toString) == Set(unwrapNumber(arg1u).toString, unwrapNumber(arg2u).toString))
+                && (op.isAny("$plus", "$times", "min", "max")))) =>
             
-            if (barbar_andand is "$amp$amp") {
-              warn(tree, new UseQuantifierFuncNotFold(identOrCol(col), "forall", reduce.toString))
-            } else if (barbar_andand is "$bar$bar") {
-              warn(tree, new UseQuantifierFuncNotFold(identOrCol(col), "exists", reduce.toString))
+            if (op is "$amp$amp") {
+              warn(tree, UseQuantifierFuncNotFold(identOrCol(col), "forall", reduce.toString))
+            } else if (op is "$bar$bar") {
+              warn(tree, UseQuantifierFuncNotFold(identOrCol(col), "exists", reduce.toString))
+            } else if (op is "$plus") {
+              warn(tree, UseFuncNotReduce(identOrCol(col), "sum", reduce.toString))
+            } else if (op is "$times") {
+              warn(tree, UseFuncNotReduce(identOrCol(col), "product", reduce.toString))
+            } else {
+              warn(tree, UseFuncNotReduce(identOrCol(col), op.toString, reduce.toString))
             }
+          
+          //case Apply(TypeApply(Select(Ident(TermName("a")), TermName("reduce")), List(TypeTree())), List(Function(List(ValDef(Modifiers(PARAM), TermName("acc"), TypeTree(), EmptyTree), ValDef(Modifiers(PARAM), TermName("n"), TypeTree(), EmptyTree)), Apply(Select(Apply(Select(Select(This(TypeName("scala")), scala.Predef), TermName("intWrapper")), List(Ident(TermName("acc")))), TermName("min")), List(Ident(TermName("n")))))))
+
+          //case Apply(Select(Apply(Select(Select(This(TypeName("scala")), scala.Predef), TermName("intWrapper")), List(Ident(TermName("acc")))), TermName("min")), List(Ident(TermName("n"))))
 
           /// flatMap(if(...) x else Nil/None) is better written as filter(...)
           case Apply(TypeApply(Select(col, flatMap), _), List(Function(List(ValDef(_, param, _, _)), If(_, e1, e2))))
@@ -1351,7 +1384,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 && (nil endsWith ".Nil") 
                 && (id.toString == param.toString) =>
                 
-                warn(tree, new UseFilterNotFlatMap(identOrCol(col)))
+                warn(tree, UseFilterNotFlatMap(identOrCol(col)))
 
               case (Apply(_Option2Iterable1, List(none)), Apply(_Option2Iterable2, List(Apply(TypeApply(Select(some, apply), _), List(Ident(id))))))
                 if (none is "scala.None")
@@ -1359,7 +1392,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 && (apply is "apply")
                 && (id.toString == param.toString) =>
                 
-                warn(tree, new UseFilterNotFlatMap(identOrCol(col)))
+                warn(tree, UseFilterNotFlatMap(identOrCol(col)))
                 
               case _ => 
                 //println((showRaw(expr1), showRaw(expr2)))
@@ -1391,13 +1424,13 @@ class LinterPlugin(val global: Global) extends Plugin {
             && (xArrayOps.toString.contains("ArrayOps"))
             && (canBuildFrom.toString == "scala.this.Array.canBuildFrom") =>
           
-            warn(tree, new TransformNotMap("col")) // FIXME name's inside xArrayOps, right?
+            warn(tree, TransformNotMap("col")) // FIXME name's inside xArrayOps, right?
           
           case Assign(id1, col @ Apply(Apply(TypeApply(Select(id2, map), List(_, _)), List(func)), List(_)))
             if (id1.toString == id2.toString) && (map is "map")
             && col.tpe.baseClasses.exists(_.tpe =:= MutableSeqLike.tpe) =>
             
-            warn(tree, new TransformNotMap(identOrCol(col)))
+            warn(tree, TransformNotMap(identOrCol(col)))
           
           /// Checks for duplicate mappings in a Map
           case Apply(TypeApply(Select(map, apply), _), args)
@@ -1437,9 +1470,9 @@ class LinterPlugin(val global: Global) extends Plugin {
             && (isEmptyCompare(x, op)) =>
           
             if(op == nme.EQ || op == nme.LE || op == nme.LT)
-              warn(pos, new InefficientUseOfListSize(identOrCol(obj), "isEmpty", size_length.toString))
+              warn(pos, InefficientUseOfListSize(identOrCol(obj), "isEmpty", size_length.toString))
             else
-              warn(pos, new InefficientUseOfListSize(identOrCol(obj), "nonEmpty", size_length.toString))
+              warn(pos, InefficientUseOfListSize(identOrCol(obj), "nonEmpty", size_length.toString))
 
           /// Inefficient use of String.size, instead of is/nonEmpty (disabled)
           /*case Apply(Select(obj, op), List(Literal(Constant(""))))
@@ -1481,20 +1514,20 @@ class LinterPlugin(val global: Global) extends Plugin {
               (p2.toString == p2_.toString) && (p2_.tpe.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe)) &&
               (filter is "filter") && (isDefined is "isDefined") && (map is "map") && (get is "get")) =>
 
-            warn(tree, new UseFlattenNotFilterOption(identOrCol(col)))
+            warn(tree, UseFlattenNotFilterOption(identOrCol(col)))
 
           /// col.exists(...) instead of !col.filter(...).isEmpty / col.filter(...).nonEmpty (idea from pippi)
           case Select(Apply(Select(col, filter), List(func)), nonEmpty)
             if col.tpe.widen.baseClasses.exists(_.tpe =:= TraversableClass.tpe)
             && (filter is "filter") && (nonEmpty is "nonEmpty") =>
 
-            warn(tree, new UseExistsNotFilterEmpty(identOrCol(col), bang = false))
+            warn(tree, UseExistsNotFilterEmpty(identOrCol(col), bang = false))
 
           case Select(Select(Apply(Select(col, filter), List(func)), isEmpty), unaryBang)
             if col.tpe.widen.baseClasses.exists(_.tpe =:= TraversableClass.tpe)
             && (filter is "filter") && (isEmpty is "isEmpty") && (unaryBang is "unary_$bang") =>
 
-            warn(tree, new UseExistsNotFilterEmpty(identOrCol(col), bang = true))
+            warn(tree, UseExistsNotFilterEmpty(identOrCol(col), bang = true))
 
           /// col.count(...) instead of col.filter(...).size/length (idea from pippi)
           case Select(Apply(Select(col, filter), List(func)), size_length)
@@ -1502,7 +1535,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             && (filter is "filter")
             && ((size_length is "size") || (size_length is "length")) =>
 
-            warn(tree, new UseCountNotFilterLength(identOrCol(col), size_length.toString))
+            warn(tree, UseCountNotFilterLength(identOrCol(col), size_length.toString))
 
           /// col.exists(...) instead of col.count(...) == 0 (or similar)
           case Apply(Select(Apply(Select(col, count), List(func)), op), List(Literal(Constant(x))))
@@ -1510,7 +1543,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             && (count is "count") && (isEmptyCompare(x, op)) =>
           
             if(!(op == nme.EQ || op == nme.LE || op == nme.LT))
-              warn(tree, new UseExistsNotCountCompare(identOrCol(col)))
+              warn(tree, UseExistsNotCountCompare(identOrCol(col)))
 
           /// Use partial function directly - temporary variable is unnecessary (idea by yzgw)
           case Apply(_, List(Function(List(ValDef(mods, x_1, typeTree: TypeTree, EmptyTree)), Match(x_1_, _))))
@@ -1523,7 +1556,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             //TODO: also detects for(x <- col) x match { ... } ... current workaround with filter has false negatives
             val line = tree.pos.lineContent
             if(!List("for", "<-").exists(line.contains(_))) {
-              warn(tree, new PassPartialFunctionDirectly(param))
+              warn(tree, PassPartialFunctionDirectly(param))
             }
 
           /// Using the implicit ordering for Unit is probably wrong
@@ -1532,7 +1565,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             && (scala_math_Ordering is "math.this.Ordering") 
             && (unit is "Unit") =>
 
-            warn(u, new UnitImplicitOrdering(minMaxBy.toString))
+            warn(u, UnitImplicitOrdering(minMaxBy.toString))
             
           case _ => 
             //if(tree.toString contains "...") println(showRaw(tree))
@@ -1572,10 +1605,10 @@ class LinterPlugin(val global: Global) extends Plugin {
       def checkRegex(reg: String): Unit = {
         try {
           val regex = reg.r
-          if(reg matches "[\\^]?([|]+|([(][|]*[)])+)+[$]?") warn(treePosHolder, new RegexWarning("Regex "+reg+" matches only empty string", error = false))
+          if(reg matches "[\\^]?([|]+|([(][|]*[)])+)+[$]?") warn(treePosHolder, RegexWarning("Regex "+reg+" matches only empty string", error = false))
         } catch {
           case e: java.util.regex.PatternSyntaxException =>
-            warn(treePosHolder, new RegexWarning(e.getDescription))
+            warn(treePosHolder, RegexWarning(e.getDescription))
           case e: Exception =>
         }
       }
@@ -1856,8 +1889,8 @@ class LinterPlugin(val global: Global) extends Plugin {
           
           
           // Check if condition will always or never hold
-          if(neverHold) warn(condExpr, new InvariantCondition(always = false, "hold"))
-          if(alwaysHold) warn(condExpr, new InvariantCondition(always = true, "hold"))
+          if(neverHold) warn(condExpr, InvariantCondition(always = false, "hold"))
+          if(alwaysHold) warn(condExpr, InvariantCondition(always = true, "hold"))
           
           //TODO: verify filter = ...
           if(!isUsed(condExpr, this.name, filter = "size|length|head|last")) (this, this) else (out, if(neverHold) this else if(alwaysHold) Values.empty else this - out)
@@ -1890,11 +1923,11 @@ class LinterPlugin(val global: Global) extends Plugin {
           case size if (size.toString matches "size|length") => if(this.actualSize != -1) Values(this.actualSize) else Values.empty.addCondition(_ >= 0)
           case head_last if (head_last.toString matches "head|last") => 
             // Only works for one element :)
-            if(this.actualSize == 0) warn(treePosHolder, new DecomposingEmptyCollection(head_last.toString))
+            if(this.actualSize == 0) warn(treePosHolder, DecomposingEmptyCollection(head_last.toString))
             if(this.actualSize == 1 && this.size == 1) Values(this.getValueForce) else Values.empty
           case tail_init if (tail_init.toString matches "tail|init") && this.actualSize != -1 => 
             if(this.actualSize == 0) {
-              warn(treePosHolder, new DecomposingEmptyCollection(tail_init.toString))
+              warn(treePosHolder, DecomposingEmptyCollection(tail_init.toString))
               Values.empty
             } else {
               Values.empty.addActualSize(this.actualSize - 1)
@@ -1911,10 +1944,10 @@ class LinterPlugin(val global: Global) extends Plugin {
           case sum if (sum.toString == "sum") && this.nonEmpty && this.distinct.size == this.actualSize => Values(this.sum)
 
           case empty if (empty.toString == "isEmpty") && (this.actualSize != -1) => 
-            warn(treePosHolder, new InvariantCondition(always = this.actualSize == 0, "hold"))
+            warn(treePosHolder, InvariantCondition(always = this.actualSize == 0, "hold"))
             Values.empty
           case empty if (empty.toString == "nonEmpty") && (this.actualSize != -1) => 
-            warn(treePosHolder, new InvariantCondition(always = this.actualSize > 0, "hold"))
+            warn(treePosHolder, InvariantCondition(always = this.actualSize > 0, "hold"))
             Values.empty
 
           case _ => 
@@ -1960,33 +1993,33 @@ class LinterPlugin(val global: Global) extends Plugin {
               right
             } else if(op.toString == "contains") {
               if(right.isValue) {
-                warn(treePosHolder, new InvariantCondition(always = left.contains(right.getValue), "return true"))
+                warn(treePosHolder, InvariantCondition(always = left.contains(right.getValue), "return true"))
               }
               Values.empty
             } else if(op.toString == "max") {
               if(left.isValue && right.isValue) { 
                 if(left.getValue >= right.getValue) {
-                  warn(treePosHolder, new InvariantExtrema(max = true, returnsFirst = true))
+                  warn(treePosHolder, InvariantExtrema(max = true, returnsFirst = true))
                 } else {
-                  warn(treePosHolder, new InvariantExtrema(max = true, returnsFirst = false))
+                  warn(treePosHolder, InvariantExtrema(max = true, returnsFirst = false))
                 }
                 Values(math.max(left.getValue, right.getValue))
               } else if(left.isValue && !right.isValue) {
                 if(left.getValue >= right.max) {
-                  warn(treePosHolder, new InvariantExtrema(max = true, returnsFirst = true))
+                  warn(treePosHolder, InvariantExtrema(max = true, returnsFirst = true))
                   Values(left.getValue)
                 } else if(left.getValue <= right.min) {
-                  warn(treePosHolder, new InvariantExtrema(max = true, returnsFirst = false))
+                  warn(treePosHolder, InvariantExtrema(max = true, returnsFirst = false))
                   right
                 } else {
                   Values.empty
                 }
               } else if(!left.isValue && right.isValue) {
                 if(right.getValue >= left.max) {
-                  warn(treePosHolder, new InvariantExtrema(max = true, returnsFirst = false))
+                  warn(treePosHolder, InvariantExtrema(max = true, returnsFirst = false))
                   Values(right.getValue)
                 } else if(right.getValue <= left.min) {
-                  warn(treePosHolder, new InvariantExtrema(max = true, returnsFirst = true))
+                  warn(treePosHolder, InvariantExtrema(max = true, returnsFirst = true))
                   left
                 } else {
                   Values.empty
@@ -1997,27 +2030,27 @@ class LinterPlugin(val global: Global) extends Plugin {
             } else if(op.toString == "min") {
               if(left.isValue && right.isValue) {
                 if(left.getValue <= right.getValue) {
-                  warn(treePosHolder, new InvariantExtrema(max = false, returnsFirst = true))
+                  warn(treePosHolder, InvariantExtrema(max = false, returnsFirst = true))
                 } else {
-                  warn(treePosHolder, new InvariantExtrema(max = false, returnsFirst = false))
+                  warn(treePosHolder, InvariantExtrema(max = false, returnsFirst = false))
                 }
                 Values(math.min(left.getValue, right.getValue))
               } else if(left.isValue && !right.isValue) {
                 if(left.getValue <= right.min) {
-                  warn(treePosHolder, new InvariantExtrema(max = false, returnsFirst = true))
+                  warn(treePosHolder, InvariantExtrema(max = false, returnsFirst = true))
                   Values(left.getValue)
                 } else if(left.getValue > right.max) {
-                  warn(treePosHolder, new InvariantExtrema(max = false, returnsFirst = false))
+                  warn(treePosHolder, InvariantExtrema(max = false, returnsFirst = false))
                   right
                 } else {
                   Values.empty
                 }
               } else if(!left.isValue && right.isValue) {
                 if(right.getValue <= left.min) {
-                  warn(treePosHolder, new InvariantExtrema(max = false, returnsFirst = false))
+                  warn(treePosHolder, InvariantExtrema(max = false, returnsFirst = false))
                   Values(right.getValue)
                 } else if(right.getValue > left.max) {
-                  warn(treePosHolder, new InvariantExtrema(max = false, returnsFirst = true))
+                  warn(treePosHolder, InvariantExtrema(max = false, returnsFirst = true))
                   left
                 } else {
                   Values.empty
@@ -2028,7 +2061,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             } else if(op.toString == "take") {
               if(left.isSeq && left.actualSize != -1 && right.isValue) {
                 if(right.getValueForce >= left.actualSize) {
-                  warn(treePosHolder, new UnnecessaryMethodCall("take"))
+                  warn(treePosHolder, UnnecessaryMethodCall("take"))
                   this 
                 } else {
                   if(right.getValueForce <= 0) warn(treePosHolder, ProducesEmptyCollection)
@@ -2040,7 +2073,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             } else if(op.toString == "drop") {
               if(left.isSeq && left.actualSize != -1 && right.isValue) {
                 if(right.getValueForce <= 0) {
-                  warn(treePosHolder, new UnnecessaryMethodCall("drop"))
+                  warn(treePosHolder, UnnecessaryMethodCall("drop"))
                   this
                 } else {
                   if(left.actualSize-right.getValueForce <= 0) warn(treePosHolder, ProducesEmptyCollection)
@@ -2050,7 +2083,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 Values.empty
               }
             } else if(left.isValue && right.isValue) {
-              if(left.getValue == right.getValue && op == nme.SUB && !left.name.isEmpty) warn(treePosHolder, new OperationAlwaysProducesZero("subtraction"))
+              if(left.getValue == right.getValue && op == nme.SUB && !left.name.isEmpty) warn(treePosHolder, OperationAlwaysProducesZero("subtraction"))
               Values(func(left.getValue, right.getValue))
             } else if(!left.isValue && right.isValue) {
               left.map(a => func(a, right.getValue), rangeSafe = isRangeSafe)
@@ -2064,8 +2097,8 @@ class LinterPlugin(val global: Global) extends Plugin {
                   //case nme.MUL => left.map(a => a*a)
                   case nme.DIV if(!left.contains(0)) => Values(1) //TODO: never gets executed?
                   case nme.SUB | nme.XOR => 
-                    if(op == nme.SUB) warn(treePosHolder, new OperationAlwaysProducesZero("subtraction"))
-                    if(op == nme.XOR) warn(treePosHolder, new OperationAlwaysProducesZero("exclusive or"))
+                    if(op == nme.SUB) warn(treePosHolder, OperationAlwaysProducesZero("subtraction"))
+                    if(op == nme.XOR) warn(treePosHolder, OperationAlwaysProducesZero("exclusive or"))
                     Values(0)
                   case nme.AND | nme.OR  => left
                   case _ => Values.empty
@@ -2528,7 +2561,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             case f @ ("head"|"last") =>
               if(str.maxLength == 0) {
-                warn(treePosHolder, new DecomposingEmptyCollection(f, "string"))
+                warn(treePosHolder, DecomposingEmptyCollection(f, "string"))
               }
               
               Left(empty)
@@ -2536,14 +2569,14 @@ class LinterPlugin(val global: Global) extends Plugin {
             case f @ ("init"|"tail") => 
               if(str.exactValue.isDefined) {
                 if(str.exactValue.get.isEmpty) {
-                  warn(treePosHolder, new DecomposingEmptyCollection(f, "string"))
+                  warn(treePosHolder, DecomposingEmptyCollection(f, "string"))
                   Left(empty)
                 } else {
                   Left(new StringAttrs(str.exactValue.map(a => if(f == "init") a.init else a.tail)))
                 }
               } else {
                 if(str.maxLength == 0) {
-                  warn(treePosHolder, new DecomposingEmptyCollection(f, "string"))
+                  warn(treePosHolder, DecomposingEmptyCollection(f, "string"))
                 }
 
                 Left(new StringAttrs(
@@ -2579,7 +2612,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             // 
             case "mkString" if paramsSize == 0 =>
-                warn(treePosHolder, new UnnecessaryMethodCall("mkString"))
+                warn(treePosHolder, UnnecessaryMethodCall("mkString"))
                 
                 Left(str)
             case "mkString" if paramsSize == 1 && str.exactValue.isDefined && stringParam.exactValue.isDefined =>
@@ -2602,7 +2635,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 Right(Values(str.exactValue.get.toInt))
               } catch {
                 case e: Exception =>
-                  warn(treePosHolder, new InvalidStringConversion(f))
+                  warn(treePosHolder, InvalidStringConversion(f))
                   Left(empty)
               }
             case f @ ("toLong") if str.exactValue.isDefined =>
@@ -2610,7 +2643,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 str.exactValue.get.toLong
               } catch {
                 case e: Exception =>
-                  warn(treePosHolder, new InvalidStringConversion(f))
+                  warn(treePosHolder, InvalidStringConversion(f))
               }
               Left(empty)
             case f @ ("toDouble"|"toFloat") if str.exactValue.isDefined =>
@@ -2618,7 +2651,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 str.exactValue.get.toDouble
               } catch {
                 case e: Exception =>
-                  warn(treePosHolder, new InvalidStringConversion(f))
+                  warn(treePosHolder, InvalidStringConversion(f))
               }
               Left(empty)
 
@@ -2666,7 +2699,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               } catch {
                 case e: IndexOutOfBoundsException =>
                   /// String index will likely cause an IndexOutOfBoundsException (runtime exception)
-                  warn(params.head, new LikelyIndexOutOfBounds("out of bounds"))
+                  warn(params.head, LikelyIndexOutOfBounds("out of bounds"))
                   Left(empty)
                 case e: Exception =>
                   Left(empty)
@@ -2699,7 +2732,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 case _ => Left(empty)
               } catch {
                 case e: IndexOutOfBoundsException =>
-                  warn(params.head, new LikelyIndexOutOfBounds("out of bounds"))
+                  warn(params.head, LikelyIndexOutOfBounds("out of bounds"))
                   Left(empty)
                 case e: Exception =>
                   Left(empty)
@@ -2718,7 +2751,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 case _ => None
               }
               val function = if(func == "$eq$eq") "equals" else if(func == "$bang$eq") "not equals" else func
-              if(result.isDefined) warn(params.head, new InvariantReturn(function, result.get.toString))
+              if(result.isDefined) warn(params.head, InvariantReturn(function, result.get.toString))
               
               Left(empty)
               
@@ -2727,7 +2760,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               val (p0, p1) = (stringParams(0).exactValue.get, stringParams(1).exactValue.get)
               
               if (p0 == p1) {
-                warn(treePosHolder, new UnnecessaryMethodCall("replace"))
+                warn(treePosHolder, UnnecessaryMethodCall("replace"))
                 
                 Left(str)
               } else if(str.exactValue.isDefined) {
@@ -2746,9 +2779,9 @@ class LinterPlugin(val global: Global) extends Plugin {
                 val special = """.\^$*+?()\[{\\|""";
                 val plainString = s"""([^${special}]|[\\\\][${special}])+""";
                 if(posFiltering && (p0 matches plainString+"\\$"))
-                  warn(treePosHolder, new RegexWarning(s"This $f can be substituted with stripSuffix", error = false))
+                  warn(treePosHolder, RegexWarning(s"This $f can be substituted with stripSuffix", error = false))
                 if(posFiltering && (p0 matches "\\^"+plainString))
-                  warn(treePosHolder, new RegexWarning(s"This $f can be substituted with stripPrefix", error = false))
+                  warn(treePosHolder, RegexWarning(s"This $f can be substituted with stripPrefix", error = false))
               }
               
               if(str.exactValue.isDefined) {
@@ -2794,9 +2827,9 @@ class LinterPlugin(val global: Global) extends Plugin {
                 val strValue = str.exactValue.get
                 val percentCnt = strValue.count(_ == '%')
                 if(percentCnt == 0) {
-                  warn(string, new InvalidStringFormat("There are no percent signs in the format string.", exception = false))
+                  warn(string, InvalidStringFormat("There are no percent signs in the format string.", exception = false))
                 } else if(parActual.length > percentCnt) {
-                  warn(string, new InvalidStringFormat("There are more parameters being passed to format, than there are percent signs in the format string.", exception = false))
+                  warn(string, InvalidStringFormat("There are more parameters being passed to format, than there are percent signs in the format string.", exception = false))
                 }
                 if(valuesDefined) {
                   try {
@@ -2807,13 +2840,13 @@ class LinterPlugin(val global: Global) extends Plugin {
                     }:_*))))
                   } catch {
                     case e: java.util.UnknownFormatConversionException =>
-                      warn(string, new InvalidStringFormat(e.toString))
+                      warn(string, InvalidStringFormat(e.toString))
                     case e: java.util.IllegalFormatConversionException if !e.getMessage.contains("!= java.lang.String") => //TODO: Why this condition?
-                      warn(string, new InvalidStringFormat(e.toString))
+                      warn(string, InvalidStringFormat(e.toString))
                     case e: java.util.MissingFormatArgumentException =>
-                      warn(string, new InvalidStringFormat(e.toString))
+                      warn(string, InvalidStringFormat(e.toString))
                     case e: java.util.DuplicateFormatFlagsException => 
-                      warn(string, new InvalidStringFormat(e.toString))
+                      warn(string, InvalidStringFormat(e.toString))
                     case e: Exception =>
                   }
                 } else {
@@ -2829,11 +2862,11 @@ class LinterPlugin(val global: Global) extends Plugin {
                       knownPieces = Set(prefix, suffix)))
                   } catch {
                     case e: java.util.UnknownFormatConversionException =>
-                      warn(string, new InvalidStringFormat(e.toString))
+                      warn(string, InvalidStringFormat(e.toString))
                     case e: java.util.MissingFormatArgumentException =>
-                      warn(string, new InvalidStringFormat(e.toString))
+                      warn(string, InvalidStringFormat(e.toString))
                     case e: java.util.DuplicateFormatFlagsException => 
-                      warn(string, new InvalidStringFormat(e.toString))
+                      warn(string, InvalidStringFormat(e.toString))
                     case e: Exception =>
                   }
                 }
@@ -3349,10 +3382,10 @@ class LinterPlugin(val global: Global) extends Plugin {
             //println("indexExpr: "+computeExpr(indexExpr))
             //println(showRaw(indexExpr))
             if(vals.contains(seq.toString) && vals(seq.toString).actualSize != -1 && (computeExpr(indexExpr).existsGreater(vals(seq.toString).actualSize-1))) {
-              warn(pos, new LikelyIndexOutOfBounds("too large"))
+              warn(pos, LikelyIndexOutOfBounds("too large"))
             }
             if(computeExpr(indexExpr).existsLower(0)) {
-              warn(pos, new LikelyIndexOutOfBounds("negative"))
+              warn(pos, LikelyIndexOutOfBounds("negative"))
             }
           
           case DefDef(_, name, _, params, _, block @ Block(b, last)) => 
@@ -3390,7 +3423,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             if(returnCount(block) == 0 && throwsCount(block) == 0) {//ADD: can be made better - if sentences are easy to model
               val retVal = computeExpr(returnVal)
               if(retVal.isValue || (retVal.isSeq && retVal.size > 0)) {
-                warn(last, new InvariantReturn("method", retVal.getValue.toString))
+                warn(last, InvariantReturn("method", retVal.getValue.toString))
               }
               popDefinitions()
               if(retVal.nonEmpty || retVal.conditions.nonEmpty || (retVal.isSeq && retVal.actualSize != -1)) {
@@ -3417,7 +3450,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             StringAttrs(regExpr).exactValue.foreach(checkRegex)
             if(func.toString == "matches") computeExpr(tree)
             
-          case Apply(Select(str, func), List(regExpr, _str)) if (str.tpe.widen <:< StringClass.tpe) && (func.toString matches "replace(All|First)?") =>
+          case Apply(Select(str, func), List(regExpr, _str)) if (str.tpe.widen <:< StringClass.tpe) && (func.toString matches "replace(All|First)") =>
             treePosHolder = regExpr
             StringAttrs(regExpr).exactValue.foreach(checkRegex)
             computeExpr(tree)
@@ -3550,7 +3583,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 //TODO: macro impl is special case?
                 unused.size match {
                   case 0 => //Ignore
-                  case _ => warn(tree, new UnusedParameter(unused, name.toString))
+                  case _ => warn(tree, UnusedParameter(unused, name.toString))
                 }
               }
             }
