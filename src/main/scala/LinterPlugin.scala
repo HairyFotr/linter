@@ -1368,9 +1368,17 @@ class LinterPlugin(val global: Global) extends Plugin {
               warn(tree, UseFuncNotReduce(identOrCol(col), op.toString, reduce.toString))
             }
           
-          //case Apply(TypeApply(Select(Ident(TermName("a")), TermName("reduce")), List(TypeTree())), List(Function(List(ValDef(Modifiers(PARAM), TermName("acc"), TypeTree(), EmptyTree), ValDef(Modifiers(PARAM), TermName("n"), TypeTree(), EmptyTree)), Apply(Select(Apply(Select(Select(This(TypeName("scala")), scala.Predef), TermName("intWrapper")), List(Ident(TermName("acc")))), TermName("min")), List(Ident(TermName("n")))))))
+          /// TODO check: col.map(...).map(...)
+          /*case Apply(TypeApply(Select(Apply(Apply(TypeApply(Select(col, TermName("map")), List(TypeTree(), TypeTree())), List(Function(List(ValDef(Modifiers(PARAM), TermName("x"), TypeTree(), EmptyTree)), Select(Ident(TermName("x")), TermName("toDouble"))))), List(TypeApply(Select(Select(This(TypeName("immutable")), scala.collection.immutable.List), TermName("canBuildFrom")), List(TypeTree())))), TermName("map")), List(TypeTree(), TypeTree())), List(Function(List(ValDef(Modifiers(PARAM), TermName("x"), TypeTree(), EmptyTree)), Apply(Select(Ident(TermName("x")), TermName("toString")), List())))) 
+            if (map1 is "map") && (map2 is "map")
+            && (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe)) =>*/
 
-          //case Apply(Select(Apply(Select(Select(This(TypeName("scala")), scala.Predef), TermName("intWrapper")), List(Ident(TermName("acc")))), TermName("min")), List(Ident(TermName("n"))))
+          /// swap operations col.sortWith(...).filter(...)
+          case Apply(Select(Apply(Select(col, sortWith), List(Function(List(ValDef(_, _, _, _), ValDef(_, _, _, _)), _))), filter), List(Function(List(ValDef(_, _, _, _)), _))) 
+            if (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
+            && (sortWith is "sortWith") && (filter.isAny("filter", "filterNot")) =>
+
+            warn(tree, FilterFirstThenSort)
 
           /// flatMap(if(...) Seq(x) else Seq(y)) is better written as map(if(...) x else y)
           // TODO: actually check all returns of the lambda
@@ -2602,7 +2610,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             case "count"      if paramsSize == 1 => 
               val out = Values.empty.addCondition(_ >= 0)
               Right(if(str.getMaxLength != Int.MaxValue) out.addCondition(_ < str.getMaxLength) else out)
-            case "filter"     if paramsSize == 1 => 
+            case ("filter" | "filterNot") if paramsSize == 1 => 
               Left(str.removeExactValue.zeroMinLengths)
             
             case f @ ("indexOf"|"lastIndexOf") if paramsSize == 1 =>

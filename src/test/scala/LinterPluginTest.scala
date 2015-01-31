@@ -899,6 +899,14 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     shouldnt("""val a = 14d; math.sqrt(math.pow(a, 3))""")
     shouldnt("""val a = 14d; math.sqrt(a*(a-1))""")
   }
+  
+  @Test
+  def FilterFirstThenSort(): Unit = {
+    implicit val msg = "Filter collection first, then sort it."
+    
+    should(""" List(1,2,3).sortWith((x, y) => x > y).filter(x => x > 1) """)
+    should(""" List(1,2,3).sortWith((x, y) => x > y).filterNot(x => x > 1) """)
+  }
 
   @Test
   def UseMapNotFlatMap(): Unit = {
