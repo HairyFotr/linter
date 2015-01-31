@@ -232,6 +232,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       val SeqLikeContains: Symbol = SeqLikeClass.info.member(newTermName("contains"))
       val SeqLikeApply: Symbol = SeqLikeClass.info.member(newTermName("apply"))
       val MapFactoryClass = rootMirror.getClassByName(newTermName("scala.collection.generic.MapFactory"))
+      val TraversableFactoryClass: Symbol = rootMirror.getClassByName(newTermName("scala.collection.generic.TraversableFactory"))
 
       val OptionGet: Symbol = OptionClass.info.member(nme.get)
       
@@ -1369,6 +1370,16 @@ class LinterPlugin(val global: Global) extends Plugin {
           //case Apply(TypeApply(Select(Ident(TermName("a")), TermName("reduce")), List(TypeTree())), List(Function(List(ValDef(Modifiers(PARAM), TermName("acc"), TypeTree(), EmptyTree), ValDef(Modifiers(PARAM), TermName("n"), TypeTree(), EmptyTree)), Apply(Select(Apply(Select(Select(This(TypeName("scala")), scala.Predef), TermName("intWrapper")), List(Ident(TermName("acc")))), TermName("min")), List(Ident(TermName("n")))))))
 
           //case Apply(Select(Apply(Select(Select(This(TypeName("scala")), scala.Predef), TermName("intWrapper")), List(Ident(TermName("acc")))), TermName("min")), List(Ident(TermName("n"))))
+
+          /// flatMap(if(...) Seq(x) else Seq(y)) is better written as map(if(...) x else y)
+          // TODO: actually check all returns of the lambda
+          case Apply(TypeApply(Select(col, flatMap), _), List(Function(List(ValDef(_, param, _, _)), If(_, Apply(TypeApply(Select(col1, apply1), _), List(elt1)), Apply(TypeApply(Select(col2, apply2), _), List(elt2))))))
+            if (flatMap is "flatMap") && (apply1 is "apply") && (apply2 is "apply")
+            && (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
+            && (col1.tpe.baseClasses.exists(_.tpe =:= TraversableFactoryClass.tpe)) 
+            && (col2.tpe.baseClasses.exists(_.tpe =:= TraversableFactoryClass.tpe)) =>
+
+            warn(tree, UseMapNotFlatMap(identOrCol(col)))
 
           /// flatMap(if(...) x else Nil/None) is better written as filter(...)
           case Apply(TypeApply(Select(col, flatMap), _), List(Function(List(ValDef(_, param, _, _)), If(_, e1, e2))))

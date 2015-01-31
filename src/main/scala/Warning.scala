@@ -90,6 +90,7 @@ object Warning {
     new UseConditionDirectly(true),
     new UseIfExpression(""),
     new UseExistsOnOption("", "", ""),
+    new UseMapNotFlatMap(""),
     new UseFilterNotFlatMap(""),
     new UseFlattenNotFilterOption(""),
     new UseExistsNotFilterEmpty("", true),
@@ -224,6 +225,8 @@ case class UseFuncNotReduce(varName: String, f: String, func: String) extends
   Warning(s"Use ${varName}.${f} instead of ${varName}.${func}.")
 case class UseFuncNotFold(varName: String, f: String, func: String) extends
   Warning(s"Use ${varName}.${f} instead of ${varName}.${func}.")
+case class UseMapNotFlatMap(varName: String) extends
+  Warning(s"Use ${varName}.map(x => if(...) y else z) instead of ${varName}.flatMap(x => if(...) Collection(y) else Collection(z)).") // Clean up warning
 case class UseFilterNotFlatMap(varName: String) extends
   Warning(s"Use ${varName}.filter(x => condition) instead of ${varName}.flatMap(x => if(condition) ... else ...).") // Clean up warning
 case class AvoidOptionMethod(method: String, explanation: String = "") extends

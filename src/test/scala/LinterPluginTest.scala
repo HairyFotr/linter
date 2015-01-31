@@ -901,6 +901,17 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
+  def UseMapNotFlatMap(): Unit = {
+    implicit val msg = "Use col.map(x => if(...) y else z) instead of col.flatMap(x => if(...) Collection(y) else Collection(z))"
+    
+    should(""" List(1,2,3).flatMap(x => if(x == 2) List(x) else List(x+1)) """)
+    should(""" val col = List(1,2,3); col.flatMap(x => if(x == 2) List(x+1) else List(x)) """)
+
+    shouldnt(""" List(1,2,3).flatMap(x => if(x == 2) List(x, x) else List(x+1)) """)
+    shouldnt(""" val col = List(1,2,3); col.flatMap(x => if(x == 2) List(x+1, x) else List(x)) """)
+  }
+
+  @Test
   def UseFilterNotFlatMap(): Unit = {
     implicit val msg = "Use col.filter(x => condition) instead of col.flatMap(x => if(condition) ... else ...)"
     
