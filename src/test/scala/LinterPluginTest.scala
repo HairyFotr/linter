@@ -972,6 +972,13 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       val y: List[String] = Nil
       x == y""")//TODO: returns true, not false
 
+    shouldnt(""" BigInt(2) == 2 """)
+    shouldnt(""" 2 == BigInt(2) """)
+    shouldnt("""
+      val x = BigInt(3)
+      val y = 3
+      x == y
+      y == x""")
     shouldnt(""" "foo" == "bar" """)
     shouldnt("""
       val x: List[Int] = Nil

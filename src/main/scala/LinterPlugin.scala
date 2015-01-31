@@ -233,6 +233,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       val SeqLikeApply: Symbol = SeqLikeClass.info.member(newTermName("apply"))
       val MapFactoryClass = rootMirror.getClassByName(newTermName("scala.collection.generic.MapFactory"))
       val TraversableFactoryClass: Symbol = rootMirror.getClassByName(newTermName("scala.collection.generic.TraversableFactory"))
+      val BigIntClass: Symbol = rootMirror.getClassByName(newTermName("scala.math.BigInt"))
 
       val OptionGet: Symbol = OptionClass.info.member(nme.get)
       
@@ -662,7 +663,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           //TODO: Scala 2.10 has a similar check "comparing values of types Int and String using `==' will always yield false"
           case Apply(eqeq @ Select(lhs, op @ (nme.EQ | nme.NE)), List(rhs))
             if methodImplements(eqeq.symbol, Object_==)
-            && !isSubtype(lhs, rhs) && !isSubtype(rhs, lhs)
+            && !isSubtype(lhs, rhs) && !isSubtype(rhs, lhs) && !(Set(lhs.tpe.widen, rhs.tpe.widen) == Set(BigIntClass.tpe, IntClass.tpe))
             && lhs.tpe.widen.toString != "Null" && rhs.tpe.widen.toString != "Null" 
             && ((lhs.tpe.widen.toString.takeWhile(_ != '[') != rhs.tpe.widen.toString.takeWhile(_ != '[')) || {
               val higherReg = """.+?\[(.+)\]""".r
