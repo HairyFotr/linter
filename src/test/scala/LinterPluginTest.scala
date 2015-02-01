@@ -914,7 +914,14 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     implicit val msg = "first, then map."
     
     should(""" List(1,2,3).map(_+1).take(2) """)
+    should(""" List(1,2,3).map(_+1).takeRight(2) """)
     should(""" List(1,2,3).map(x => x-1).drop(2) """)
+    should(""" List(1,2,3).map(x => x-1).dropRight(2) """)
+    should(""" List(1,2,3).map(_+1).headOption """)
+    should(""" List(1,2,3).map(_+1).lastOption """)
+    should(""" List(1,2,3).map(_+1).init """)
+    should(""" List(1,2,3).map(_+1).tail """)
+    should(""" List(1,2,3).map(_+1).slice(0,1) """)
   }
   
   @Test
@@ -923,6 +930,12 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     
     should(""" List(1,2,3).sortWith((x, y) => x > y).filter(x => x > 1) """)
     should(""" List(1,2,3).sortWith((x, y) => x > y).filterNot(x => x > 1) """)
+
+    should(""" List(1,2,3).sortBy(x => x).filter(x => x > 1) """)
+    should(""" List(1,2,3).sortBy(x => x).filterNot(x => x > 1) """)
+
+    should(""" List(1,2,3).sorted.filter(x => x > 1) """)
+    should(""" List(1,2,3).sorted.filterNot(x => x > 1) """)
   }
 
   @Test

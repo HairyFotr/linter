@@ -1377,23 +1377,39 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           /// swap operations col.map(...).take(...)
           // TODO head, last could be like that too
-          case Apply(Select(Apply(Apply(TypeApply(Select(col, map), _), List(Function(List(ValDef(_, _, _, _)), _))), List(canBuildFrom)), take_drop), List(n))
+          case Select(Apply(Apply(TypeApply(Select(col, map), _), List(Function(List(ValDef(_, _, _, _)), _))), List(canBuildFrom)), func)
             if (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
-            && (map is "map") && (take_drop.isAny("take", "takeRight", "drop", "dropRight"))
+            && (map is "map") && (func.isAny("take", "takeRight", "drop", "dropRight", "headOption", "lastOption", "init", "tail", "slice"))
             && (canBuildFrom.toString contains "canBuildFrom") =>
 
-            warn(tree, FuncFirstThenMap(take_drop.toString))
+            warn(tree, FuncFirstThenMap(func.toString))
             
-          case Apply(Select(Apply(Select(col, map), List(Function(List(ValDef(_, _, _, _)), _))), take_drop), List(n))
+          case Select(Apply(Select(col, map), List(Function(List(ValDef(_, _, _, _)), _))), func)
             if (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
-            && (map is "map") && (take_drop.isAny("take", "takeRight", "drop", "dropRight")) =>
+            && (map is "map") && (func.isAny("take", "takeRight", "drop", "dropRight", "headOption", "lastOption", "init", "tail", "slice")) =>
 
-            warn(tree, FuncFirstThenMap(take_drop.toString))
+            warn(tree, FuncFirstThenMap(func.toString))
 
           /// swap operations col.sortWith(...).filter(...)
           case Apply(Select(Apply(Select(col, sortWith), List(Function(List(ValDef(_, _, _, _), ValDef(_, _, _, _)), _))), filter), List(Function(List(ValDef(_, _, _, _)), _))) 
             if (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
             && (sortWith is "sortWith") && (filter.isAny("filter", "filterNot")) =>
+
+            warn(tree, FilterFirstThenSort)
+
+          /// swap operations col.sortBy(...).filter(...)
+          case Apply(Select(Apply(Apply(TypeApply(Select(col, sortBy), _), List(Function(List(ValDef(_, _, _, _)), _))), List(ordering)), filter), List(Function(List(ValDef(_, _, _, _)), _)))
+            if (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
+            && (ordering is "math.this.Ordering.Int")
+            && (sortBy is "sortBy") && (filter.isAny("filter", "filterNot")) =>
+
+            warn(tree, FilterFirstThenSort)
+
+          /// swap operations col.sorted.filter(...)
+          case Apply(Select(Apply(TypeApply(Select(col, sorted), _), List(ordering)), filter), List(Function(List(ValDef(_, _, _, _)), _)))
+            if (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
+            && (ordering is "math.this.Ordering.Int")
+            && (sorted is "sorted") && (filter.isAny("filter", "filterNot")) =>
 
             warn(tree, FilterFirstThenSort)
 
