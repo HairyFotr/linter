@@ -901,6 +901,14 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
+  def FuncFirstThenMap(): Unit = {
+    implicit val msg = "first, then map."
+    
+    should(""" List(1,2,3).map(_+1).take(2) """)
+    should(""" List(1,2,3).map(x => x-1).drop(2) """)
+  }
+  
+  @Test
   def FilterFirstThenSort(): Unit = {
     implicit val msg = "Filter collection first, then sort it."
     

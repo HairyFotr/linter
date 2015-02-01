@@ -1373,6 +1373,21 @@ class LinterPlugin(val global: Global) extends Plugin {
             if (map1 is "map") && (map2 is "map")
             && (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe)) =>*/
 
+          /// swap operations col.map(...).take(...)
+          // TODO head, last could be like that too
+          case Apply(Select(Apply(Apply(TypeApply(Select(col, map), _), List(Function(List(ValDef(_, _, _, _)), _))), List(canBuildFrom)), take_drop), List(n))
+            if (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
+            && (map is "map") && (take_drop.isAny("take", "takeRight", "drop", "dropRight"))
+            && (canBuildFrom.toString contains "canBuildFrom") =>
+
+            warn(tree, FuncFirstThenMap(take_drop.toString))
+            
+          case Apply(Select(Apply(Select(col, map), List(Function(List(ValDef(_, _, _, _)), _))), take_drop), List(n))
+            if (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
+            && (map is "map") && (take_drop.isAny("take", "takeRight", "drop", "dropRight")) =>
+
+            warn(tree, FuncFirstThenMap(take_drop.toString))
+
           /// swap operations col.sortWith(...).filter(...)
           case Apply(Select(Apply(Select(col, sortWith), List(Function(List(ValDef(_, _, _, _), ValDef(_, _, _, _)), _))), filter), List(Function(List(ValDef(_, _, _, _)), _))) 
             if (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
