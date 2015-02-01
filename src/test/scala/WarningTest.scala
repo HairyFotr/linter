@@ -75,6 +75,7 @@ class WarningTest extends JUnitMustMatchers {
       case UnnecessaryElseBranch => 1
       case UseExistsOnOption(_, _, _) => 1
       case UseExpm1 => 1
+      case MergeMaps => 1
       case FuncFirstThenMap(_) => 1
       case FilterFirstThenSort => 1
       case UseMapNotFlatMap(_) => 1

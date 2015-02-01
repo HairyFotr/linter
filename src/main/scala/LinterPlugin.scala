@@ -1368,10 +1368,12 @@ class LinterPlugin(val global: Global) extends Plugin {
               warn(tree, UseFuncNotReduce(identOrCol(col), op.toString, reduce.toString))
             }
           
-          /// TODO check: col.map(...).map(...)
-          /*case Apply(TypeApply(Select(Apply(Apply(TypeApply(Select(col, TermName("map")), List(TypeTree(), TypeTree())), List(Function(List(ValDef(Modifiers(PARAM), TermName("x"), TypeTree(), EmptyTree)), Select(Ident(TermName("x")), TermName("toDouble"))))), List(TypeApply(Select(Select(This(TypeName("immutable")), scala.collection.immutable.List), TermName("canBuildFrom")), List(TypeTree())))), TermName("map")), List(TypeTree(), TypeTree())), List(Function(List(ValDef(Modifiers(PARAM), TermName("x"), TypeTree(), EmptyTree)), Apply(Select(Ident(TermName("x")), TermName("toString")), List())))) 
+          /// col.map(...).map(...)
+          case Apply(TypeApply(Select(Apply(Apply(TypeApply(Select(col, map1), _), List(Function(List(ValDef(_, _, _, _)), _))), List(canBuildFrom)), map2), _), List(Function(List(ValDef(_, _, _, _)), _)))
             if (map1 is "map") && (map2 is "map")
-            && (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe)) =>*/
+            && (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe)) =>
+            
+            warn(tree, MergeMaps)
 
           /// swap operations col.map(...).take(...)
           // TODO head, last could be like that too

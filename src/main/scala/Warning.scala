@@ -90,6 +90,7 @@ object Warning {
     UseConditionDirectly(true),
     UseIfExpression(""),
     UseExistsOnOption("", "", ""),
+    MergeMaps,
     FuncFirstThenMap(""),
     FilterFirstThenSort,
     UseMapNotFlatMap(""),
@@ -227,6 +228,8 @@ case class UseFuncNotReduce(varName: String, f: String, func: String) extends
   Warning(s"Use ${varName}.${f} instead of ${varName}.${func}.")
 case class UseFuncNotFold(varName: String, f: String, func: String) extends
   Warning(s"Use ${varName}.${f} instead of ${varName}.${func}.")
+case object MergeMaps extends
+  Warning("Merge these two map operations.")
 case class FuncFirstThenMap(methName: String) extends
   Warning(s"Use method ${methName} first, then map.")
 case object FilterFirstThenSort extends

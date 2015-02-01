@@ -901,6 +901,15 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
+  def MergeMaps(): Unit = {
+    implicit val msg = "Merge these two map operations."
+    
+    should(""" List(1,2,3).map(_+1).map(_/2) """)
+    should(""" List("1","2","3").map(x => x + "hello").map( _ + "hi") """)
+    should(""" val a = List("1234","2234","3344"); a.filter(_ contains '2').map(x => x + "hello").map( _ + "hi") """)
+  }
+  
+  @Test
   def FuncFirstThenMap(): Unit = {
     implicit val msg = "first, then map."
     
