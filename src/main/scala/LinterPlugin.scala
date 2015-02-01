@@ -1748,11 +1748,11 @@ class LinterPlugin(val global: Global) extends Plugin {
         def map(func: Int => Int, rangeSafe: Boolean = true): Values = //ADD: conditions?
           if(rangeSafe) {
             new Values(
-              ranges
-                .map { case (low, high) => (func(low), func(high)) }
-                .map { case (low, high) if low > high => (high, low); case (low, high) => (low, high) },
-              values
-                .map(func))
+              ranges.map { case (preLow, preHigh) => 
+                  val (low, high) = (func(preLow), func(preHigh))
+                  if(low > high) (high, low) else (low, high)
+              },
+              values.map(func))
           } else {
             if(this.ranges.nonEmpty && this.size <= 100001) //ADD: this only checks small ranges, also can still get slow
               (new Values(values = values ++ ranges.flatMap { case (low, high) => (low to high) }, name = name, isSeq = isSeq, actualSize = actualSize)).map(func)
@@ -1952,9 +1952,10 @@ class LinterPlugin(val global: Global) extends Plugin {
           case signum if signum.toString == "signum" => this.map(a => math.signum(a)).addCondition({ a => Set(-1, 0, +1) contains a })
           case abs if abs.toString == "abs" =>
             new Values(//ADD: conditions
-              ranges
-                .map { case (low, high) => (if(low > 0) low else 0, math.max(math.abs(low), math.abs(high))) }
-                .map { case (low, high) if low > high => (high, low); case (low, high) => (low, high) },
+              ranges.map { case (preLow, preHigh) => 
+                val (low, high) = (if(preLow > 0) preLow else 0, math.max(math.abs(preLow), math.abs(preHigh)))
+                if(low > high) (high, low) else (low, high)
+              },
               values.map(a => math.abs(a))).addCondition(_ >= 0)
 
           case size if (size.toString matches "size|length") => if(this.actualSize != -1) Values(this.actualSize) else Values.empty.addCondition(_ >= 0)
