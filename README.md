@@ -222,6 +222,7 @@ Rule lists from other static analysis tools for inspiration:
 * Scapegoat(Scala) - https://github.com/sksamuel/scalac-scapegoat-plugin#inspections
 * WartRemover(Scala) - https://github.com/typelevel/wartremover#warts
 * Scala Abide(Scala) - https://github.com/scala/scala-abide
+* SuperSafe™(Scala) - http://www.artima.com/supersafe_user_guide.html
 * Findbugs(JVM) - http://findbugs.sourceforge.net/bugDescriptions.html
 * CheckStyle(Java) - http://checkstyle.sourceforge.net/availablechecks.html
 * PMD(Java) - http://pmd.sourceforge.net/snapshot/pmd-java/rules/index.html
