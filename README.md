@@ -217,7 +217,7 @@ Feel free to add your own ideas, or implement these. Pull requests welcome!
 * Boolean function parameters should be named (`func("arg1", force = true)`)
 * Detect vars, that could easily be vals (done in scala 2.11 -Xlint)
 
-Rule lists from other static analysis tools for inspiration:
+Rule lists from other static analysis tools:
 * ScalaStyle(Scala) - https://github.com/scalastyle/scalastyle/wiki
 * Scapegoat(Scala) - https://github.com/sksamuel/scalac-scapegoat-plugin#inspections
 * WartRemover(Scala) - https://github.com/typelevel/wartremover#warts
