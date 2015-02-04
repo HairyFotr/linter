@@ -9,7 +9,7 @@ Add Linter to your project by appending these lines to your `build.sbt`:
 
     addCompilerPlugin("com.foursquare.lint" %% "linter" % "0.1-SNAPSHOT")
 
-If you have problems with the snapshot version when working offline, there are also 0.1.x versions being published - see Linter's `build.sbt`, or use the [sbt-updates plugin](https://github.com/rtimush/sbt-updates), to find the lastest published version. You can also try using the [sbt offline mode](http://www.scala-sbt.org/0.13.5/docs/Detailed-Topics/Dependency-Management-Flow.html).
+There are also published releases - the current version is `"0.1.6"`.
 
 ## Manual usage
 Another possible way to use Linter is to manually download and use these jars:<br>
