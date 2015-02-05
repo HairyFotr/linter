@@ -119,7 +119,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           
           /// Warn on Nothing/Any or M[Nothing/Any] (idea by OlegYch)
           case ValDef(mods, _, tpe, _)
-            if !mods.isParameter 
+            if !mods.isParameter
             && tpe.toString == "<type ?>" =>
             
             inferred += tpe.pos
@@ -158,9 +158,9 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             val tpe = 
               (literal match { 
-                case _: Double => "Double"; 
-                case _: Float => "Float";
-                case _ => "floating point type"; })
+                case _: Double => "Double"
+                case _: Float => "Float"
+                case _ => "floating point type" })
             
             val (strLiteral, actualLiteral) = {
                 // Get the actual token from code
@@ -174,7 +174,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                   case e: UnsupportedOperationException => // Happens if tree doesn't have a position
                   case e: NumberFormatException => // Could warn here, but I don't trust the above code enough
                   case e: MatchError => // Float regex failed
-                  case e: Exception =>  
+                  case e: Exception => 
                     //println(treeLiteral.pos.lineContent)
                     //e.printStackTrace
                 }
@@ -325,7 +325,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       
       
       def identOrDefault(tree: Tree, default: String): String = {
-        if (tree.isInstanceOf[Ident] && !tree.toString.contains(".")) tree.toString else default;
+        if (tree.isInstanceOf[Ident] && !tree.toString.contains(".")) tree.toString else default
       }
       def identOrCol(tree: Tree): String = identOrDefault(tree, "col")
       def identOrOpt(tree: Tree): String = identOrDefault(tree, "opt")
@@ -379,7 +379,7 @@ class LinterPlugin(val global: Global) extends Plugin {
         case _ => /*println(showRaw(pow));*/ false
       }
       
-      def isMath_E(e: Tree): Boolean = e match {
+      def isMathE(e: Tree): Boolean = e match {
         case Literal(Constant(e: Double)) 
           if (e >= 2.718281)
           && (e <= 2.718282) => true
@@ -530,7 +530,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// Suggest using exp instead of pow(E, a)
           case Apply(pow, List(e, num_)) 
             if isMath(pow, "pow")
-            && isMath_E(e) =>
+            && isMathE(e) =>
 
             warn(tree, UseExp)
 
@@ -826,7 +826,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               //println((caseStr, caseTypeStr))
 
               optionCase |= (caseTypeStr matches optionCaseReg)
-              booleanCase |= (caseTypeStr matches booleanCaseReg)  
+              booleanCase |= (caseTypeStr matches booleanCaseReg) 
             }
             def printCaseWarning(): Unit = {
               if(cases.size == 2) {
@@ -1217,20 +1217,20 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// Putting null into Option (idea by Smotko)
           case DefDef(_, _, _, _, tpe, body) if (tpe.toString matches "Option\\[.*\\]") &&
             (body match {
-              case n @ Literal(Constant(null)) => warn(n, AssigningOptionToNull); true;
-              case Block(_, n @ Literal(Constant(null))) => warn(n, AssigningOptionToNull); true;
+              case n @ Literal(Constant(null)) => warn(n, AssigningOptionToNull); true
+              case Block(_, n @ Literal(Constant(null))) => warn(n, AssigningOptionToNull); true
               case _ => false
             }) => //Ignore
           case ValDef(_, _, tpe, body) if (tpe.toString matches "Option\\[.*\\]") &&
             (body match {
-              case n @ Literal(Constant(null)) => warn(n, AssigningOptionToNull); true;
-              case Block(_, n @ Literal(Constant(null))) => warn(n, AssigningOptionToNull); true;
+              case n @ Literal(Constant(null)) => warn(n, AssigningOptionToNull); true
+              case Block(_, n @ Literal(Constant(null))) => warn(n, AssigningOptionToNull); true
               case _ => false
             }) => //Ignore
           case Assign(left, right) if (left.tpe.toString matches "Option\\[.*\\]") &&
             (right match {
-              case n @ Literal(Constant(null)) => warn(n, AssigningOptionToNull); true;
-              case Block(_, n @ Literal(Constant(null))) => warn(n, AssigningOptionToNull); true;
+              case n @ Literal(Constant(null)) => warn(n, AssigningOptionToNull); true
+              case Block(_, n @ Literal(Constant(null))) => warn(n, AssigningOptionToNull); true
               case _ => false
             }) => //Ignore
           
@@ -1399,7 +1399,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, MergeMaps)
 
           /// swap operations col.map(...).take(...)
-          // TODO head, last could be like that too
+          //TODO: head, last could be like that too
           case Select(Apply(Apply(TypeApply(Select(col, map), _), List(Function(List(ValDef(_, _, _, _)), _))), List(canBuildFrom)), func)
             if (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
             && (map is "map") && (func.isAny("take", "takeRight", "drop", "dropRight", "headOption", "lastOption", "init", "tail", "slice"))
@@ -1437,7 +1437,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, FilterFirstThenSort)
 
           /// flatMap(if(...) Seq(x) else Seq(y)) is better written as map(if(...) x else y)
-          // TODO: actually check all returns of the lambda
+          //TODO: actually check all returns of the lambda
           case Apply(TypeApply(Select(col, flatMap), _), List(Function(List(ValDef(_, param, _, _)), If(_, Apply(TypeApply(Select(col1, apply1), _), List(elt1)), Apply(TypeApply(Select(col2, apply2), _), List(elt2))))))
             if (flatMap is "flatMap") && (apply1 is "apply") && (apply2 is "apply")
             && (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
@@ -2853,8 +2853,9 @@ class LinterPlugin(val global: Global) extends Plugin {
                 //TODO: nopenopenopenope - matches the end of replaceX func, because this gets traversed multiple times with the wrong pos
                 val posFiltering = treePosHolder.toString matches (".*?[ .]"+ f + """ *[(].*, *("{2}|"{6}) *[)]""")
 
-                val special = """.\^$*+?()\[{\\|""";
-                val plainString = s"""([^${special}]|[\\\\][${special}])+""";
+                val special = """.\^$*+?()\[{\\|"""
+                val plainString = s"""([^${special}]|[\\\\][${special}])+"""
+                
                 if(posFiltering && (p0 matches plainString+"\\$"))
                   warn(treePosHolder, RegexWarning(s"This $f can be substituted with stripSuffix", error = false))
                 if(posFiltering && (p0 matches "\\^"+plainString))

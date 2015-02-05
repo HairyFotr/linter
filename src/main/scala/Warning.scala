@@ -19,7 +19,7 @@ package com.foursquare.lint
 sealed abstract class Warning(val message: String) {
   def name: String = toString.takeWhile(_ != '(')
 }
-// scalastyle:off public.methods.have.type
+
 object Warning {
   final val All: Seq[Warning] = Vector(
     AssigningOptionToNull,
@@ -223,7 +223,7 @@ case class UseExistsOnOption(varName: String, find_filter: String, isEmpty_isDef
   Warning(s"Use ${varName}.exists(...) instead of ${varName}.${find_filter}(...).${isEmpty_isDefined}.")
 case class UseFindNotFilterHead(varName: String) extends
   Warning(s"Unless there are side-effects, ${varName}.filter(...).headOption can be replaced by ${varName}.find(...).")
-case class UseContainsNotExistsEquals(colName: String, valCmp:String, val1: String, val2: String) extends
+case class UseContainsNotExistsEquals(colName: String, valCmp: String, val1: String, val2: String) extends
   Warning(s"Use ${colName}.contains(${valCmp}) instead of ${colName}.exists(${val1} == $val2)")
 case class UseQuantifierFuncNotFold(varName: String, method: String, func: String) extends
   Warning(s"Unless there are side-effects, this ${varName}.${func} can be replaced by ${varName}.${method}.")

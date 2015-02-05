@@ -24,10 +24,17 @@ class LinterOptionsTest extends JUnitMustMatchers {
 
   @Test
   def printWarningNames() {
+    val Right(linterOptions) = LinterOptions.parse(List("printWarningNames"))
+    val nonUnitResult = linterOptions.printWarningNames must beTrue
+  }
+  @Test
+  def printWarningNamesTrue() {
     val Right(linterOptions) = LinterOptions.parse(List("printWarningNames:true"))
     val nonUnitResult = linterOptions.printWarningNames must beTrue
-
-    val Right(linterOptions2) = LinterOptions.parse(List("printWarningNames:false"))
-    val nonUnitResult2 = linterOptions2.printWarningNames must beFalse
+  }
+  @Test
+  def printWarningNamesFalse() {
+    val Right(linterOptions) = LinterOptions.parse(List("printWarningNames:false"))
+    val nonUnitResult = linterOptions.printWarningNames must beFalse
   }
 }
