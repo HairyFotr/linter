@@ -103,6 +103,7 @@ class WarningTest extends JUnitMustMatchers {
       case SuspiciousMatches => 1
       case UseFindNotFilterHead(_) => 1
       case IfDoWhile => 1
+      case UseContainsNotExistsEquals(_, _, _, _) => 1
       case UseQuantifierFuncNotFold(_, _, _) => 1
       case UseFuncNotReduce(_, _, _) => 1
       case UseFuncNotFold(_, _, _) => 1

@@ -1309,11 +1309,34 @@ class LinterPlugin(val global: Global) extends Plugin {
             
             warn(pos, UseExistsOnOption(identOrCol(col), find_filter.toString, isEmpty_isDefined.toString))
 
+          /// exists(a == ...) is better written as contains(...)
+          case Apply(Select(col, exists), List(Function(List(ValDef(_, param1, _, _)), Apply(Select(param2, eq), List(id @ Ident(_))))))
+            if (exists is "exists") && ((eq is "$eq$eq") || (eq is "eq"))
+            && (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
+            && (param1.toString == param2.toString) =>
+            
+            warn(tree, UseContainsNotExistsEquals(identOrCol(col), id.toString, param2.toString, id.toString))
+
+          case Apply(Select(col, exists), List(Function(List(ValDef(_, param1, _, _)), Apply(Select(id @ Ident(_), eq), List(param2)))))
+            if (exists is "exists") && ((eq is "$eq$eq") || (eq is "eq"))
+            && (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
+            && (param1.toString == param2.toString) =>
+            
+            warn(tree, UseContainsNotExistsEquals(identOrCol(col), id.toString, id.toString, param2.toString))
+
+          case Apply(Select(col, exists), List(Function(List(ValDef(_, param1, _, _)), Apply(Select(param2, eq), List(Literal(Constant(lit)))))))
+            if (exists is "exists") && ((eq is "$eq$eq") || (eq is "eq"))
+            && (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
+            && (param1.toString == param2.toString) =>
+            
+            warn(tree, UseContainsNotExistsEquals(identOrCol(col), String.valueOf(lit.toString), param2.toString, String.valueOf(lit.toString)))
+
+
           /// fold(true)(acc && xxx) => forall
           /// fold(false)(acc || xxx) => exists
           //TODO: fix foldRight, reduceRight
           case Apply(Apply(TypeApply(Select(col, fold), List(_)), List(lit @ Literal(Constant(start)))), List(Function(List(ValDef(_, arg1, _, _), ValDef(_, arg2, _, _)), Apply(Select(arg1u, op), List(arg2u))))) 
-            if ((fold is "foldLeft") || (fold is "fold"))
+            if ((fold is "foldLeft") || (fold is "fold") || (fold is "$div$colon"))
             && (((true == start || false == start)
                 && ((arg1.toString == arg1u.toString) || (arg1.toString == arg2u.toString))
                 && (op.isAny("$amp$amp", "$bar$bar")))
@@ -3262,10 +3285,11 @@ class LinterPlugin(val global: Global) extends Plugin {
               knownPieces = this.knownPieces ++ (if(n >= 2) Set(this.suffix+this.prefix) else Nil))
           }
         
+        //TODO: wait what... I hope this isn't needed anywhere :)
         override def hashCode: Int = exactValue.hashCode + name.hashCode + minLength + trimmedMinLength + maxLength + trimmedMaxLength
         override def equals(that: Any): Boolean = that match {
-          case s: StringAttrs => (this.exactValue.isDefined && s.exactValue.isDefined && this.exactValue.get == s.exactValue.get)
-          case s: String => this.exactValue.exists(_ == s)
+          case that: StringAttrs => (this.exactValue.isDefined && that.exactValue.isDefined && this.exactValue.get == that.exactValue.get)
+          case that: String => this.exactValue.exists(_ == that)
           case _ => false
         }
         

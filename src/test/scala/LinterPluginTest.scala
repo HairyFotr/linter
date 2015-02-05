@@ -546,11 +546,27 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test
+  def UseContainsNotExistsEquals(): Unit = {
+    implicit val msg = " instead of "
+    
+    should("val b = 5; Set(1,2,3).exists(_ == b) ")
+    should("val b = 5; List(1,2,3).exists(a => a == b) ")
+    should("val b = 5; Set(1,2,3).exists(a => b == a) ")
+    should("""val b = "5"; Set("1","2","3").exists(a => b eq a) """)
+    should("Set(1,2,3).exists(a => a == 2) ")
+    should("Vector(1,2,3).exists(a => a == 2) ")
+    
+    shouldnt("Option(2).exists(_ == 2)")
+    
+  }
+  
+  @Test
   def UseQuantifierFuncNotFold(): Unit = {
     implicit val msg = " can be replaced by "
     
     should(""" val a = List(true, true, false); a.fold(true)((acc, n) => acc && !n) """)
     should(""" val a = List(true, true, false); a.fold(true)((acc, n) => !n && acc) """)
+    should(""" val a = List(true, true, false); a./:(true)((acc, n) => acc && !n) """)
     should(""" val a = Array.fill(10)(scala.util.Random.nextInt(20)); a.foldLeft(false)((acc, n) => acc || n > 5) """)
     should(""" val a = Array.fill(10)(scala.util.Random.nextInt(20)); a.foldLeft(false)((acc, n) => n > 5 || acc) """)
     should(""" val a = List(true, true, false); a.reduce((acc, n) => acc && !n) """)
@@ -563,11 +579,13 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   def UseFuncNotFold(): Unit = {
     {
       should(""" val a = List(1, 2, 3); a.fold(0)((a, b) => a + b) """)(".sum instead of ")
+      should(""" val a = List(1, 2, 3); a./:(0)((a, b) => a + b) """)(".sum instead of ")
       should(""" val a = List(1.0, 2.0, 3.0); a.foldLeft(2.0)((a, b) => b + a) """)(".sum + 2.0 instead of ")
       shouldnt(""" val a = List(1.0, 2.0, 3.0); a.foldLeft(2.0)((a, b) => b + (a * 4)) """)(".sum + 2.0 instead of ")
     }
     {
       should(""" val a = List(1, 2, 3); a.fold(1)((a, b) => a * b) """)(".product instead of ")
+      should(""" val a = List(1, 2, 3); a./:(1)((a, b) => a * b) """)(".product instead of ")
       should(""" val a = List(1.0, 2.0, 3.0); a.foldLeft(2d)((a, b) => b * a) """)(".product * 2.0 instead of ")
     }
   }

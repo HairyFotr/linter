@@ -101,6 +101,7 @@ object Warning {
     UseExistsNotCountCompare(""),
     UseGetOrElseOnOption(""),
     UseFindNotFilterHead(""),
+    UseContainsNotExistsEquals("", "", "", ""),
     UseQuantifierFuncNotFold("", "", ""),
     UseFuncNotReduce("", "", ""),
     UseFuncNotFold("", "", ""),
@@ -222,6 +223,8 @@ case class UseExistsOnOption(varName: String, find_filter: String, isEmpty_isDef
   Warning(s"Use ${varName}.exists(...) instead of ${varName}.${find_filter}(...).${isEmpty_isDefined}.")
 case class UseFindNotFilterHead(varName: String) extends
   Warning(s"Unless there are side-effects, ${varName}.filter(...).headOption can be replaced by ${varName}.find(...).")
+case class UseContainsNotExistsEquals(colName: String, valCmp:String, val1: String, val2: String) extends
+  Warning(s"Use ${colName}.contains(${valCmp}) instead of ${colName}.exists(${val1} == $val2)")
 case class UseQuantifierFuncNotFold(varName: String, method: String, func: String) extends
   Warning(s"Unless there are side-effects, this ${varName}.${func} can be replaced by ${varName}.${method}.")
 case class UseFuncNotReduce(varName: String, f: String, func: String) extends
