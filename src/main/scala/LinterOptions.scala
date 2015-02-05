@@ -18,13 +18,14 @@ package com.foursquare.lint
 
 import annotation.tailrec
 
-case class LinterOptions(disabledWarningNames: Seq[String] = Nil)
+case class LinterOptions(disabledWarningNames: Seq[String] = Nil, printWarningNames: Boolean = false)
 
 object LinterOptions {
   def parse(options: List[String]): Either[String, LinterOptions] = parse0(options, new LinterOptions)
 
   final val EnableOnlyArgument = "enable-only"
   final val DisableArgument = "disable"
+  final val PrintWarningNames = "printWarningNames"
   final val WarningNameDelimiter = "\\+"
   final val OptionKeyValueDelimiter = ":"
 
@@ -32,10 +33,10 @@ object LinterOptions {
     case Array(option, warningNames) => 
       val (validNames, invalidNames) = warningNames.split(WarningNameDelimiter).partition(Warning.NameToWarning.contains) 
       if (validNames.nonEmpty && invalidNames.isEmpty) Right(validNames)
-      else Left("The '%s' option referenced invalid warnings: %s".format(option, invalidNames.mkString(", ")))
-    case _ => Left("The '%s' option was not of the expected form.")
+      else Left(s"The '${option}' option referenced invalid warnings: ${invalidNames.mkString(", ")}")
+    case _ => Left(s"The '${fullOption}' option was not of the expected form.")
   }
-    
+  
   @tailrec
   private def parse0(options: List[String], linterOptions: LinterOptions): Either[String, LinterOptions] = options match {
     case Nil => Right(linterOptions)
@@ -44,6 +45,11 @@ object LinterOptions {
       case Right(warnings) => parse0(xs, linterOptions.copy(disabledWarningNames = warnings))
       case Left(errorMessage) => Left(errorMessage)
     }
-    case unknownOption :: _ => Left("The option '%s' is unrecognized.".format(unknownOption))
+    case option :: xs if option.startsWith(PrintWarningNames) => option.split(OptionKeyValueDelimiter) match {
+      case Array(_, value @ ("true" | "false")) => Right(linterOptions.copy(printWarningNames = value.toBoolean))
+      case Array(_) if option == PrintWarningNames => Right(linterOptions.copy(printWarningNames = true))
+      case _ => Left(s"The '${option}' option was not of the expected form")
+    }
+    case unknownOption :: _ => Left(s"The option '${unknownOption}' is unrecognized.")
   }
 }

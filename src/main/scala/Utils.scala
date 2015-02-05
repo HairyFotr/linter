@@ -20,17 +20,17 @@ import scala.tools.nsc.Global
 import collection.mutable
 
 object Utils {
-  var disabledWarningNames: Seq[String] = Nil
+  var linterOptions = LinterOptions()
   val nowarnPositions = mutable.HashSet[Global#Position]()
   
   def warn(tree: Global#Tree, warning: Warning)(implicit unit: Global#CompilationUnit): Unit = { 
-    if((disabledWarningNames contains warning.name)
+    if((linterOptions.disabledWarningNames contains warning.name)
     || (tree.pos.lineContent matches ".*// *linter:(nowarn|ignore|disable)(:([a-zA-Z]+[+])*?"+warning.name+"([+][a-zA-Z]+)*?)? *(//.*)?")
     || (nowarnPositions contains tree.pos)) {
       // skip
     } else {
       // scalastyle:off regex
-      unit.warning(tree.pos, warning.message)
+      unit.warning(tree.pos, if (linterOptions.printWarningNames) s"[${warning.name}] ${warning.message}" else warning.message)
       // scalastyle:on regex
     }
   }

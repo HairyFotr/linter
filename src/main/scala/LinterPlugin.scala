@@ -36,8 +36,8 @@ class LinterPlugin(val global: Global) extends Plugin {
   override def processOptions(options: List[String], error: String => Unit): Unit = {
     LinterOptions.parse(options) match {
      case Left(errorMessage) => error(errorMessage)
-     case Right(LinterOptions(disabledWarnings)) => 
-       Utils.disabledWarningNames = disabledWarnings
+     case Right(linterOptions) => 
+       Utils.linterOptions = linterOptions
     }
   }
 
@@ -1312,21 +1312,21 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// exists(a == ...) is better written as contains(...)
           case Apply(Select(col, exists), List(Function(List(ValDef(_, param1, _, _)), Apply(Select(param2, eq), List(id @ Ident(_))))))
             if (exists is "exists") && ((eq is "$eq$eq") || (eq is "eq"))
-            && (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
+            && (col.tpe.baseClasses.exists(c => c.tpe =:= TraversableClass.tpe || c.tpe =:= OptionClass.tpe))
             && (param1.toString == param2.toString) =>
             
             warn(tree, UseContainsNotExistsEquals(identOrCol(col), id.toString, param2.toString, id.toString))
 
           case Apply(Select(col, exists), List(Function(List(ValDef(_, param1, _, _)), Apply(Select(id @ Ident(_), eq), List(param2)))))
             if (exists is "exists") && ((eq is "$eq$eq") || (eq is "eq"))
-            && (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
+            && (col.tpe.baseClasses.exists(c => c.tpe =:= TraversableClass.tpe || c.tpe =:= OptionClass.tpe))
             && (param1.toString == param2.toString) =>
             
             warn(tree, UseContainsNotExistsEquals(identOrCol(col), id.toString, id.toString, param2.toString))
 
           case Apply(Select(col, exists), List(Function(List(ValDef(_, param1, _, _)), Apply(Select(param2, eq), List(Literal(Constant(lit)))))))
             if (exists is "exists") && ((eq is "$eq$eq") || (eq is "eq"))
-            && (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
+            && (col.tpe.baseClasses.exists(c => c.tpe =:= TraversableClass.tpe || c.tpe =:= OptionClass.tpe))
             && (param1.toString == param2.toString) =>
             
             warn(tree, UseContainsNotExistsEquals(identOrCol(col), String.valueOf(lit.toString), param2.toString, String.valueOf(lit.toString)))
@@ -1514,9 +1514,9 @@ class LinterPlugin(val global: Global) extends Plugin {
             && (map.tpe.baseClasses.exists(_.tpe <:< MapFactoryClass.tpe)) =>
             
             val keys = args flatMap {
-              case Apply(TypeApply(Select(Apply(any2ArrowAssoc, List(lhs)), arrow), _), _rhs)
-                if (arrow is "$minus$greater")
-                && (any2ArrowAssoc startsWith "scala.this.Predef.any2ArrowAssoc") 
+              case Apply(TypeApply(Select(Apply(arrowAssoc, List(lhs)), arrow), _), _rhs)
+                if ((arrow is "$minus$greater") || (arrow is "$u2192"))
+                && (arrowAssoc.toString matches "scala[.]this[.]Predef[.](any2)?ArrowAssoc.+")
                 && (lhs.isInstanceOf[Literal] || lhs.isInstanceOf[Ident]) => //TODO: support pure functions someday
                 List(lhs)
                 
@@ -1525,7 +1525,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 && (lhs.isInstanceOf[Literal] || lhs.isInstanceOf[Ident]) =>
                 List(lhs)
 
-              case _ => //unknown mapping format, TODO
+              case k => //unknown mapping format, TODO
                 Nil
             }
             

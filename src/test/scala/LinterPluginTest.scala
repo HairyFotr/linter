@@ -21,6 +21,12 @@ import org.specs2.matcher.{StandardMatchResults, JUnitMustMatchers}
 import util.matching.Regex
 import collection.mutable
 
+import java.io.{PrintWriter, StringWriter}
+import scala.io.Source
+import scala.tools.nsc.{Settings, Properties}
+import scala.tools.nsc.interpreter.{IMain, Results}
+import scala.tools.nsc.reporters.Reporter
+
 //TODO:
 // * each test should have a positive and a negative case
 // * have longer tests, that maybe trigger several checks
@@ -29,12 +35,6 @@ import collection.mutable
 // * detect the non-compiling tests (they currently pass)
 
 final object Compiler {
-  import java.io.{PrintWriter, StringWriter}
-  import scala.io.Source
-  import scala.tools.nsc.{Settings, Properties}
-  import scala.tools.nsc.interpreter.{IMain, Results}
-  import scala.tools.nsc.reporters.Reporter
-
   private val settings = new Settings
   val loader = manifest[LinterPlugin].runtimeClass.getClassLoader
   settings.classpath.value = Source.fromURL(loader.getResource("app.class.path")).mkString
@@ -556,8 +556,10 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("Set(1,2,3).exists(a => a == 2) ")
     should("Vector(1,2,3).exists(a => a == 2) ")
     
-    shouldnt("Option(2).exists(_ == 2)")
-    
+    if (!Properties.versionString.contains("2.10")) {
+      should("val b = 5; Option(2).exists(_ == b)")
+      should("Option(2).exists(_ == 2)")
+    }
   }
   
   @Test
@@ -872,6 +874,19 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     """)
   }
   
+  @Test
+  def DuplicateKeyInMap(): Unit = {
+    implicit val msg = "This key has already been defined"
+    
+    should(""" val a = 5; Map(a -> 5, 2 -> 4, a -> 2) """)
+    should(""" val a = 5; collection.mutable.HashMap(a -> 5, 2 -> 4, a -> 2) """)
+    should(""" val a = 5; Map((a,5), 2 -> 4, a → 2) """)
+
+    shouldnt(""" Map(1 -> 2, 2 -> 3, 3 -> 4) """)
+    shouldnt(""" val a = 5; Map(a -> 5, 2 -> 4, (a+1) -> 2) """)
+    shouldnt(""" val a = 5; collection.mutable.HashMap(a -> 5, 2 -> 4, (a-1) -> 2) """)
+  }
+
   @Test
   def UseFlattenNotFilterOption(): Unit = {
     implicit val msg = ".flatten instead of "//.filter(_.isDefined).map(_.get)"
@@ -2211,19 +2226,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     shouldnt("""var a = new util.Random; a.nextInt(1)""")
   }
     
-  @Test
-  def map__apply(): Unit = {
-    implicit val msg = "This key has already been defined"
-    
-    should(""" val a = 5; Map(a -> 5, 2 -> 4, a -> 2) """)
-    should(""" val a = 5; collection.mutable.HashMap(a -> 5, 2 -> 4, a -> 2) """)
-    should(""" val a = 5; Map((a,5), 2 -> 4, a -> 2) """)
-
-    shouldnt(""" Map(1 -> 2, 2 -> 3, 3 -> 4) """)
-    shouldnt(""" val a = 5; Map(a -> 5, 2 -> 4, (a+1) -> 2) """)
-    shouldnt(""" val a = 5; collection.mutable.HashMap(a -> 5, 2 -> 4, (a-1) -> 2) """)
-  }
-
   @Test
   def puzzlers__001(): Unit = {
     implicit val msg = "You're passing a block that returns a function"
