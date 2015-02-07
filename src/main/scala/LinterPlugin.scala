@@ -65,6 +65,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       override def apply(unit: global.CompilationUnit): Unit = {
         if(!unit.isJava) {
           resetTraits()
+          nowarnPositions.clear
           new PreTyperTraverser(unit).traverse(unit.body)
           //println((sealedTraits, usedTraits))
           for(unusedTrait <- sealedTraits.filterNot(st => usedTraits.exists(_.toString == st._1.toString))) {
@@ -213,6 +214,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
       override def apply(unit: global.CompilationUnit): Unit = {
         if(!unit.isJava) {
+          nowarnPositions.clear
           new PostTyperTraverser(unit).traverse(unit.body)
         }
       }
@@ -234,6 +236,7 @@ class LinterPlugin(val global: Global) extends Plugin {
       val SeqLikeApply: Symbol = SeqLikeClass.info.member(newTermName("apply"))
       val MapFactoryClass = rootMirror.getClassByName(newTermName("scala.collection.generic.MapFactory"))
       val TraversableFactoryClass: Symbol = rootMirror.getClassByName(newTermName("scala.collection.generic.TraversableFactory"))
+      val TraversableOnceClass: Symbol = rootMirror.getClassByName(newTermName("scala.collection.TraversableOnce"))
       val BigIntClass: Symbol = rootMirror.getClassByName(newTermName("scala.math.BigInt"))
 
       val OptionGet: Symbol = OptionClass.info.member(nme.get)
@@ -1313,21 +1316,21 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// exists(a == ...) is better written as contains(...)
           case Apply(Select(col, exists), List(Function(List(ValDef(_, param1, _, _)), Apply(Select(param2, eq), List(id @ Ident(_))))))
             if (exists is "exists") && ((eq is "$eq$eq") || (eq is "eq"))
-            && (col.tpe.baseClasses.exists(c => c.tpe =:= TraversableClass.tpe || c.tpe =:= OptionClass.tpe))
+            && (col.tpe.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || c.tpe =:= OptionClass.tpe))
             && (param1.toString == param2.toString) =>
             
             warn(tree, UseContainsNotExistsEquals(identOrCol(col), id.toString, param2.toString, id.toString))
 
           case Apply(Select(col, exists), List(Function(List(ValDef(_, param1, _, _)), Apply(Select(id @ Ident(_), eq), List(param2)))))
             if (exists is "exists") && ((eq is "$eq$eq") || (eq is "eq"))
-            && (col.tpe.baseClasses.exists(c => c.tpe =:= TraversableClass.tpe || c.tpe =:= OptionClass.tpe))
+            && (col.tpe.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || c.tpe =:= OptionClass.tpe))
             && (param1.toString == param2.toString) =>
             
             warn(tree, UseContainsNotExistsEquals(identOrCol(col), id.toString, id.toString, param2.toString))
 
           case Apply(Select(col, exists), List(Function(List(ValDef(_, param1, _, _)), Apply(Select(param2, eq), List(Literal(Constant(lit)))))))
             if (exists is "exists") && ((eq is "$eq$eq") || (eq is "eq"))
-            && (col.tpe.baseClasses.exists(c => c.tpe =:= TraversableClass.tpe || c.tpe =:= OptionClass.tpe))
+            && (col.tpe.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || c.tpe =:= OptionClass.tpe))
             && (param1.toString == param2.toString) =>
             
             warn(tree, UseContainsNotExistsEquals(identOrCol(col), String.valueOf(lit.toString), param2.toString, String.valueOf(lit.toString)))
@@ -1595,32 +1598,55 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           /// col.exists(...) instead of !col.filter(...).isEmpty / col.filter(...).nonEmpty (idea from pippi)
           case Select(Apply(Select(col, filter), List(func)), nonEmpty)
-            if col.tpe.widen.baseClasses.exists(_.tpe =:= TraversableClass.tpe)
+            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || c.tpe =:= OptionClass.tpe)
             && (filter is "filter") && (nonEmpty is "nonEmpty") =>
 
             warn(tree, UseExistsNotFilterEmpty(identOrCol(col), bang = false))
 
           case Select(Select(Apply(Select(col, filter), List(func)), isEmpty), unaryBang)
-            if col.tpe.widen.baseClasses.exists(_.tpe =:= TraversableClass.tpe)
+            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || c.tpe =:= OptionClass.tpe)
+            && (filter is "filter") && (isEmpty is "isEmpty") && (unaryBang is "unary_$bang") =>
+
+            warn(tree, UseExistsNotFilterEmpty(identOrCol(col), bang = true))
+
+          case Select(Apply(xArrayOps, List(Apply(Select(col, filter), List(func)))), nonEmpty)
+            if (xArrayOps.toString.contains("ArrayOps"))
+            && (filter is "filter") && (nonEmpty is "nonEmpty") =>
+
+            warn(tree, UseExistsNotFilterEmpty(identOrCol(col), bang = false))
+
+          case Select(Select(Apply(xArrayOps, List(Apply(Select(col, filter), List(func)))), isEmpty), unaryBang)
+            if (xArrayOps.toString.contains("ArrayOps"))
             && (filter is "filter") && (isEmpty is "isEmpty") && (unaryBang is "unary_$bang") =>
 
             warn(tree, UseExistsNotFilterEmpty(identOrCol(col), bang = true))
 
           /// col.count(...) instead of col.filter(...).size/length (idea from pippi)
           case Select(Apply(Select(col, filter), List(func)), size_length)
-            if col.tpe.widen.baseClasses.exists(_.tpe =:= TraversableClass.tpe)
+            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || c.tpe =:= OptionClass.tpe)
             && (filter is "filter")
             && ((size_length is "size") || (size_length is "length")) =>
 
             warn(tree, UseCountNotFilterLength(identOrCol(col), size_length.toString))
 
+          case Select(Apply(xArrayOps, List(Apply(Select(col, filter), List(func)))), size_length) 
+            if (xArrayOps.toString.contains("ArrayOps"))
+            && (filter is "filter")
+            && ((size_length is "size") || (size_length is "length")) =>
+          
+            warn(tree, UseCountNotFilterLength(identOrCol(col), size_length.toString))
+
           /// col.exists(...) instead of col.count(...) == 0 (or similar)
           case Apply(Select(Apply(Select(col, count), List(func)), op), List(Literal(Constant(x))))
-            if col.tpe.widen.baseClasses.exists(_.tpe =:= TraversableClass.tpe)
+            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe)
             && (count is "count") && (isEmptyCompare(x, op)) =>
           
             if(!(op == nme.EQ || op == nme.LE || op == nme.LT))
               warn(tree, UseExistsNotCountCompare(identOrCol(col)))
+
+          case Apply(Select(Apply(Select(col, count), List(func)), op), List(Literal(Constant(x))))
+            if (count is "count") && (isEmptyCompare(x, op)) =>
+            println(col.tpe.widen.baseClasses)
 
           /// Use partial function directly - temporary variable is unnecessary (idea by yzgw)
           case Apply(_, List(Function(List(ValDef(mods, x_1, typeTree: TypeTree, EmptyTree)), Match(x_1_, _))))
@@ -1663,6 +1689,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
       override def apply(unit: global.CompilationUnit): Unit = {
         if(!unit.isJava) {
+          nowarnPositions.clear
           new PostTyperInterpreterTraverser(unit).traverse(unit.body)
         }
       }
@@ -3623,6 +3650,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     
     override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
       override def apply(unit: global.CompilationUnit): Unit = {
+        nowarnPositions.clear
         if(!unit.isJava) new PostRefChecksTraverser(unit).traverse(unit.body)
       }
     }

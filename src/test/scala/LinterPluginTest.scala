@@ -504,18 +504,48 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       var a = Seq(1,2,3);
       val b = !a.filter{ _ > 1 }.isEmpty
     """)
+    should(""" 
+      var a = Set(1,2,3);
+      val b = !a.filter{ _ > 1 }.isEmpty
+    """)
+    should(""" 
+      var a = Array(1,2,3);
+      val b = !a.filter{ _ > 1 }.isEmpty
+    """)
+    should(""" 
+      var a = Option(1);
+      val b = !a.filter{ _ > 1 }.isEmpty
+    """)
   }
 
   @Test
   def UseCountNotFilterLength(): Unit = {
+    implicit val msg = "Use a.count(...) instead of a.filter(...)."
+
     should(""" 
       var a = Seq(1,2,3);
       val b = a.filter{ _ > 1 }.length
-    """)("Use a.count(...) instead of a.filter(...).length")
+    """)
     should(""" 
       var a = Seq(1,2,3);
       val b = a.filter{ _ > 1 }.size
-    """)("Use a.count(...) instead of a.filter(...).size")
+    """)
+    should(""" 
+      var a = Set(1,2,3);
+      val b = a.filter{ _ > 1 }.size
+    """)
+    should(""" 
+      var atte = Array(1,2,3);
+      val b = atte.filter{ _ > 1 }.size
+    """)("Use col.count(...) instead of col.filter(...).")
+    should(""" 
+      var aaaa = Array(1,2,3);
+      val b = aaaa.filter{ _ > 1 }.size
+    """)("Use col.count(...) instead of col.filter(...).")
+    should(""" 
+      var a = Array(1,2,3);
+      val b = a.filter{ _ > 1 }.size
+    """)("Use col.count(...) instead of col.filter(...).")
   }
   
   @Test
@@ -532,6 +562,22 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     """)
     should(""" 
       var a = Seq(1,2,3);
+      val b = a.count{ _ > 1 } != 0
+    """)
+    should(""" 
+      var a = Set(1,2,3);
+      val b = a.count{ _ > 1 } != 0
+    """)
+    should(""" 
+      var a = collection.mutable.ListBuffer(1,2,3);
+      val b = a.count{ _ > 1 } != 0
+    """)
+    should(""" 
+      var a = Array(1,2,3);
+      val b = a.count{ _ > 1 } != 0
+    """)
+    should(""" 
+      var a = Option(1);
       val b = a.count{ _ > 1 } != 0
     """)
 
@@ -555,6 +601,8 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""val b = "5"; Set("1","2","3").exists(a => b eq a) """)
     should("Set(1,2,3).exists(a => a == 2) ")
     should("Vector(1,2,3).exists(a => a == 2) ")
+    should("Array(1,2,3).exists(a => a == 2) ")
+    should("collection.mutable.ListBuffer(1,2,3).exists(a => a == 2) ")
     
     if (!Properties.versionString.contains("2.10")) {
       should("val b = 5; Option(2).exists(_ == b)")
@@ -574,6 +622,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should(""" val a = List(true, true, false); a.reduce((acc, n) => acc && !n) """)
     should(""" val a = List(true, true, false); a.reduce((acc, n) => !n || acc) """)
     should(""" val a = List(true, true, false); a.reduceLeft((acc, n) => !n || acc) """)
+    should(""" val a = Set(true, true, false); a.reduceLeft((acc, n) => !n || acc) """)
  
   }
   
@@ -583,11 +632,15 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       should(""" val a = List(1, 2, 3); a.fold(0)((a, b) => a + b) """)(".sum instead of ")
       should(""" val a = List(1, 2, 3); a./:(0)((a, b) => a + b) """)(".sum instead of ")
       should(""" val a = List(1.0, 2.0, 3.0); a.foldLeft(2.0)((a, b) => b + a) """)(".sum + 2.0 instead of ")
+      should(""" val a = Array(1.0, 2.0, 3.0); a.foldLeft(2.0)((a, b) => b + a) """)(".sum + 2.0 instead of ")
+      should(""" val a = Set(1.0, 2.0, 3.0); a.foldLeft(2.0)((a, b) => b + a) """)(".sum + 2.0 instead of ")
       shouldnt(""" val a = List(1.0, 2.0, 3.0); a.foldLeft(2.0)((a, b) => b + (a * 4)) """)(".sum + 2.0 instead of ")
     }
     {
       should(""" val a = List(1, 2, 3); a.fold(1)((a, b) => a * b) """)(".product instead of ")
       should(""" val a = List(1, 2, 3); a./:(1)((a, b) => a * b) """)(".product instead of ")
+      should(""" val a = Array(1, 2, 3); a./:(1)((a, b) => a * b) """)(".product instead of ")
+      should(""" val a = Set(1, 2, 3); a./:(1)((a, b) => a * b) """)(".product instead of ")
       should(""" val a = List(1.0, 2.0, 3.0); a.foldLeft(2d)((a, b) => b * a) """)(".product * 2.0 instead of ")
     }
   }
@@ -599,6 +652,8 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       
       should(""" val a = List(1, 2, 3); a.reduce((a, b) => a + b) """)
       should(""" val a = List(1.0, 2.0, 3.0); a.reduceLeft((a, b) => b + a) """)
+      should(""" val a = Array(1.0, 2.0, 3.0); a.reduceLeft((a, b) => b + a) """)
+      should(""" val a = Set(1.0, 2.0, 3.0); a.reduceLeft((a, b) => b + a) """)
       shouldnt(""" val a = List(1.0, 2.0, 3.0); a.reduceLeft((a, b) => b + (a * 2)) """)
     }
     {
@@ -606,6 +661,8 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       
       should(""" val a = List(1, 2, 3); a.reduce((a, b) => a * b) """)
       should(""" val a = List(1.0, 2.0, 3.0); a.reduceLeft((a, b) => b * a) """)
+      should(""" val a = Array(1.0, 2.0, 3.0); a.reduceLeft((a, b) => b * a) """)
+      should(""" val a = Set(1.0, 2.0, 3.0); a.reduceLeft((a, b) => b * a) """)
       shouldnt(""" val a = List(1.0, 2.0, 3.0); a.reduceLeft((a, b) => b * (a * 2)) """)
     }
     {
@@ -613,6 +670,8 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       
       should(""" val a = List(1, 2, 3); a.reduce((a, b) => a min b) """)
       should(""" val a = List(1.0, 2.0, 3.0); a.reduceLeft(_ min _) """)
+      should(""" val a = Array(1.0, 2.0, 3.0); a.reduceLeft(_ min _) """)
+      should(""" val a = Set(1.0, 2.0, 3.0); a.reduceLeft(_ min _) """)
       shouldnt(""" val a = List(1, 2, 3); a.reduce((a, b) => a min (b + 2)) """)
     }
     {
@@ -620,6 +679,8 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       
       should(""" val a = List(1, 2, 3); a.reduce((a, b) => a max b) """)
       should(""" val a = List(1.0, 2.0, 3.0); a.reduceLeft(_ max _) """)
+      should(""" val a = Array(1.0, 2.0, 3.0); a.reduceLeft(_ max _) """)
+      should(""" val a = Set(1.0, 2.0, 3.0); a.reduceLeft(_ max _) """)
       shouldnt(""" val a = List(1, 2, 3); a.reduce((a, b) => a max (b / 2)) """)
     }
   }
