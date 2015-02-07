@@ -16,16 +16,16 @@
 
 package com.foursquare.lint
 
-import org.junit.{Ignore, Before, Test}
-import org.specs2.matcher.{StandardMatchResults, JUnitMustMatchers}
-import util.matching.Regex
-import collection.mutable
+import java.io.{ PrintWriter, StringWriter }
 
-import java.io.{PrintWriter, StringWriter}
+import org.junit.{ Ignore, Test }
+import org.specs2.matcher.{ JUnitMustMatchers, StandardMatchResults }
+
+import scala.collection.mutable
 import scala.io.Source
-import scala.tools.nsc.{Settings, Properties}
-import scala.tools.nsc.interpreter.{IMain, Results}
+import scala.tools.nsc.interpreter.{ IMain, Results }
 import scala.tools.nsc.reporters.Reporter
+import scala.tools.nsc.{ Properties, Settings }
 
 //TODO:
 // * each test should have a positive and a negative case
@@ -62,7 +62,7 @@ final object Compiler {
 
   def compileAndLint(code: String): String = {
     stringWriter.getBuffer.delete(0, stringWriter.getBuffer.length)
-    val thunked = "() => { \n%s\n }".format(code)
+    val thunked = s"() => { \n$code\n }"
     interpreter.interpret(thunked) match {
       case Results.Success => ""
       case Results.Error => stringWriter.toString

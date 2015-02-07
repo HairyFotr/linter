@@ -130,7 +130,7 @@ object Warning {
 case object UnextendedSealedTrait extends
   Warning("This sealed trait is never extended")
 case class UnlikelyEquality(lhs: String, rhs: String, op: String) extends
-  Warning(s"Comparing with ${op} on instances of unrelated types ${(lhs, rhs).toString}.")
+  Warning(s"Comparing with $op on instances of unrelated types ${(lhs, rhs).toString}.")
 case object UseLog1p extends
   Warning("Use math.log1p(x), instead of math.log(1 + x) for added accuracy when x is near 0.")
 case object UseLog10 extends
@@ -164,15 +164,15 @@ case object CloseSourceFile extends
 case object JavaConverters extends
   Warning("Consider using the explicit collection.JavaConverters instead of implicit conversions in collection.JavaConversions.")
 case class ContainsTypeMismatch(seqType: String, targetType: String) extends 
-  Warning(s"${seqType}.contains(${targetType}) will probably return false, since the collection and target element are of unrelated types.")
+  Warning(s"$seqType.contains($targetType) will probably return false, since the collection and target element are of unrelated types.")
 case class NumberInstanceOf(tpe: String) extends
-  Warning(s"Use to${tpe} instead of asInstanceOf[${tpe}].")
+  Warning(s"Use to$tpe instead of asInstanceOf[$tpe].")
 case object PatternMatchConstant extends
   Warning("Pattern matching on a constant value.")
 case object PreferIfToBooleanMatch extends
   Warning("Pattern matching on Boolean is probably better written as an if statement.")
 case class IdenticalCaseBodies(n: String) extends
-  Warning(s"Bodies of ${n} neighbouring cases are identical and could be merged.")
+  Warning(s"Bodies of $n neighbouring cases are identical and could be merged.")
 case object IdenticalCaseConditions extends
   Warning("Identical case condition detected above. This case will never match.") // Why doesn't compiler catch this?
 case object ReflexiveComparison extends
@@ -182,7 +182,7 @@ case object YodaConditions extends
 case class UseConditionDirectly(negated: Boolean = false) extends
   Warning(s"""Remove the if expression and use the ${if (negated) "negated " else ""}condition directly.""")
 case class UseIfExpression(varName: String) extends
-  Warning(s"Assign the result of the if expression to variable ${varName} directly.")
+  Warning(s"Assign the result of the if expression to variable $varName directly.")
 case object UnnecessaryElseBranch extends
   Warning("This else branch is unnecessary, as the then branch always returns.")
 case object DuplicateIfBranches extends
@@ -192,7 +192,7 @@ case object IdenticalIfElseCondition extends
 case object MergeNestedIfs extends
   Warning("These two nested ifs can be merged into one.")
 case class VariableAssignedUnusedValue(varName: String) extends
-  Warning(s"Variable ${varName} has an unused value before this reassign.")
+  Warning(s"Variable $varName has an unused value before this reassign.")
 case object MalformedSwap extends
   Warning("Did you mean to swap these two variables?")
 case object IdenticalIfCondition extends
@@ -204,7 +204,7 @@ case object IndexingWithNegativeNumber extends
 case object OptionOfOption extends
   Warning("Why would you need an Option of an Option?")
 case class UndesirableTypeInference(inferredType: String) extends
-  Warning(s"Inferred type ${inferredType}. (This might not be what you've intended)")
+  Warning(s"Inferred type $inferredType. (This might not be what you've intended)")
 case object AssigningOptionToNull extends
   Warning("You probably meant None, not null.")
 case object WrapNullWithOption extends
@@ -214,71 +214,71 @@ case object AvoidOptionStringSize extends
 case object AvoidOptionCollectionSize extends
   Warning("Did you mean to take the size of the collection inside the Option?")
 case class UseGetOrElseOnOption(varname: String) extends
-  Warning(s"Use ${varname}.getOrElse(...) instead of ${varname}.orElse(Some(...)).get.")
+  Warning(s"Use $varname.getOrElse(...) instead of $varname.orElse(Some(...)).get.")
 case class UseOptionOrNull(varname: String, insteadOf: String) extends
-  Warning(s"Use ${varname}.orNull or ${varname}.getOrElse(null) instead of if (${insteadOf}) ${varname}.get else null.")
+  Warning(s"Use $varname.orNull or $varname.getOrElse(null) instead of if ($insteadOf) $varname.get else null.")
 case class UseOptionGetOrElse(varname: String, insteadOf: String) extends
-  Warning(s"Use ${varname}.getOrElse(...) instead of if(${insteadOf}) ${varname}.get else ...")
+  Warning(s"Use $varname.getOrElse(...) instead of if($insteadOf) $varname.get else ...")
 case class UseExistsOnOption(varName: String, find_filter: String, isEmpty_isDefined: String) extends
-  Warning(s"Use ${varName}.exists(...) instead of ${varName}.${find_filter}(...).${isEmpty_isDefined}.")
+  Warning(s"Use $varName.exists(...) instead of $varName.$find_filter(...).$isEmpty_isDefined.")
 case class UseFindNotFilterHead(varName: String) extends
-  Warning(s"Unless there are side-effects, ${varName}.filter(...).headOption can be replaced by ${varName}.find(...).")
+  Warning(s"Unless there are side-effects, $varName.filter(...).headOption can be replaced by $varName.find(...).")
 case class UseContainsNotExistsEquals(colName: String, valCmp: String, val1: String, val2: String) extends
-  Warning(s"Use ${colName}.contains(${valCmp}) instead of ${colName}.exists(${val1} == $val2)")
+  Warning(s"Use $colName.contains($valCmp) instead of $colName.exists($val1 == $val2)")
 case class UseQuantifierFuncNotFold(varName: String, method: String, func: String) extends
-  Warning(s"Unless there are side-effects, this ${varName}.${func} can be replaced by ${varName}.${method}.")
+  Warning(s"Unless there are side-effects, this $varName.$func can be replaced by $varName.$method.")
 case class UseFuncNotReduce(varName: String, f: String, func: String) extends
-  Warning(s"Use ${varName}.${f} instead of ${varName}.${func}.")
+  Warning(s"Use $varName.$f instead of $varName.$func.")
 case class UseFuncNotFold(varName: String, f: String, func: String) extends
-  Warning(s"Use ${varName}.${f} instead of ${varName}.${func}.")
+  Warning(s"Use $varName.$f instead of $varName.$func.")
 case object MergeMaps extends
   Warning("Merge these two map operations.")
 case class FuncFirstThenMap(methName: String) extends
-  Warning(s"Use method ${methName} first, then map.")
+  Warning(s"Use method $methName first, then map.")
 case object FilterFirstThenSort extends
   Warning("Filter collection first, then sort it.")
 case class UseMapNotFlatMap(varName: String) extends
-  Warning(s"Use ${varName}.map(x => if(...) y else z) instead of ${varName}.flatMap(x => if(...) Collection(y) else Collection(z)).") // Clean up warning
+  Warning(s"Use $varName.map(x => if(...) y else z) instead of $varName.flatMap(x => if(...) Collection(y) else Collection(z)).") // Clean up warning
 case class UseFilterNotFlatMap(varName: String) extends
-  Warning(s"Use ${varName}.filter(x => condition) instead of ${varName}.flatMap(x => if(condition) ... else ...).") // Clean up warning
+  Warning(s"Use $varName.filter(x => condition) instead of $varName.flatMap(x => if(condition) ... else ...).") // Clean up warning
 case class AvoidOptionMethod(method: String, explanation: String = "") extends
-  Warning(s"Using Option.${method} is not recommended. ${explanation}")
+  Warning(s"Using Option.$method is not recommended. $explanation")
 case class TransformNotMap(varName: String) extends
-  Warning(s"Use ${varName}.transform(...) instead of col = ${varName}.map(...).")
+  Warning(s"Use $varName.transform(...) instead of col = $varName.map(...).")
 case object DuplicateKeyInMap extends
   Warning("This key has already been defined, and will override the previous mapping.")
 case class InefficientUseOfListSize(varName: String, replacement: String, func: String) extends
-  Warning(s"Use ${varName}.${replacement} instead of comparing to ${varName}.${func}. (${varName} is a List, ${func} takes O(n) time)") // Cover length
+  Warning(s"Use $varName.$replacement instead of comparing to $varName.$func. ($varName is a List, $func takes O(n) time)") // Cover length
 case object OnceEvaluatedStatementsInBlockReturningFunction extends
   Warning("You're passing a block that returns a function. The statements in this block, except the last one, will only be executed once.")
 case object IntDivisionAssignedToFloat extends
   Warning("Integer division detected in an expression assigned to a floating point variable.")
 case class UseFlattenNotFilterOption(varName: String) extends
-  Warning(s"Use ${varName}.flatten instead of ${varName}.filter(_.isDefined).map(_.get).") // Cover isEmpty, etc
+  Warning(s"Use $varName.flatten instead of $varName.filter(_.isDefined).map(_.get).") // Cover isEmpty, etc
 case class UseExistsNotFilterEmpty(varName: String, bang: Boolean) extends
-  Warning(s"""Use ${varName}.exists(...) instead of ${ if (bang) s"!${varName}.filter(...).isEmpty" else s"${varName}.filter(...).nonEmpty" }""")
+  Warning(s"""Use $varName.exists(...) instead of ${ if (bang) s"!$varName.filter(...).isEmpty" else s"$varName.filter(...).nonEmpty" }""")
 case class UseCountNotFilterLength(varName: String, func: String) extends
-  Warning(s"Use ${varName}.count(...) instead of ${varName}.filter(...).${func}")
+  Warning(s"Use $varName.count(...) instead of $varName.filter(...).$func")
 case class UseExistsNotCountCompare(varName: String) extends
-  Warning(s"Use ${varName}.exists(...) instead of ${varName}.count(...) compare.")
+  Warning(s"Use $varName.exists(...) instead of $varName.count(...) compare.")
 case class PassPartialFunctionDirectly(matchVar: String) extends
-  Warning(s"You can pass the partial function in directly. (Remove `${matchVar} match {`).")
+  Warning(s"You can pass the partial function in directly. (Remove `$matchVar match {`).")
 case class UnitImplicitOrdering(function: String) extends
-  Warning(s"Unit is returned here, so this ${function} will always return the first element.")
+  Warning(s"Unit is returned here, so this $function will always return the first element.")
 case class RegexWarning(errorMessage: String, error: Boolean = true) extends
-  Warning("Regex pattern "+(if(error) "syntax error" else "warning")+s": ${errorMessage}.")
+  Warning("Regex pattern "+(if(error) "syntax error" else "warning")+s": $errorMessage.")
 case class InvariantCondition(always: Boolean, doWhat: String) extends
-  Warning(s"""This condition will ${ if (always) "always" else "never" } ${doWhat}.""")
+  Warning(s"""This condition will ${ if (always) "always" else "never" } $doWhat.""")
 case class DecomposingEmptyCollection(method: String, collection: String = "collection") extends
-  Warning(s"Taking the ${method} of an empty ${collection}.")
+  Warning(s"Taking the $method of an empty $collection.")
 case class InvariantExtrema(max: Boolean, returnsFirst: Boolean) extends
   Warning(s"""This ${ if (max) "max" else "min" } will always return the ${ if (returnsFirst) "first" else "second" } value""")
 case class UnnecessaryMethodCall(method: String) extends
-  Warning(s"This ${method} is always unnecessary.")
+  Warning(s"This $method is always unnecessary.")
 case object ProducesEmptyCollection extends
   Warning("The resulting collection will always be empty.")
 case class OperationAlwaysProducesZero(operation: String) extends
-  Warning(s"Same values on both sides of ${operation} will return 0.")
+  Warning(s"Same values on both sides of $operation will return 0.")
 case object ModuloByOne extends
   Warning("Taking the modulo by one will return zero.")
 case object DivideByOne extends
@@ -296,33 +296,33 @@ case object UnusedForLoopIteratorValue extends
 case object StringMultiplicationByNonPositive extends
   Warning("Multiplying a string with a value <= 0 will result in an empty string.")
 case class LikelyIndexOutOfBounds(direction: String) extends
-  Warning(s"You will likely use a ${direction} index.")
+  Warning(s"You will likely use a $direction index.")
 case object UnnecessaryReturn extends
   Warning("Scala has implicit return. You don't need a return statement at the end of a method.")
 case class InvariantReturn(structure: String, returnValue: String) extends
-  Warning(s"This ${structure} always returns the same value: ${returnValue}.")
+  Warning(s"This $structure always returns the same value: $returnValue.")
 case class UnusedParameter(parameters: Seq[String], method: String) extends
   Warning("Parameter" +
-    (parameters match { case Seq(p) => " " + p + " is" case _ => "s (%s) are".format(parameters.mkString(", ")) }) +
-    s" not used in method ${method}.")
+    (parameters match { case Seq(p) => " " + p + " is" case _ => "s (" + parameters.mkString(", ") + ") are" }) +
+    s" not used in method $method.")
 case class InvalidStringFormat(errorMessage: String, exception: Boolean = true) extends
-  Warning(if(exception) s"This string format will throw: ${errorMessage}" else s"${errorMessage}") // Likely Exception
+  Warning(if(exception) s"This string format will throw: $errorMessage" else s"$errorMessage") // Likely Exception
 case class InvalidStringConversion(conversionType: String) extends
-  Warning(s"This String ${conversionType} conversion will likely fail.") // Likely Exception
+  Warning(s"This String $conversionType conversion will likely fail.") // Likely Exception
 case object UnnecessaryStringNonEmpty extends
   Warning("This string will never be empty.")
 case object UnnecessaryStringIsEmpty extends
   Warning("This string will always be empty.")
 case class PossibleLossOfPrecision(improvement: String) extends
-  Warning(s"Possible loss of precision. ${improvement}.")
+  Warning(s"Possible loss of precision. $improvement.")
 case class UnsafeAbs(improvement: String) extends
-  Warning(s"Possibly unsafe use of abs. ${improvement}.")
+  Warning(s"Possibly unsafe use of abs. $improvement.")
 case class TypeToType(tpe: String) extends
-  Warning(s"Using to${tpe} on something that is already of type ${tpe}.")
+  Warning(s"Using to$tpe on something that is already of type $tpe.")
 case object EmptyStringInterpolator extends
   Warning("This string interpolation has no arguments.")
 case class UnlikelyToString(tpe: String) extends
-  Warning(s"Using toString on type ${tpe} is likely unintended.")
+  Warning(s"Using toString on type $tpe is likely unintended.")
 case object UnthrownException extends
   Warning("This exception was likely meant to be thrown here.")
 case object SuspiciousMatches extends

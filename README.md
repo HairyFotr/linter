@@ -222,18 +222,19 @@ Rule lists from other static analysis tools:
 * Scapegoat(Scala) - https://github.com/sksamuel/scalac-scapegoat-plugin#inspections
 * WartRemover(Scala) - https://github.com/typelevel/wartremover#warts
 * Scala Abide(Scala) - https://github.com/scala/scala-abide
-* SuperSafe™(Scala) - http://www.artima.com/supersafe_user_guide.html
+* ($)SuperSafe™(Scala) - http://www.artima.com/supersafe_user_guide.html
+* IntelliJ IDEA(Scala/...) - https://www.jetbrains.com/idea/features/scala.html
 * Findbugs(JVM) - http://findbugs.sourceforge.net/bugDescriptions.html
 * CheckStyle(Java) - http://checkstyle.sourceforge.net/availablechecks.html
 * PMD(Java) - http://pmd.sourceforge.net/snapshot/pmd-java/rules/index.html
 * Error-prone(Java) - https://code.google.com/p/error-prone/wiki/BugPatterns
 * CodeNarc(Groovy) - http://codenarc.sourceforge.net/codenarc-rule-index.html
-* PVS-Studio(C++) - http://www.viva64.com/en/d/
-* Coverity(C++) - http://www.slideshare.net/Coverity/static-analysis-primer-22874326 (6,7)
+* ($)PVS-Studio(C++) - http://www.viva64.com/en/d/
+* ($)Coverity(C++/Java/...) - http://www.slideshare.net/Coverity/static-analysis-primer-22874326 (6,7)
 * CppCheck(C++) - http://sourceforge.net/apps/mediawiki/cppcheck/index.php?title=Main_Page#Checks
 * Clang(C++/ObjC) - http://clang-analyzer.llvm.org/available_checks.html
 * OCLint(C++/ObjC) - http://docs.oclint.org/en/dev/rules/index.html
-* Fortify(Java/C++/...) - http://www.hpenterprisesecurity.com/vulncat/en/vulncat/index.html
+* ($)Fortify(Java/C++/...) - http://www.hpenterprisesecurity.com/vulncat/en/vulncat/index.html
  
 ### Some resources
 * A quick overview of writing compiler plugins: http://www.scala-lang.org/node/140

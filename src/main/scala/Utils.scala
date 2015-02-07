@@ -16,8 +16,8 @@
 
 package com.foursquare.lint
 
+import scala.collection.mutable
 import scala.tools.nsc.Global
-import collection.mutable
 
 object Utils {
   var linterOptions = LinterOptions()
@@ -60,7 +60,7 @@ class Utils[G <: Global](val global: G) {
     used
   }
 
-  import definitions.{ AnyClass, NothingClass, ObjectClass, Object_==, OptionClass, SeqClass }
+  import definitions.{ AnyClass, OptionClass }
   val JavaConversionsModule: Symbol = rootMirror.getModuleByName(newTermName("scala.collection.JavaConversions"))
   val SeqLikeClass: Symbol = rootMirror.getClassByName(newTermName("scala.collection.SeqLike"))
   val SeqLikeContains: Symbol = SeqLikeClass.info.member(newTermName("contains"))

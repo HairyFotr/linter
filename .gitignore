@@ -1,10 +1,12 @@
 .DS_Store
 /target/
 /project/target/
-/project/project/target
+/project/project/
 *~
 *.orig
 *.log
 *.jar
 *.class
 
+.idea
+*.iml

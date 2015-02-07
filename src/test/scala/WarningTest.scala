@@ -1,7 +1,7 @@
 package com.foursquare.lint
 
-import org.specs2.matcher.JUnitMustMatchers
 import org.junit.Test
+import org.specs2.matcher.JUnitMustMatchers
 
 class WarningTest extends JUnitMustMatchers {
   @Test

@@ -1,7 +1,7 @@
-import de.johoop.findbugs4sbt._
 import de.johoop.cpd4sbt.CopyPasteDetector._
-import de.johoop.cpd4sbt.{ReportType => CPDReportType, OutputType => CPDOutputType}
-import org.scalastyle.sbt.{ScalastylePlugin, PluginKeys}
+import de.johoop.cpd4sbt.{OutputType => CPDOutputType, ReportType => CPDReportType}
+import de.johoop.findbugs4sbt._
+import org.scalastyle.sbt.{PluginKeys, ScalastylePlugin}
 
 scalacOptions ++= Seq(
   "-feature",

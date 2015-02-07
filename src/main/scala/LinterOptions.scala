@@ -16,7 +16,7 @@
 
 package com.foursquare.lint
 
-import annotation.tailrec
+import scala.annotation.tailrec
 
 case class LinterOptions(disabledWarningNames: Seq[String] = Nil, printWarningNames: Boolean = false)
 
@@ -33,8 +33,8 @@ object LinterOptions {
     case Array(option, warningNames) => 
       val (validNames, invalidNames) = warningNames.split(WarningNameDelimiter).partition(Warning.NameToWarning.contains) 
       if (validNames.nonEmpty && invalidNames.isEmpty) Right(validNames)
-      else Left(s"The '${option}' option referenced invalid warnings: ${invalidNames.mkString(", ")}")
-    case _ => Left(s"The '${fullOption}' option was not of the expected form.")
+      else Left(s"The '$option' option referenced invalid warnings: ${invalidNames.mkString(", ")}")
+    case _ => Left(s"The '$fullOption' option was not of the expected form.")
   }
   
   @tailrec
@@ -48,8 +48,8 @@ object LinterOptions {
     case option :: xs if option.startsWith(PrintWarningNames) => option.split(OptionKeyValueDelimiter) match {
       case Array(_, value @ ("true" | "false")) => Right(linterOptions.copy(printWarningNames = value.toBoolean))
       case Array(_) if option == PrintWarningNames => Right(linterOptions.copy(printWarningNames = true))
-      case _ => Left(s"The '${option}' option was not of the expected form")
+      case _ => Left(s"The '$option' option was not of the expected form")
     }
-    case unknownOption :: _ => Left(s"The option '${unknownOption}' is unrecognized.")
+    case unknownOption :: _ => Left(s"The option '$unknownOption' is unrecognized.")
   }
 }

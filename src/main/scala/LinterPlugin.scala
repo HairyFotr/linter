@@ -16,21 +16,22 @@
 
 package com.foursquare.lint
 
-import scala.tools.nsc.{ Global, Phase }
+import scala.collection.mutable
 import scala.tools.nsc.plugins.{ Plugin, PluginComponent }
-import collection.mutable
+import scala.tools.nsc.{ Global, Phase }
 
 class LinterPlugin(val global: Global) extends Plugin {
+  import com.foursquare.lint.Utils._
   import global._
-  import Utils._
 
   val name = "linter"
   val description = "a static analysis compiler plugin to help protect against bugs and style problems"
   val components = List[PluginComponent](PreTyperComponent, PostTyperComponent, PostTyperInterpreterComponent, PostRefChecksComponent)
   
   override val optionsHelp: Option[String] = Some(Seq(
-    "%s:plus+separated+warning+names".format(LinterOptions.DisableArgument),
-    "%s:plus+separated+warning+names".format(LinterOptions.EnableOnlyArgument)
+    LinterOptions.DisableArgument+":plus+separated+warning+names",
+    LinterOptions.EnableOnlyArgument+":plus+separated+warning+names",
+    LinterOptions.PrintWarningNames+":true|false"
   ).map(" -P:" + name + ":" +  _).mkString("\n"))
 
   override def processOptions(options: List[String], error: String => Unit): Unit = {
@@ -1670,7 +1671,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     class PostTyperInterpreterTraverser(unit: CompilationUnit) extends Traverser {
       implicit val unitt = unit
       var treePosHolder: Tree = null
-      import Utils._
+      import com.foursquare.lint.Utils._
       val utils = new Utils[global.type](global)
       import utils._
 
@@ -2617,11 +2618,11 @@ class LinterPlugin(val global: Global) extends Plugin {
                 str.exactValue
                   .map(v => Values(v.size))
                   .getOrElse(
-                    if(str.getMinLength == str.getMaxLength) 
+                    if(str.getMinLength == str.getMaxLength)
                       Values(str.getMinLength)
                     else if(str.getMinLength == 0 && str.getMaxLength == Int.MaxValue)
                       Values.empty
-                    else 
+                    else
                       Values(str.getMinLength, str.getMaxLength)
                   ).addCondition(_ >= 0).addCondition(_ < str.getMaxLength)
               )
@@ -2854,7 +2855,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 val posFiltering = treePosHolder.toString matches (".*?[ .]"+ f + """ *[(].*, *("{2}|"{6}) *[)]""")
 
                 val special = """.\^$*+?()\[{\\|"""
-                val plainString = s"""([^${special}]|[\\\\][${special}])+"""
+                val plainString = s"""([^$special]|[\\\\][$special])+"""
                 
                 if(posFiltering && (p0 matches plainString+"\\$"))
                   warn(treePosHolder, RegexWarning(s"This $f can be substituted with stripSuffix", error = false))
@@ -3010,15 +3011,12 @@ class LinterPlugin(val global: Global) extends Plugin {
                 }
               } catch {
                 case e: Exception => 
-                  e.printStackTrace
                   empty
               }
 
             case Apply(Ident(name), _params) if defModels contains name.toString =>
               defModels
-                .find(m => m._1 == name.toString && m._2.isRight)
-                .map(_._2.right.get)
-                .getOrElse(empty)
+                .find(m => m._1 == name.toString && m._2.isRight).fold(empty)(_._2.right.get)
             
             case If(_cond, expr1, expr2) =>
               val (e1, e2) = (traverseString(expr1), traverseString(expr2))
@@ -3173,8 +3171,8 @@ class LinterPlugin(val global: Global) extends Plugin {
             knownPieces = knownPieces map { _.reverse })
 
         def trim: StringAttrs = {
-          val newMinLength = exactValue.map(_.trim.size).getOrElse(getTrimmedMinLength)
-          val newMaxLength = exactValue.map(_.trim.size).getOrElse(getTrimmedMaxLength)
+          val newMinLength = exactValue.fold(getTrimmedMinLength)(_.trim.size)
+          val newMaxLength = exactValue.fold(getTrimmedMaxLength)(_.trim.size)
           new StringAttrs(
             exactValue = exactValue.map { _.trim },
             minLength = newMinLength, 
@@ -3212,10 +3210,10 @@ class LinterPlugin(val global: Global) extends Plugin {
         def alwaysIsEmpty: Boolean = getMaxLength == 0
         def alwaysNonEmpty: Boolean = getMinLength > 0
         
-        def getMinLength: Int = exactValue.map(_.size).getOrElse(minLength)
-        def getMaxLength: Int = exactValue.map(_.size).getOrElse(maxLength)
-        def getTrimmedMinLength: Int = exactValue.map(_.trim.size).getOrElse(trimmedMinLength)
-        def getTrimmedMaxLength: Int = exactValue.map(_.trim.size).getOrElse(trimmedMaxLength)
+        def getMinLength: Int = exactValue.fold(minLength)(_.size)
+        def getMaxLength: Int = exactValue.fold(maxLength)(_.size)
+        def getTrimmedMinLength: Int = exactValue.fold(trimmedMinLength)(_.trim.size)
+        def getTrimmedMaxLength: Int = exactValue.fold(trimmedMaxLength)(_.trim.size)
         
         def +(s: String): StringAttrs = 
           new StringAttrs(

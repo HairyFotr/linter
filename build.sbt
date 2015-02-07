@@ -15,7 +15,7 @@ libraryDependencies ++= Seq(
   "junit"          % "junit"           % "4.12"   % "test",
   "com.novocode"   % "junit-interface" % "0.11"   % "test")
 
-libraryDependencies <+= (scalaVersion) { (scalaVersion) =>
+libraryDependencies <+= scalaVersion { (scalaVersion) =>
   "org.scala-lang" % "scala-compiler"  % scalaVersion
 }
 
