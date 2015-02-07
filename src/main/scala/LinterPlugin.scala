@@ -1644,10 +1644,6 @@ class LinterPlugin(val global: Global) extends Plugin {
             if(!(op == nme.EQ || op == nme.LE || op == nme.LT))
               warn(tree, UseExistsNotCountCompare(identOrCol(col)))
 
-          case Apply(Select(Apply(Select(col, count), List(func)), op), List(Literal(Constant(x))))
-            if (count is "count") && (isEmptyCompare(x, op)) =>
-            println(col.tpe.widen.baseClasses)
-
           /// Use partial function directly - temporary variable is unnecessary (idea by yzgw)
           case Apply(_, List(Function(List(ValDef(mods, x_1, typeTree: TypeTree, EmptyTree)), Match(x_1_, _))))
             if (((x_1 is "x$1") && (x_1_ is "x$1") && (mods.isSynthetic) && (mods.isParameter)) // _ match { ... }
