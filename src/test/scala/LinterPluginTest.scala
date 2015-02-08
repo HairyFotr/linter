@@ -73,13 +73,13 @@ final object Compiler {
 
 final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
   // A few hacks to scrap the boilerplate and better pinpoint the failing test
-  def should(code: String, not: Boolean = false)(implicit expectedMsg: String) {
+  def should(code: String, not: Boolean = false)(implicit expectedMsg: String): Unit = {
     val unitResult = (expectedMsg, Compiler.compileAndLint(code)) must beLike {
       case (expected, actual) if (not ^ actual.contains(expected)) => ok
       case _ => ko((if(not) "false positive" else "false negative")+":\n" + code + "\n ")
     }
   }
-  def shouldnt(code: String)(implicit expectedMsg: String) { should(code, not = true)(expectedMsg) }
+  def shouldnt(code: String)(implicit expectedMsg: String): Unit = { should(code, not = true)(expectedMsg) }
   def noWarnings(code: String): Unit = { val unitResult = Compiler.compileAndLint(code) must be ("") }
 
   /*@Before
@@ -88,15 +88,41 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }*/
   
   @Test
-  def nowarn(): Unit = {
-    implicit val msg = "Regex pattern"
+  def readmeExamples(): Unit = {
+    val defs = """
     
-    should(""" "ffasd".replaceFirst("/$", "") """)
-    shouldnt(""" "ffasd".replaceFirst("/$", "") // linter:disable:RegexWarning """)
-    shouldnt(""" "ffasd".replaceFirst("/$", "") // linter:disable """)
-
-    should(""" "ffasd".replaceFirst("/$", ""); val a = 1/0 // linter:disable:RegexWarning """)("division")
-    shouldnt(""" "ffasd".replaceFirst("/$", ""); val a = 1/0 // linter:disable """)
+      val a,b,x,y = util.Random.nextInt
+      val bool = util.Random.nextBoolean
+      val str = util.Random.nextString(5)
+      val strOption = Option(str)
+      
+    """
+  
+    should(defs+"""if(a == 10 || b == 10) 0 else if(a == 20 && b == 10) 1 else 2""")("""This condition has appeared earlier in the if-else chain and will never hold here.""")
+    should(defs+"""if(b > 4) (2,a) else (2,a)""")("""If statement branches have the same structure.""")
+    should(defs+"""if(a == b) true else false""")("""Remove the if expression and use the condition directly.""")
+    should(defs+"""(x,y) match { case (a,5) if a > 5 => 0 case (c,5) if c > 5 => 1 }""")("""Identical case condition detected above. This case will never match.""")
+    should(defs+"""a match { case 3 => "hello" case 4 => "hello" case 5 => "hello" case _ => "how low" }""")("""Bodies of 3 neighbouring cases are identical and could be merged.""")
+    should(defs+"""bool match { case true => 0 case false => 1 }""")("""Pattern matching on Boolean is probably better written as an if statement.""")
+    should(defs+"""for(i <- 10 to 20) { if(i > 20) "" }""")("""This condition will never hold.""")
+    should(defs+"""for(i <- 1 to 10) { 1/(i-1)  }""")("""Possible division by zero.""")
+    should(defs+"""{ val a = List(1,2,3); for(i <- 1 to 10) { println(a(i)) } }""")("""You will likely use a too large index.""")
+    should(defs+"""for(i <- 10 to 20) { if(i.toString.length == 3) "" }""")("""This condition will never hold.""")
+    should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s contains "world") ""; """)("""This contains always returns the same value: true""")
+    should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s startsWith "hell") ""; """)("""This startsWith always returns the same value: true""")
+    should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s endsWith "!") ""; """)("""This endsWith always returns the same value: true""")
+    should(defs+"""str.replaceAll("?", ".")""")("""Regex pattern syntax error: Dangling meta character '?'""")
+    should(defs+"""math.log(1d + a)""")("""Use math.log1p(x), instead of math.log(1 + x) for added accuracy when x is near 0.""")
+    should(defs+"""BigDecimal(0.555555555555555555555555555)""")("""Possible loss of precision.""")
+    should(defs+"""{val a = Some(List(1,2,3)); if(a.size > 3) ""}""")("""Did you mean to take the size of the collection inside the Option?""")
+    should(defs+"""if(strOption.isDefined) strOption.get else """"")("""Use strOption.getOrElse(...) instead of if(strOption.isDefined) strOption.get else ...""")
+    should(defs+"""List(1,2,3,4).find(x => x % 2 == 0).isDefined""")("""Use col.exists(...) instead of col.find(...).isDefined""")
+    should(defs+"""List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)""")("""Use col.filter(x => condition) instead of col.flatMap(x => if(condition) ... else ...).""")
+    should(defs+"""def func(b: Int, c: String, d: String) = { println(b); b+c }""")("""Parameter d is not used in method func""")
+    //should(defs+"""List(1, 2, 3).contains("4")""")("""List[Int].contains(String) will probably return false because the collection and target element are of different types.""")
+    //should(defs+"""Nil == None""")("""Comparing with == on instances of different types (scala.collection.immutable.Nil.type, None.type) will probably return false.""")
+    should(defs+"""List(1, 2, 3).contains("4")""")("""will probably return false, since the collection and target element are of unrelated types.""")
+    should(defs+"""Nil == None""")("""Comparing with == on instances of unrelated types""")
   }
 
   @Test
@@ -322,6 +348,8 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     
     should(""" val a = s"wat" """)
     should(""" println(s"wat") """)
+    should(""" val a = 5; println(s"wat" + a) """)
+    should(""" val a = "5"; val b = s"wat" + a """)
     shouldnt(""" { val a = 5; s" $a " } """)
   }
 
@@ -1082,8 +1110,444 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""def a(x:Int) = x == 2; List(1,2,3).filter(a).isEmpty""")
   }
 
+  @Test
+  def ReflexiveAssignment(): Unit = {
+    implicit val msg = "Assigning a variable to itself?"
+
+    should("""
+      var a = 4d
+      println("hi")
+      a = a
+    """)
+    should("""
+      class t { 
+        var a = 4d
+        def k { a = a }
+      }
+    """)
+
+    shouldnt("""
+      var a = 4d
+      a += 1
+    """)
+    shouldnt("""
+      var a = 4d
+      a = a * a
+    """)
+  }
+
+  @Test
+  def IdenticalIfElseCondition(): Unit = {
+    implicit val msg = "condition has appeared earlier"
+
+    should("""
+      var a = "b"+util.Random.nextInt
+      if(a.size == 5) 
+        println("hi")
+      else if(a.size == 5) 
+        println("hello")
+    """)
+    should("""
+      var a = "b"+util.Random.nextInt
+      if(a.size == 5) 
+        println("hi")
+      else if(a.size == 4) 
+        println("hello")
+      else if(a.size == 3) 
+        println("hell")
+      else if(a.size == 4) 
+        println("helo")
+    """)
+    should("""
+      var a = 5
+      a = util.Random.nextInt
+      val b = 
+        if(a == 4) 
+          println("hi")
+        else if(a == 4) 
+          println("hello")
+    """)
+
+    shouldnt("""
+      var a = "b"
+      if(a.size == 5) 
+        println("hi")
+      else if(a.size != 5) 
+        println("hello")
+    """)
+    shouldnt("""
+      var a = 5
+      val b = 
+        if(a == 4) 
+          println("hi")
+        else if(a == 5) 
+          println("hello")
+    """)
+    shouldnt("""
+      import util.Random._
+      
+      if(nextBoolean) 
+        println("hi")
+      else if(nextBoolean) 
+        println("hello")
+    """)
+  }
+
+  @Test
+  def YodaConditions(): Unit = {
+    implicit val msg = "Yoda conditions"
+
+    should("""
+      var a = util.Random.nextInt
+      if(5 == a) "foo"
+    """)
+    shouldnt("""
+      var a = util.Random.nextInt
+      if(a == 5) "foo"
+    """)
+    shouldnt("""
+      var a = util.Random.nextInt
+      if(5 < a && a <= 10) "foo"
+    """)
+
+    //TODO: _ is marked as x, so it's ignored...  should(""" "abc".filter(x => 'b' == x) """)
+    should(""" "abc".filter(c => 'b' == c) """)
+    shouldnt(""" "abc".filter('b' == _) """)
+    shouldnt(""" "abc".filter('b'==) """)
+  }
+  
+  @Test
+  def MergeNestedIfs(): Unit = {
+    implicit val msg = "These two nested ifs can be merged"
+    
+    should("""
+      val a,b = 4
+      if(a > 3) {
+        if(b == 4) {
+          println("foo")
+        }
+      }
+    """)
+
+    shouldnt("""
+      val a,b = 4
+      if(a > 3) {
+        println("bar")
+        if(b == 4) {
+          println("foo")
+        }
+      }
+    """)
+    shouldnt("""
+      val a,b = 4
+      if(a > 3) {
+        if(b == 4) {
+          println("foo")
+        }
+        println("bar")
+      }
+    """)
+    shouldnt("""
+      val a,b = 4
+      if(a > 3) {
+        if(b == 4) {
+          println("foo")
+        } else {
+          println("bar")
+        }
+      }
+    """)
+    shouldnt("""
+      val a,b = 4
+      if(a > 3) {
+        if(b == 4) {
+          println("foo")
+        }
+      } else {
+        println("bar")
+      }
+    """)
+  }
+  
+  @Test
+  def UseSignum(): Unit = {
+    implicit val msg = "Did you mean to use the signum function"
+    
+    should("""
+      val a = 4d
+      a/math.abs(a)
+    """)
+    should("""
+      val a = 4d
+      (a+1)/math.abs(a+1)
+    """)
+    should("""
+      val a = 4d
+      a/a.abs
+    """)
+    should("""
+      val a = 4d
+      (a+1)/(a+1).abs
+    """)
+    should("""
+      val a = 4d
+      (a+1).abs/(a+1)
+    """)
+    should("""
+      val a = 4d
+      math.abs(a)/a
+    """)
+    should("""
+      val a = 4d
+      Math.abs(a)/a
+    """)
+
+    shouldnt("""
+      val a = 4d
+      math.abs(a/a)
+    """)
+    shouldnt("""
+      val a = 4d
+      a/math.abs(a+1)
+    """)
+  }
+
+  @Test
+  def MalformedSwap(): Unit = {
+    implicit val msg = "Did you mean to swap these two variables"
+    
+    should("""
+      var a = 6
+      var b = 7
+      println(a+b)
+      a = b
+      b = a
+    """)
+
+    shouldnt("""
+      var a = 6
+      var b = 7
+      println(a+b)
+      val c = a
+      a = b
+      b = c
+    """)
+  }
+
+  @Test
+  def IdenticalCaseConditions(): Unit = {
+    implicit val msg = "Identical case condition detected above. This case will never match."
+    
+    should("""val a = 5; a match { case a if a == 5 => "f" case a if a == 5 => "d" }""")
+    shouldnt("""val a = 5; a match { case a if a == 6 => "f" case a if a == 5 => "d" }""")
+    
+    should("""val x = 5; (x,8) match { case (a,8) if a == 5 => "f" case (b,8) if b == 5 => "d" }""")
+    shouldnt("""val x = 5; (x,8) match { case (a,8) if a == 5 => "f" case (b,8) if b == 6 => "d" }""")
+    shouldnt("""val x = 5; (x,8) match { case (a,8) if a == 5 => "f" case (b,7) if b == 6 => "d" }""")
+  }
+
+  @Test
+  def UndesirableTypeInference(): Unit = {
+    implicit val msg = "Inferred type"//Any/Nothing. This might not be what you intended."
+    
+    should("""{ var a = if(3 == 3) 5 else ""; println(a) }""")
+    shouldnt("""{ var a:Any = if(3 == 3) 5 else ""; println(a) }""")
+    
+    should("""{ var a = List(if(3 == 3) 5 else ""); println(a) }""")
+    shouldnt("""{ var a:List[Any] = List(if(3 == 3) 5 else ""); println(a) }""")
+
+    should("""{ var a = if(3 == 3) throw new Exception() else throw new Error(); println(a) }""")
+    shouldnt("""{ var a:Nothing = if(3 == 3) throw new Exception() else throw new Error(); println(a) }""")
+    
+    should("""{ var a = List(if(3 == 3) throw new Exception() else throw new Error()); println(a) }""")
+    shouldnt("""{ var a:List[Nothing] = List(if(3 == 3) throw new Exception() else throw new Error()); println(a) }""")
+
+    should("""{ var a = List(1, "2") }""")
+    shouldnt("""{ var a = List[Any](1, "2") }""")
+  }
+  
+  @Test
+  def VariableAssignedUnusedValue(): Unit = {
+    implicit val msg = "unused value before"
+    
+    should("""
+      var a = BigDecimal(6)
+      a = BigDecimal(16)
+    """)
+    should("""
+      var a = BigDecimal(6)
+      println("foo")
+      a = BigDecimal(16)
+    """)
+
+    shouldnt("""
+      var a = 6L
+      a = 3
+    """)
+    shouldnt("""
+      var a = 6L
+      println("foo")
+      a = 3
+    """)
+
+    shouldnt("""
+      var a = "A6"
+      a = a.toLowerCase
+    """)
+    shouldnt("""
+      var a = 6L
+      a += 3
+    """)
+
+    should("""
+      var a = 6L
+      println(a)
+      a = 4
+      a = 3
+    """)
+
+    // TODO: If fails, look at isUsed first
+    shouldnt("""
+      var a = "A6"
+      println(a)
+      a = a.toLowerCase
+      a = a + "d"
+    """)
+  }
+  
+  @Test
+  def IdenticalStatements(): Unit = {
+    implicit val msg = "You're doing the exact same thing twice"
+    
+    should("""
+      val a = 5
+      println(a) 
+      println(a) 
+    """)
+    
+    shouldnt("""
+      var a = 5
+      println(a)
+      print(a)
+      print(a+1)
+    """)
+  }
+
+  @Test
+  def UseIsNanNotSelfComparison(): Unit = {
+    implicit val msg = "Use x.isNan instead"
+
+    should("""
+      var a = Double.NaN
+      if(a != a) "foo"
+    """)
+    should("""
+      var a = 4f
+      if(a != a) "foo"
+    """)
+
+    shouldnt("""
+      var a = 4
+      if(a != a) "foo"
+    """)
+  }
+  
+  @Test
+  def UseIsNanNotNanComparison(): Unit = {
+    implicit val msg = "Use x.isNan instead"
+
+    should("""
+      var a = Double.NaN
+      if(a == Double.NaN) "foo"
+    """)
+    should("""
+      var a = Double.NaN
+      if(a == a) "foo"
+    """)
+  }
+
+  @Test
+  def UseUntilNotToMinusOne(): Unit = {
+    implicit val msg = "Use (low until high) instead of (low to high-1)"
+    
+    should(""" val a = 5; val b = (1 to a-1) """)
+    should(""" val a = 5; for(i <- 1 to a-1) 5 """)
+    should(""" val a = List(1,2,3); val b = (1 to a.size-1) """)
+    should(""" val a = "fdsfd"; val b = (1 to a.size-1) """)
+
+    shouldnt(""" val a = 5; val b = (a-5 to a-1) """)
+    shouldnt(""" val a = 5; val b = (1 to a) """)
+    shouldnt(""" val a = 5; for(i <- 1 to a) 5 """)
+    shouldnt(""" val a = 5; for(i <- 1 until a-1) 5 """)
+    shouldnt(""" val a = 5; for(i <- 1 until a) 5 """)
+  }
+
+  @Test 
+  def UnextendedSealedTrait(): Unit = {
+    implicit val msg = "This sealed trait is never"
+    
+    should("""sealed trait Hello""")
+    should("""sealed trait Hello { def a = println("hello") }""")
+    should("""class a { sealed trait Hello; object a { val b = "fdsfds"; class s(); } }""")
+    should("""class a { sealed trait Hello; sealed trait Hello2 extends Hello; object a { val b = "fdsfds"; class s(); } }""")
+    should("""class a { sealed trait Hello; sealed trait Hello2 extends Hello; object a { val b = "fdsfds"; class s() extends Hello; } }""")
+    shouldnt("""class a { sealed trait Hello; sealed trait Hello2 extends Hello; object a { val b = "fdsfds"; class s() extends Hello2; } }""")
+
+    shouldnt("""sealed trait Hello { def a = println("hello") }; val b = new Hello {}""")
+    shouldnt("""sealed trait Hello[A, B <: List]""")
+  }
+
+  @Test
+  def PassPartialFunctionDirectly(): Unit = {
+    implicit val msg = "You can pass the partial function in directly"
+    should("""List(Some(1), None) map { _ match { case Some(x) => x; case None => 10 }}""")
+    should("""List(Some(1), None) map { item => item match { case Some(x) => x; case None => 10 }}""")
+    should("""List(1,2,3) map { a => a match { case _ => 5 }}""")
+    shouldnt("""List(1,2,3) map { a: AnyVal => a match { case _ => 5 }}""")
+    shouldnt("""List(Some(1), None) map { case Some(x) => x; case None => 10 }""")
+    shouldnt("""for(a <- List(Some(1), None)) a match { case Some(x) => x; case None => 10 }""")
+  }
+
+  @Test // see http://scalapuzzlers.com/#pzzlr-001
+  def OnceEvaluatedStatementsInBlockReturningFunction(): Unit = {
+    implicit val msg = "You're passing a block that returns a function"
+    
+    should("""List(1, 2).map { println("Hi"); _ + 1 }""")
+    shouldnt("""List(1, 2).map { i => println("Hi"); i + 1 }""")
+  }
+
+  @Test
+  def IntDivisionAssignedToFloat(): Unit = {
+    implicit val msg = "Integer division detected in an expression assigned to a floating point variable."
+    
+    should("""var a = 5; var b = 5f; println("Ignoring some other warning here... "+b); b = 1/a""")
+    shouldnt("""var a = 5; var b = 5f; println("Ignoring some other warning here... "+b); b = 1/a.toFloat""")
+    should("""var a = 5; var b: Float = 1/a""")
+    shouldnt("""var a = 5; var b = 1/a""")
+    shouldnt("""var a = 5; var b = 1/a.toFloat""")
+    should("""var a = 5; var b = 1f + 1/a + 1f""")
+    shouldnt("""var a = 5; var b = 1f + 1/a.toDouble + 1f""")
+  }
+
+  @Test 
+  def InvalidParamToRandomNextInt(): Unit = {
+    implicit val msg = """The parameter of this .nextInt might be lower than 1 here."""
+    
+    should("""util.Random.nextInt(-1)""")
+    should("""var a = new util.Random; a.nextInt(-1)""")
+
+    shouldnt("""util.Random.nextInt(1)""")
+    shouldnt("""var a = new util.Random; a.nextInt(1)""")
+  }
+
   // ^ New tests named after their Warning.scala name ^
+  // --------------------------------------------------
+
+  // --------------------------------------------------
+  // --------------------------------------------------
   // ----------------- OLD TESTS ----------------------
+  // --------------------------------------------------
+  // --------------------------------------------------
 
   /* //commented because they crash if stopAfter is set.
   @Test
@@ -1125,31 +1589,44 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       x == "bar" """)
   }
   
-  @Test //UseIsNanNotSelfComparison, UseIsNanNotNanComparison
-  def numeric_isNan(): Unit = {
-    implicit val msg = "Use x.isNan instead"
+  @Test
+  def warningSuppression(): Unit = {
+    implicit val msg = "Regex pattern"
+    
+    should(""" "ffasd".replaceFirst("/$", "") """)
+    shouldnt(""" "ffasd".replaceFirst("/$", "") // linter:disable:RegexWarning """)
+    shouldnt(""" "ffasd".replaceFirst("/$", "") // linter:disable """)
 
-    should("""
-      var a = Double.NaN
-      if(a != a) "foo"
-    """)
-    should("""
-      var a = 4f
-      if(a != a) "foo"
-    """)
-    should("""
-      var a = Double.NaN
-      if(a == Double.NaN) "foo"
-    """)
-    should("""
-      var a = Double.NaN
-      if(a == a) "foo"
-    """)
+    should(""" "ffasd".replaceFirst("/$", ""); val a = 1/0 // linter:disable:RegexWarning """)("division")
+    shouldnt(""" "ffasd".replaceFirst("/$", ""); val a = 1/0 // linter:disable """)
+  }
 
-    shouldnt("""
-      var a = 4
-      if(a != a) "foo"
-    """)
+  @Test //UseOptionGetOrElse, UseOptionOrNull
+  def style__if_to_optstuff(): Unit = {
+    implicit val msg = " instead of if" //use getOrElse, orNull, ... instead of if
+    
+    should("""val a = Option("str"); if(a.isDefined) a.get else null""")
+    should("""val a = Option("str"); if(!a.isDefined) null else a.get""")
+    should("""val a = Option("str"); if(a.isEmpty) null else a.get""")
+    should("""val a = Option("str"); if(!a.isEmpty) a.get else null""")
+    should("""val a = Option("str"); if(a != None) a.get else null""")
+    should("""val a = Option("str"); if(a == None) null else a.get""")
+    
+    // different value
+    shouldnt("""val a = Option("str"); if(a.isDefined) a.get+1 else null""")
+    shouldnt("""val a = Option("str"); if(!a.isDefined) null else a.get+1""")
+    shouldnt("""val a = Option("str"); if(a.isEmpty) null else a.get+1""")
+    shouldnt("""val a = Option("str"); if(!a.isEmpty) a.get+1 else null""")
+    shouldnt("""val a = Option("str"); if(a != None) a.get+1 else null""")
+    shouldnt("""val a = Option("str"); if(a == None) null else a.get+1""")
+    
+    // switcheroo
+    shouldnt("""val a = Option("str"); if(a.isDefined) null else a.get""")
+    shouldnt("""val a = Option("str"); if(!a.isDefined) a.get else null""")
+    shouldnt("""val a = Option("str"); if(a.isEmpty) a.get else null""")
+    shouldnt("""val a = Option("str"); if(!a.isEmpty) null else a.get""")
+    shouldnt("""val a = Option("str"); if(a != None) null else a.get""")
+    shouldnt("""val a = Option("str"); if(a == None) a.get else null""") 
   }
 
   @Test
@@ -1179,19 +1656,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""if(1 < 5) 7 else 8""")("This condition will always be true.")
 
     shouldnt("""while(1 < 5) { 7; 8 """)("This condition will always be true.")
-  }
-
-  
-  @Test
-  def case__unreachable(): Unit = {
-    implicit val msg = "Identical case condition detected above. This case will never match."
-    
-    should("""val a = 5; a match { case a if a == 5 => "f" case a if a == 5 => "d" }""")
-    shouldnt("""val a = 5; a match { case a if a == 6 => "f" case a if a == 5 => "d" }""")
-    
-    should("""val x = 5; (x,8) match { case (a,8) if a == 5 => "f" case (b,8) if b == 5 => "d" }""")
-    shouldnt("""val x = 5; (x,8) match { case (a,8) if a == 5 => "f" case (b,8) if b == 6 => "d" }""")
-    shouldnt("""val x = 5; (x,8) match { case (a,8) if a == 5 => "f" case (b,7) if b == 6 => "d" }""")
   }
   
   @Test
@@ -1587,97 +2051,14 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       a.replace(a.asInstanceOf[CharSequence], "bb".asInstanceOf[CharSequence])
     """)
     
-   shouldnt("""
+    shouldnt("""
       val a = "aa"
       a.replace(a: CharSequence, "bb": CharSequence)
     """)
-   }
-   
-  @Test
-  def probableBugs__selfAssign(): Unit = {
-    implicit val msg = "Assigning a variable to itself?"
-
-    should("""
-      var a = 4d
-      println("hi")
-      a = a
-    """)
-    should("""
-      class t { 
-        var a = 4d
-        def k { a = a }
-      }
-    """)
-
-    shouldnt("""
-      var a = 4d
-      a += 1
-    """)
-    shouldnt("""
-      var a = 4d
-      a = a * a
-    """)
   }
-
+    
   @Test
-  def probableBugs__sameElseIfCondition(): Unit = {
-    implicit val msg = "condition has appeared earlier"
-
-    should("""
-      var a = "b"+util.Random.nextInt
-      if(a.size == 5) 
-        println("hi")
-      else if(a.size == 5) 
-        println("hello")
-    """)
-    should("""
-      var a = "b"+util.Random.nextInt
-      if(a.size == 5) 
-        println("hi")
-      else if(a.size == 4) 
-        println("hello")
-      else if(a.size == 3) 
-        println("hell")
-      else if(a.size == 4) 
-        println("helo")
-    """)
-    should("""
-      var a = 5
-      a = util.Random.nextInt
-      val b = 
-        if(a == 4) 
-          println("hi")
-        else if(a == 4) 
-          println("hello")
-    """)
-
-    shouldnt("""
-      var a = "b"
-      if(a.size == 5) 
-        println("hi")
-      else if(a.size != 5) 
-        println("hello")
-    """)
-    shouldnt("""
-      var a = 5
-      val b = 
-        if(a == 4) 
-          println("hi")
-        else if(a == 5) 
-          println("hello")
-    """)
-    shouldnt("""
-      import util.Random._
-      
-      if(nextBoolean) 
-        println("hi")
-      else if(nextBoolean) 
-        println("hello")
-    """)
-  }
-  
-  @Test
-  @Ignore
+  @Ignore //disabled check
   def probableBugs__sameExpression(): Unit = {
     implicit val msg = /*Same value/expression */"on both sides"
 
@@ -1718,33 +2099,9 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       val a = List(1,2,3); a(a.size-3)
     """)
   }
-  
+      
   @Test
-  def style__YodaConditions(): Unit = {
-    implicit val msg = "Yoda conditions"
-
-    should("""
-      var a = util.Random.nextInt
-      if(5 == a) "foo"
-    """)
-    shouldnt("""
-      var a = util.Random.nextInt
-      if(a == 5) "foo"
-    """)
-    shouldnt("""
-      var a = util.Random.nextInt
-      if(5 < a && a <= 10) "foo"
-    """)
-
-    //TODO: _ is marked as x, so it's ignored...  should(""" "abc".filter(x => 'b' == x) """)
-    should(""" "abc".filter(c => 'b' == c) """)
-    shouldnt(""" "abc".filter('b' == _) """)
-    shouldnt(""" "abc".filter('b'==) """)
-  }
-  
-  
-  @Test
-  @Ignore
+  @Ignore //disabled check
   def string__constantLength(): Unit = {
     implicit val msg = "of a constant string"
 
@@ -1766,7 +2123,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  @Ignore
+  @Ignore //disabled check
   def string__processingConstant(): Unit = {
     implicit val msg = "Processing a constant string"
     
@@ -1781,199 +2138,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def if__mergeInner(): Unit = {
-    implicit val msg = "These two nested ifs can be merged"
-    
-    should("""
-      val a,b = 4
-      if(a > 3) {
-        if(b == 4) {
-          println("foo")
-        }
-      }
-    """)
-
-    shouldnt("""
-      val a,b = 4
-      if(a > 3) {
-        println("bar")
-        if(b == 4) {
-          println("foo")
-        }
-      }
-    """)
-    shouldnt("""
-      val a,b = 4
-      if(a > 3) {
-        if(b == 4) {
-          println("foo")
-        }
-        println("bar")
-      }
-    """)
-    shouldnt("""
-      val a,b = 4
-      if(a > 3) {
-        if(b == 4) {
-          println("foo")
-        } else {
-          println("bar")
-        }
-      }
-    """)
-    shouldnt("""
-      val a,b = 4
-      if(a > 3) {
-        if(b == 4) {
-          println("foo")
-        }
-      } else {
-        println("bar")
-      }
-    """)
-  }
-  
-  @Test
-  def numeric__signum(): Unit = {
-    implicit val msg = "Did you mean to use the signum function"
-    
-    should("""
-      val a = 4d
-      a/math.abs(a)
-    """)
-    should("""
-      val a = 4d
-      (a+1)/math.abs(a+1)
-    """)
-    should("""
-      val a = 4d
-      a/a.abs
-    """)
-    should("""
-      val a = 4d
-      (a+1)/(a+1).abs
-    """)
-    should("""
-      val a = 4d
-      (a+1).abs/(a+1)
-    """)
-    should("""
-      val a = 4d
-      math.abs(a)/a
-    """)
-    should("""
-      val a = 4d
-      Math.abs(a)/a
-    """)
-
-    shouldnt("""
-      val a = 4d
-      math.abs(a/a)
-    """)
-    shouldnt("""
-      val a = 4d
-      a/math.abs(a+1)
-    """)
-  }
-
-  @Test
-  def possibleBugs__anynothing(): Unit = {
-    implicit val msg = "Inferred type"//Any/Nothing. This might not be what you intended."
-    
-    should("""{ var a = if(3 == 3) 5 else ""; println(a) }""")
-    shouldnt("""{ var a:Any = if(3 == 3) 5 else ""; println(a) }""")
-    
-    should("""{ var a = List(if(3 == 3) 5 else ""); println(a) }""")
-    shouldnt("""{ var a:List[Any] = List(if(3 == 3) 5 else ""); println(a) }""")
-
-    should("""{ var a = if(3 == 3) throw new Exception() else throw new Error(); println(a) }""")
-    shouldnt("""{ var a:Nothing = if(3 == 3) throw new Exception() else throw new Error(); println(a) }""")
-    
-    should("""{ var a = List(if(3 == 3) throw new Exception() else throw new Error()); println(a) }""")
-    shouldnt("""{ var a:List[Nothing] = List(if(3 == 3) throw new Exception() else throw new Error()); println(a) }""")
-
-    should("""{ var a = List(1, "2") }""")
-    shouldnt("""{ var a = List[Any](1, "2") }""")
-  }
-  
-  @Test
-  def possibleBugs__assignment(): Unit = {
-    implicit val msg = "unused value before"
-    
-    should("""
-      var a = BigDecimal(6)
-      a = BigDecimal(16)
-    """)
-    should("""
-      var a = BigDecimal(6)
-      println("foo")
-      a = BigDecimal(16)
-    """)
-
-    shouldnt("""
-      var a = 6L
-      a = 3
-    """)
-    shouldnt("""
-      var a = 6L
-      println("foo")
-      a = 3
-    """)
-
-    shouldnt("""
-      var a = "A6"
-      a = a.toLowerCase
-    """)
-    shouldnt("""
-      var a = 6L
-      a += 3
-    """)
-  }
-
-  @Test
-  def possibleBugs__assignment2(): Unit = {
-    implicit val msg = "unused value before"
-    
-    should("""
-      var a = 6L
-      println(a)
-      a = 4
-      a = 3
-    """)
-
-    // If fails, look at isUsed first
-    shouldnt("""
-      var a = "A6"
-      println(a)
-      a = a.toLowerCase
-      a = a + "d"
-    """)
-  }
-
-  @Test
-  def possibleBugs__swapVars(): Unit = {
-    implicit val msg = "Did you mean to swap these two variables"
-    
-    should("""
-      var a = 6
-      var b = 7
-      println(a+b)
-      a = b
-      b = a
-    """)
-
-    shouldnt("""
-      var a = 6
-      var b = 7
-      println(a+b)
-      val c = a
-      a = b
-      b = c
-    """)
-  }
-
-  @Test
-  @Ignore
+  @Ignore //disabled check
   def style__tempVariable(): Unit = {
     implicit val msg = "You don't need that temp variable"
    
@@ -1992,24 +2157,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
         out += 5
         out
       }
-    """)
-  }
-  
-  @Test
-  def possibleBugs__sameThingTwice(): Unit = {
-    implicit val msg = "You're doing the exact same thing twice"
-    
-    should("""
-      val a = 5
-      println(a) 
-      println(a) 
-    """)
-    
-    shouldnt("""
-      var a = 5
-      println(a)
-      print(a)
-      print(a+1)
     """)
   }
   
@@ -2063,6 +2210,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       a(b.size-b.length)
     """)
   }
+  
   @Test
   def collections__tooLargeIndex(): Unit = {
     implicit val msg = "too large index"
@@ -2183,52 +2331,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def style__if_to_optstuff(): Unit = {
-    implicit val msg = " instead of if" //use getOrElse, orNull, ... instead of if
-    
-    should("""val a = Option("str"); if(a.isDefined) a.get else null""")
-    should("""val a = Option("str"); if(!a.isDefined) null else a.get""")
-    should("""val a = Option("str"); if(a.isEmpty) null else a.get""")
-    should("""val a = Option("str"); if(!a.isEmpty) a.get else null""")
-    should("""val a = Option("str"); if(a != None) a.get else null""")
-    should("""val a = Option("str"); if(a == None) null else a.get""")
-    
-    // different value
-    shouldnt("""val a = Option("str"); if(a.isDefined) a.get+1 else null""")
-    shouldnt("""val a = Option("str"); if(!a.isDefined) null else a.get+1""")
-    shouldnt("""val a = Option("str"); if(a.isEmpty) null else a.get+1""")
-    shouldnt("""val a = Option("str"); if(!a.isEmpty) a.get+1 else null""")
-    shouldnt("""val a = Option("str"); if(a != None) a.get+1 else null""")
-    shouldnt("""val a = Option("str"); if(a == None) null else a.get+1""")
-    
-    // switcheroo
-    shouldnt("""val a = Option("str"); if(a.isDefined) null else a.get""")
-    shouldnt("""val a = Option("str"); if(!a.isDefined) a.get else null""")
-    shouldnt("""val a = Option("str"); if(a.isEmpty) a.get else null""")
-    shouldnt("""val a = Option("str"); if(!a.isEmpty) null else a.get""")
-    shouldnt("""val a = Option("str"); if(a != None) null else a.get""")
-    shouldnt("""val a = Option("str"); if(a == None) a.get else null""") 
-  }
-
-
-  @Test
-  def style__useUntil(): Unit = {
-    implicit val msg = "Use (low until high) instead of (low to high-1)"
-    
-    should(""" val a = 5; val b = (1 to a-1) """)
-    should(""" val a = 5; for(i <- 1 to a-1) 5 """)
-    should(""" val a = List(1,2,3); val b = (1 to a.size-1) """)
-    should(""" val a = "fdsfd"; val b = (1 to a.size-1) """)
-
-    shouldnt(""" val a = 5; val b = (a-5 to a-1) """)
-    shouldnt(""" val a = 5; val b = (1 to a) """)
-    shouldnt(""" val a = 5; for(i <- 1 to a) 5 """)
-    shouldnt(""" val a = 5; for(i <- 1 until a-1) 5 """)
-    shouldnt(""" val a = 5; for(i <- 1 until a) 5 """)
-  }
-  
-  @Test
-  @Ignore
+  @Ignore //disabled check
   def def__recursion(): Unit = {
     implicit val msg = "infinite recursive call"
     
@@ -2249,21 +2352,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
   
   @Test 
-  def trait__unused_sealed(): Unit = {
-    implicit val msg = "This sealed trait is never"
-    
-    should("""sealed trait Hello""")
-    should("""sealed trait Hello { def a = println("hello") }""")
-    should("""class a { sealed trait Hello; object a { val b = "fdsfds"; class s(); } }""")
-    should("""class a { sealed trait Hello; sealed trait Hello2 extends Hello; object a { val b = "fdsfds"; class s(); } }""")
-    should("""class a { sealed trait Hello; sealed trait Hello2 extends Hello; object a { val b = "fdsfds"; class s() extends Hello; } }""")
-    shouldnt("""class a { sealed trait Hello; sealed trait Hello2 extends Hello; object a { val b = "fdsfds"; class s() extends Hello2; } }""")
-
-    shouldnt("""sealed trait Hello { def a = println("hello") }; val b = new Hello {}""")
-    shouldnt("""sealed trait Hello[A, B <: List]""")
-  }
-
-  @Test 
   def option__newbieChecks(): Unit = {
     
     should("""var a: String = null; if(a+"" == null) None else Some(a+"")""")("""Use Option(...), which automatically wraps null to None""")
@@ -2277,76 +2365,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
   }
 
-  @Test 
-  def random__checks(): Unit = {
-    implicit val msg = """The parameter of this .nextInt might be lower than 1 here."""
-    
-    should("""util.Random.nextInt(-1)""")
-    shouldnt("""util.Random.nextInt(1)""")
-    should("""var a = new util.Random; a.nextInt(-1)""")
-    shouldnt("""var a = new util.Random; a.nextInt(1)""")
-  }
-    
-  @Test
-  def puzzlers__001(): Unit = {
-    implicit val msg = "You're passing a block that returns a function"
-    
-    should("""List(1, 2).map { println("Hi"); _ + 1 }""")
-    shouldnt("""List(1, 2).map { i => println("Hi"); i + 1 }""")
-  }
-
-  @Test
-  def numeric__IntDivIntoFloatVar(): Unit = {
-    implicit val msg = "Integer division detected in an expression assigned to a floating point variable."
-    
-    should("""var a = 5; var b = 5f; println("Ignoring some other warning here... "+b); b = 1/a""")
-    shouldnt("""var a = 5; var b = 5f; println("Ignoring some other warning here... "+b); b = 1/a.toFloat""")
-    should("""var a = 5; var b: Float = 1/a""")
-    shouldnt("""var a = 5; var b = 1/a""")
-    shouldnt("""var a = 5; var b = 1/a.toFloat""")
-    should("""var a = 5; var b = 1f + 1/a + 1f""")
-    shouldnt("""var a = 5; var b = 1f + 1/a.toDouble + 1f""")
-  }
-
-
-  @Test
-  def readmeExamples(): Unit = {
-    val defs = """
-    
-      val a,b,x,y = util.Random.nextInt
-      val bool = util.Random.nextBoolean
-      val str = util.Random.nextString(5)
-      val strOption = Option(str)
-      
-    """
-  
-    should(defs+"""if(a == 10 || b == 10) 0 else if(a == 20 && b == 10) 1 else 2""")("""This condition has appeared earlier in the if-else chain and will never hold here.""")
-    should(defs+"""if(b > 4) (2,a) else (2,a)""")("""If statement branches have the same structure.""")
-    should(defs+"""if(a == b) true else false""")("""Remove the if expression and use the condition directly.""")
-    should(defs+"""(x,y) match { case (a,5) if a > 5 => 0 case (c,5) if c > 5 => 1 }""")("""Identical case condition detected above. This case will never match.""")
-    should(defs+"""a match { case 3 => "hello" case 4 => "hello" case 5 => "hello" case _ => "how low" }""")("""Bodies of 3 neighbouring cases are identical and could be merged.""")
-    should(defs+"""bool match { case true => 0 case false => 1 }""")("""Pattern matching on Boolean is probably better written as an if statement.""")
-    should(defs+"""for(i <- 10 to 20) { if(i > 20) "" }""")("""This condition will never hold.""")
-    should(defs+"""for(i <- 1 to 10) { 1/(i-1)  }""")("""Possible division by zero.""")
-    should(defs+"""{ val a = List(1,2,3); for(i <- 1 to 10) { println(a(i)) } }""")("""You will likely use a too large index.""")
-    should(defs+"""for(i <- 10 to 20) { if(i.toString.length == 3) "" }""")("""This condition will never hold.""")
-    should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s contains "world") ""; """)("""This contains always returns the same value: true""")
-    should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s startsWith "hell") ""; """)("""This startsWith always returns the same value: true""")
-    should(defs+"""val s = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(s endsWith "!") ""; """)("""This endsWith always returns the same value: true""")
-    should(defs+"""str.replaceAll("?", ".")""")("""Regex pattern syntax error: Dangling meta character '?'""")
-    should(defs+"""math.log(1d + a)""")("""Use math.log1p(x), instead of math.log(1 + x) for added accuracy when x is near 0.""")
-    should(defs+"""BigDecimal(0.555555555555555555555555555)""")("""Possible loss of precision.""")
-    should(defs+"""{val a = Some(List(1,2,3)); if(a.size > 3) ""}""")("""Did you mean to take the size of the collection inside the Option?""")
-    should(defs+"""if(strOption.isDefined) strOption.get else """"")("""Use strOption.getOrElse(...) instead of if(strOption.isDefined) strOption.get else ...""")
-    should(defs+"""List(1,2,3,4).find(x => x % 2 == 0).isDefined""")("""Use col.exists(...) instead of col.find(...).isDefined""")
-    should(defs+"""List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)""")("""Use col.filter(x => condition) instead of col.flatMap(x => if(condition) ... else ...).""")
-    should(defs+"""def func(b: Int, c: String, d: String) = { println(b); b+c }""")("""Parameter d is not used in method func""")
-    //should(defs+"""List(1, 2, 3).contains("4")""")("""List[Int].contains(String) will probably return false because the collection and target element are of different types.""")
-    //should(defs+"""Nil == None""")("""Comparing with == on instances of different types (scala.collection.immutable.Nil.type, None.type) will probably return false.""")
-    should(defs+"""List(1, 2, 3).contains("4")""")("""will probably return false, since the collection and target element are of unrelated types.""")
-    should(defs+"""Nil == None""")("""Comparing with == on instances of unrelated types""")
-  }
-  
   @Test
   def absInterpreter(): Unit = {
     should("""{ val a = 5; { val a = 6; if(a == 6) "" } }""")("This condition will always hold.")
@@ -2357,17 +2375,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
     //should("""object o1 { val a = 5 }; object o2 { def d = { if(a == 6) "" }; val a = 6 }""")("This condition will never hold.")
     should("""for(i <- 1 to 10) { for(j <- 1 to i-1) { }}""")("Use (low until high) instead of (low to high-1)")
-  }
-
-  @Test
-  def style__partialfunction(): Unit = {
-    implicit val msg = "You can pass the partial function in directly"
-    should("""List(Some(1), None) map { _ match { case Some(x) => x; case None => 10 }}""")
-    should("""List(Some(1), None) map { item => item match { case Some(x) => x; case None => 10 }}""")
-    should("""List(1,2,3) map { a => a match { case _ => 5 }}""")
-    shouldnt("""List(1,2,3) map { a: AnyVal => a match { case _ => 5 }}""")
-    shouldnt("""List(Some(1), None) map { case Some(x) => x; case None => 10 }""")
-    shouldnt("""for(a <- List(Some(1), None)) a match { case Some(x) => x; case None => 10 }""")
   }
 
   //stuff that doesn't work and I don't know why
