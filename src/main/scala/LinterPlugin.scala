@@ -1305,6 +1305,48 @@ class LinterPlugin(val global: Global) extends Plugin {
             if(elseCase equalsStructure Literal(Constant(null))) warn(opt2, UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + "== None"))
             else if(getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + "== None"))
           
+          /// sortBy(...).head/last is better written as min/maxBy(...)
+          case Select(Apply(Apply(TypeApply(Select(col, sortBy), _), List(_func)), List(ordering)), head_last)
+            if (sortBy is "sortBy")
+            && (head_last.isAny("head", "last"))
+            && (col.tpe.baseClasses.exists(_.tpe =:= TraversableOnceClass.tpe))
+            && (ordering.toString.contains("Ordering")) =>
+
+            val func = head_last.toString
+            val replacement = if (func == "head") "minBy" else "maxBy"
+            warn(tree, UseMinOrMaxNotSort(identOrCol(col), "sortBy", func, replacement))
+
+          case Select(Apply(xArrayOps, List(Apply(Apply(TypeApply(Select(col, sortBy), _), List(_func)), List(ordering)))), head_last)
+            if (sortBy is "sortBy")
+            && (head_last.isAny("head", "last"))
+            && (xArrayOps.toString.contains("ArrayOps"))
+            && (ordering.toString.contains("Ordering")) =>
+
+            val func = head_last.toString
+            val replacement = if (func == "head") "minBy" else "maxBy"
+            warn(tree, UseMinOrMaxNotSort(identOrCol(col), "sortBy", func, replacement))
+
+          /// sorted(...).head/last is better written as min/max
+          case Select(Apply(TypeApply(Select(col, sorted), _), List(ordering)), head_last)
+            if (sorted is "sorted")
+            && (head_last.isAny("head", "last"))
+            && (col.tpe.baseClasses.exists(_.tpe =:= TraversableOnceClass.tpe))
+            && (ordering.toString.contains("Ordering")) =>
+
+            val func = head_last.toString
+            val replacement = if (func == "head") "min" else "max"
+            warn(tree, UseMinOrMaxNotSort(identOrCol(col), "sorted", func, replacement))
+
+          case Select(Apply(xArrayOps, List(Apply(TypeApply(Select(col, sorted), _), List(ordering)))), head_last)
+            if (sorted is "sorted")
+            && (head_last.isAny("head", "last"))
+            && (xArrayOps.toString.contains("ArrayOps"))
+            && (ordering.toString.contains("Ordering")) =>
+
+            val func = head_last.toString
+            val replacement = if (func == "head") "min" else "max"
+            warn(tree, UseMinOrMaxNotSort(identOrCol(col), "sorted", func, replacement))
+
           /// find(...).isDefined is better written as exists(...)
           /// filter(...).isEmpty is better written as exists(...)
           case Select(Apply(pos @ Select(col, find_filter), _func), isEmpty_isDefined) 
@@ -1427,7 +1469,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// swap operations col.sortBy(...).filter(...)
           case Apply(Select(Apply(Apply(TypeApply(Select(col, sortBy), _), List(Function(List(ValDef(_, _, _, _)), _))), List(ordering)), filter), List(Function(List(ValDef(_, _, _, _)), _)))
             if (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
-            && (ordering is "math.this.Ordering.Int")
+            && (ordering.toString.contains("Ordering"))
             && (sortBy is "sortBy") && (filter.isAny("filter", "filterNot")) =>
 
             warn(tree, FilterFirstThenSort)
@@ -1435,7 +1477,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// swap operations col.sorted.filter(...)
           case Apply(Select(Apply(TypeApply(Select(col, sorted), _), List(ordering)), filter), List(Function(List(ValDef(_, _, _, _)), _)))
             if (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
-            && (ordering is "math.this.Ordering.Int")
+            && (ordering.toString.contains("Ordering"))
             && (sorted is "sorted") && (filter.isAny("filter", "filterNot")) =>
 
             warn(tree, FilterFirstThenSort)
@@ -3158,7 +3200,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           else None
         }
         def matches(s: String): Option[Boolean] = {
-          if((s startsWith "^") || (s endsWith "$")) warn(treePosHolder, SuspiciousMatches)
+          if((s startsWith "^") || ((s endsWith "$") && !(s endsWith "\\$"))) warn(treePosHolder, SuspiciousMatches)
          
           if(exactValue.isDefined) Some(exactValue.get matches s)
           else None

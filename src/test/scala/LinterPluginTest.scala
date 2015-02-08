@@ -115,7 +115,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should(defs+"""math.log(1d + a)""")("""Use math.log1p(x), instead of math.log(1 + x) for added accuracy when x is near 0.""")
     should(defs+"""BigDecimal(0.555555555555555555555555555)""")("""Possible loss of precision.""")
     should(defs+"""{val a = Some(List(1,2,3)); if(a.size > 3) ""}""")("""Did you mean to take the size of the collection inside the Option?""")
-    should(defs+"""if(strOption.isDefined) strOption.get else """"")("""Use strOption.getOrElse(...) instead of if(strOption.isDefined) strOption.get else ...""")
+    should(defs+"""if(strOption.isDefined) strOption.get else "" """)("""Use strOption.getOrElse(...) instead of if(strOption.isDefined) strOption.get else ...""")
     should(defs+"""List(1,2,3,4).find(x => x % 2 == 0).isDefined""")("""Use col.exists(...) instead of col.find(...).isDefined""")
     should(defs+"""List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)""")("""Use col.filter(x => condition) instead of col.flatMap(x => if(condition) ... else ...).""")
     should(defs+"""def func(b: Int, c: String, d: String) = { println(b); b+c }""")("""Parameter d is not used in method func""")
@@ -381,7 +381,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     
     should(""" val a = util.Random.nextString(5); val b = a matches (a+"$") """)
     should(""" val a = util.Random.nextString(5); val b = a matches ("fdsf$") """)
-    shouldnt(""" val a = util.Random.nextString(5); val b = a matches ("fdsf\$") """)
+    shouldnt(""" val a = util.Random.nextString(5); val b = a matches ("fdsf\\$") """)
     
     should(""" val a = util.Random.nextString(5); val b = a matches ("^"+a) """)
     shouldnt(""" val a = util.Random.nextString(5); a matches a """)
@@ -846,7 +846,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
         case _ => "hi"
       }""")
     
-    //TODO: should("""val a = 5; a match { case 3 => "hello"; case _ => "hi" """)
+    //TODO: should("""val a = 5; a match { case 3 => "hello"; case _ => "hi" } """)
     
     shouldnt("""
       val a = 5
@@ -1051,13 +1051,27 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     implicit val msg = "Filter collection first, then sort it."
     
     should(""" List(1,2,3).sortWith((x, y) => x > y).filter(x => x > 1) """)
-    should(""" List(1,2,3).sortWith((x, y) => x > y).filterNot(x => x > 1) """)
+    should(""" List(1.0,2.0,3.0).sortWith((x, y) => x > y).filterNot(x => x > 1) """)
 
-    should(""" List(1,2,3).sortBy(x => x).filter(x => x > 1) """)
+    should(""" List(1L,2L,3L).sortBy(x => x).filter(x => x > 1) """)
     should(""" List(1,2,3).sortBy(x => x).filterNot(x => x > 1) """)
 
-    should(""" List(1,2,3).sorted.filter(x => x > 1) """)
+    should(""" List("1","2","3").sorted.filter(x => x.contains("x")) """)
     should(""" List(1,2,3).sorted.filterNot(x => x > 1) """)
+  }
+  
+  @Test
+  def UseMinOrMaxNotSort(): Unit = {
+    implicit val msg = " instead of "
+
+    should(""" List(1,2,3).sorted.head """)
+    should(""" List(1,2,3).sorted.last """)
+    should(""" Array(1,2,3).sorted.last """)
+
+    should(""" List(1,2,3).sortBy(x => x).head """)
+    should(""" List(1,2,3).sortBy(x => x).last """)
+    should(""" Array(1,2,3).sortBy(x => -x).last """)
+
   }
 
   @Test
@@ -1494,7 +1508,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     shouldnt("""class a { sealed trait Hello; sealed trait Hello2 extends Hello; object a { val b = "fdsfds"; class s() extends Hello2; } }""")
 
     shouldnt("""sealed trait Hello { def a = println("hello") }; val b = new Hello {}""")
-    shouldnt("""sealed trait Hello[A, B <: List]""")
+    shouldnt("""sealed trait Hello[A, B <: List[_]]""")
   }
 
   @Test
@@ -1871,34 +1885,34 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should(""" val a = "   ".substring(2,2); if(a.isEmpty) "foo" """)
     
     msg = "always returns the same value: true"
-    should(""""fszd".startsWith("f")""")
-    shouldnt(""""fszd".startsWith("a")""")
-    should(""""fszd".endsWith("zd")""")
-    shouldnt(""""fszd".endsWith("a")""")
-    should(""""fszd".reverse.endsWith("sf")""")
-    should(""""abcd".substring(2,4).endsWith("cd")""")
+    should(""" "fszd".startsWith("f")""")
+    shouldnt(""" "fszd".startsWith("a")""")
+    should(""" "fszd".endsWith("zd")""")
+    shouldnt(""" "fszd".endsWith("a")""")
+    should(""" "fszd".reverse.endsWith("sf")""")
+    should(""" "abcd".substring(2,4).endsWith("cd")""")
 
     msg = "always returns the same value: false"
-    shouldnt(""""fszd".startsWith("f")""")
-    should(""""fszd".startsWith("a")""")
-    shouldnt(""""fszd".endsWith("zd")""")
-    should(""""fszd".endsWith("a")""")
-    shouldnt(""""fszd".reverse.endsWith("sf")""")
+    shouldnt(""" "fszd".startsWith("f")""")
+    should(""" "fszd".startsWith("a")""")
+    shouldnt(""" "fszd".endsWith("zd")""")
+    should(""" "fszd".endsWith("a")""")
+    shouldnt(""" "fszd".reverse.endsWith("sf")""")
 
     msg = "You will likely use a out of bounds index."
-    should(""""abcd".substring(2,77).endsWith("cd")""")
-    should(""""abcd".substring(2,1).endsWith("cd")""")
+    should(""" "abcd".substring(2,77).endsWith("cd")""")
+    should(""" "abcd".substring(2,1).endsWith("cd")""")
     should(""" val a = "abcd"; val b = a.substring(2,2).tail """)("Taking the tail of an empty string.")
-    should(""""abcd".substring(0,2).charAt(6)""")
-    should(""""abcd".substring(-1,2).endsWith("cd")""")
-    should(""""abcd".substring(78,89).endsWith("cd")""")
-    shouldnt(""""abcd".substring(2,4).endsWith("cd")""")
+    should(""" "abcd".substring(0,2).charAt(6)""")
+    should(""" "abcd".substring(-1,2).endsWith("cd")""")
+    should(""" "abcd".substring(78,89).endsWith("cd")""")
+    shouldnt(""" "abcd".substring(2,4).endsWith("cd")""")
 
-    should(""""abcd".charAt(22)""")
-    shouldnt(""""abcd".charAt(2)""")
+    should(""" "abcd".charAt(22)""")
+    shouldnt(""" "abcd".charAt(2)""")
 
-    //should(""""abcd"(22)""")
-    //shouldnt(""""abcd"(2)""")
+    //should(""" "abcd"(22)""")
+    //shouldnt(""" "abcd"(2)""")
     
     msg = "Multiplying a string with a value <= 0 will always result in an empty string."
     //should(""" "dfd"*(-5) """)
@@ -1906,9 +1920,9 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     //shouldnt(""" val a = 3; "dfd"*(a) """)
     
     // prefix/suffix tests
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b contains "bcd") """"")("This contains always returns the same value: true")
-    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b contains "cde") """"")("This contains always returns the same value: true")
-    should("""val b = "abc"; if(b contains "abcd") """"")("This contains always returns the same value: false")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b contains "bcd") "" """)("This contains always returns the same value: true")
+    should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b contains "cde") "" """)("This contains always returns the same value: true")
+    should("""val b = "abc"; if(b contains "abcd") "" """)("This contains always returns the same value: false")
     
     should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b startsWith "bc") "" """)("This startsWith always returns the same value: true")
     should("""val b = "bcd"+util.Random.nextString(6)+"cde"; if(b startsWith "bcd") "" """)("This startsWith always returns the same value: true")
@@ -2259,7 +2273,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       )
     """)
     should("""BigDecimal.valueOf(0.555555555555555555f)""")
-    shouldnt("""BigDecimal.valueOf("0.555555555555555555")""")
+    shouldnt("""BigDecimal("0.555555555555555555")""")
 
     should("""BigDecimal(0.5555555555555555555555555555555555555555555555555555555555555)""")
     should("""BigDecimal(-0.5555555555555555555555555555555555555555555555555555555555555)""")
@@ -2271,8 +2285,10 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     shouldnt("""BigDecimal(0.1)""")
     shouldnt("""BigDecimal("0.1")""")
     shouldnt("""new java.math.BigDecimal("0.1")""")
-    shouldnt("""BigDecimal.valueOf("0.1")""")
-    shouldnt("""math.BigDecimal.valueOf("0.1")""")
+    shouldnt("""BigDecimal("0.1")""")
+    shouldnt("""BigDecimal.valueOf(0.1)""")
+    shouldnt("""math.BigDecimal.valueOf(0.1)""")
+    shouldnt("""math.BigDecimal("0.1")""")
     
     should("""BigDecimal("afdsfsdafd")""")("""NumberFormatException""")
   }

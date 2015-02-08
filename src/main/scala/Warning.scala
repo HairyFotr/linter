@@ -93,6 +93,7 @@ object Warning {
     MergeMaps,
     FuncFirstThenMap(""),
     FilterFirstThenSort,
+    UseMinOrMaxNotSort("", "", "", ""),
     UseMapNotFlatMap(""),
     UseFilterNotFlatMap(""),
     UseFlattenNotFilterOption(""),
@@ -237,6 +238,8 @@ case class FuncFirstThenMap(methName: String) extends
   Warning(s"Use method $methName first, then map.")
 case object FilterFirstThenSort extends
   Warning("Filter collection first, then sort it.")
+case class UseMinOrMaxNotSort(colName: String, sortFunc: String, op: String, replacement: String) extends
+  Warning(s"Use $colName.$replacement instead of $colName.$sortFunc.$op.")
 case class UseMapNotFlatMap(varName: String) extends
   Warning(s"Use $varName.map(x => if(...) y else z) instead of $varName.flatMap(x => if(...) Collection(y) else Collection(z)).") // Clean up warning
 case class UseFilterNotFlatMap(varName: String) extends

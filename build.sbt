@@ -4,7 +4,7 @@ organization := "com.foursquare.lint"
 
 //version := "0.1.6"
 
-scalaVersion := "2.11.4"
+scalaVersion := "2.10.4"
 
 crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.4", "2.11.4") }
 

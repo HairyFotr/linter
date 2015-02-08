@@ -1,0 +1,4 @@
+# Doesn't do multiline tests
+cat LinterPluginTest.scala | grep -Po '(?<=    ) *should(nt)?[(].+[)] *$' | grep -oP '".+"' | grep -vP '"[)][(]"' | grep -v "//" | grep -oP '(?<=")[^"].*[^"](?=")' | awk '$0="{ "$0" }"' > testCode
+
+#scala < testCode
