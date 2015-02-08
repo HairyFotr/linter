@@ -5,7 +5,7 @@ import org.specs2.matcher.JUnitMustMatchers
 
 class WarningTest extends JUnitMustMatchers {
   @Test
-  def allIncludesAll() {
+  def allIncludesAll(): Unit = {
     val count: Int = Warning.All.distinct.map {
       case AssigningOptionToNull => 1
       case AvoidOptionCollectionSize => 1
@@ -112,18 +112,19 @@ class WarningTest extends JUnitMustMatchers {
       // The real point is that you need to add the new Warning to Warning.All.
       // ------------------------------------------------------------------------------------------------------
     }.sum
+    
     val nonUnitResult = Warning.All.length must beEqualTo(count)
   }
 
   @Test
-  def warningNamesAreAlphaNumeric() {
+  def warningNamesAreAlphaNumeric(): Unit = {
     Warning.AllNames.foreach { name =>
       name must beMatching("^[A-Z][a-zA-Z0-9]+$")
     }
   }
 
   @Test
-  def warningNamesAreUnique() {
+  def warningNamesAreUnique(): Unit = {
     val warningsWithDuplicateNames = Warning.All.toList.groupBy(_.name).collect { case (_, warnings) if (warnings.length > 1) => warnings }
     warningsWithDuplicateNames.foreach(warnings => warnings.toString must beEqualTo("have duplicate names: " + warnings.head.name))
   }
