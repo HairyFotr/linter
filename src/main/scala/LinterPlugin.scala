@@ -1201,6 +1201,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case ValDef(mods, name, tpe, body) 
             if !mods.isParameter 
             && !(name.toString.trim matches "res[0-9]+") //Workaround: for REPL
+            && !(name.toString.trim == "$result") //Workaround: for REPL/Tests
             && ((tpe.toString contains "Any") || (tpe.toString contains "Nothing")) // Gets rid of Stuff[_]
             && (containsAnyType(tpe.tpe) || containsNothingType(tpe.tpe))
             && (inferred contains tpe.pos) 

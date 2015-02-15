@@ -1,4 +1,7 @@
-# Doesn't do multiline tests
+# Doesn't do multiline tests and at least )("msg...") cases
 cat LinterPluginTest.scala | grep -Po '(?<=    ) *should(nt)?[(].+[)] *$' | grep -oP '".+"' | grep -vP '"[)][(]"' | grep -v "//" | grep -oP '(?<=")[^"].*[^"](?=")' | awk '$0="{ "$0" }"' > testCode
+
+# Doesn't do some other stuff (diff with above :))
+grep -Pzo '(?s)(?<=    ) *should(nt)? *[(]("""[^"]([^"]["]["]?([^)"] *\n|[^")]|[)] *[^ \n]| *\n)|[^"])+[^"]"""|"[^"]([^\\][\\]["]|[^"])+[^"]")[)] *$' LinterPluginTest.scala | sed -r 's/^ *should(nt)?\(("|""")/ { /g' | sed -r 's/([^"])("|""")+\) *$/\1 } /g' > testCode2
 
 #scala < testCode

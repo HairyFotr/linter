@@ -13,7 +13,7 @@ There are also published releases - the current version is `"0.1.7"`.
 
 ## Manual usage
 Another possible way to use Linter is to manually download and use these jars:<br>
-[Scala 2.11.x](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar?raw=true) (unstable), <br>
+[Scala 2.11.x](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar?raw=true), <br>
 [Scala 2.10.x](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar?raw=true), <br>
 [Scala 2.9.3](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.9.3/0.1-SNAPSHOT/linter_2.9.3-0.1-SNAPSHOT.jar?raw=true) (outdated)
 
@@ -46,18 +46,19 @@ Or only specific checks can be enabled using:
 ## Suppressing false positives
 
 If you believe some warnings are false positives, you can ignore them with a code comment:
+```scala
+scala> val x = math.pow(5, 1/3d) + 1/0 // linter:disable:UseCbrt+DivideByZero // ignores UseCbrt and DivideByZero
+<console>:8: warning: Integer division detected in an expression assigned to a floating point variable.
+              math.pow(5, 1/3d) + 1/0 // linter:disable:UseCbrt+DivideByZero // ignores UseCbrt and DivideByZero
+                                ^
+scala> val x = math.pow(5, 1/3d) + 1/0 // linter:disable // ignores all warnings
+```
     
-    scala> val x = math.pow(5, 1/3d) + 1/0 // linter:disable:UseCbrt+DivideByZero // ignores UseCbrt and DivideByZero
-    <console>:8: warning: Integer division detected in an expression assigned to a floating point variable.
-                  math.pow(5, 1/3d) + 1/0 // linter:disable:UseCbrt+DivideByZero // ignores UseCbrt and DivideByZero
-                                    ^
-    scala> val x = math.pow(5, 1/3d) + 1/0 // linter:disable // ignores all warnings
-    
-__Note:__ Please consider reporting false positives so they can be removed in future versions.
+__Note:__ Please consider reporting false positives so that they can be removed in future versions.
 
 ## List of implemented checks
 
-[UnextendedSealedTrait](src/test/scala/LinterPluginTest.scala#L1500), [UnlikelyEquality](src/test/scala/LinterPluginTest.scala#L1576), [UseLog1p](src/test/scala/LinterPluginTest.scala#L883), [UseLog10](src/test/scala/LinterPluginTest.scala#L245), [UseExpm1](src/test/scala/LinterPluginTest.scala#L929), [UseHypot](src/test/scala/LinterPluginTest.scala#L192), [UseCbrt](src/test/scala/LinterPluginTest.scala#L214), [UseSqrt](src/test/scala/LinterPluginTest.scala#L224), [UseExp](src/test/scala/LinterPluginTest.scala#L234), [UseAbsNotSqrtSquare](src/test/scala/LinterPluginTest.scala#L1012), [UseIsNanNotSelfComparison](src/test/scala/LinterPluginTest.scala#L1451), [UseIsNanNotNanComparison](src/test/scala/LinterPluginTest.scala#L1470), [UseSignum](src/test/scala/LinterPluginTest.scala#L1287), BigDecimalNumberFormat, BigDecimalPrecisionLoss, [ReflexiveAssignment](src/test/scala/LinterPluginTest.scala#L1128), [CloseSourceFile](src/test/scala/LinterPluginTest.scala#L717), [JavaConverters](src/test/scala/LinterPluginTest.scala#L728), [ContainsTypeMismatch](src/test/scala/LinterPluginTest.scala#L734), [NumberInstanceOf](src/test/scala/LinterPluginTest.scala#L171), [PatternMatchConstant](src/test/scala/LinterPluginTest.scala#L840), PreferIfToBooleanMatch, [IdenticalCaseBodies](src/test/scala/LinterPluginTest.scala#L794), [IdenticalCaseConditions](src/test/scala/LinterPluginTest.scala#L1352), ReflexiveComparison, [YodaConditions](src/test/scala/LinterPluginTest.scala#L1211), [UseConditionDirectly](src/test/scala/LinterPluginTest.scala#L745), [UseIfExpression](src/test/scala/LinterPluginTest.scala#L129), [UnnecessaryElseBranch](src/test/scala/LinterPluginTest.scala#L139), [DuplicateIfBranches](src/test/scala/LinterPluginTest.scala#L770), [IdenticalIfElseCondition](src/test/scala/LinterPluginTest.scala#L1154), [MergeNestedIfs](src/test/scala/LinterPluginTest.scala#L1234), [VariableAssignedUnusedValue](src/test/scala/LinterPluginTest.scala#L1384), [MalformedSwap](src/test/scala/LinterPluginTest.scala#L1330), IdenticalIfCondition, [IdenticalStatements](src/test/scala/LinterPluginTest.scala#L1433), IndexingWithNegativeNumber, OptionOfOption, [UndesirableTypeInference](src/test/scala/LinterPluginTest.scala#L1364), AssigningOptionToNull, WrapNullWithOption, AvoidOptionStringSize, AvoidOptionCollectionSize, UseGetOrElseOnOption, UseOptionOrNull, UseOptionGetOrElse, UseExistsOnOption, [UseFindNotFilterHead](src/test/scala/LinterPluginTest.scala#L392), [UseContainsNotExistsEquals](src/test/scala/LinterPluginTest.scala#L623), [UseQuantifierFuncNotFold](src/test/scala/LinterPluginTest.scala#L642), [UseFuncNotReduce](src/test/scala/LinterPluginTest.scala#L677), [UseFuncNotFold](src/test/scala/LinterPluginTest.scala#L658), [MergeMaps](src/test/scala/LinterPluginTest.scala#L1026), [FuncFirstThenMap](src/test/scala/LinterPluginTest.scala#L1035), [FilterFirstThenSort](src/test/scala/LinterPluginTest.scala#L1050), [UseMinOrMaxNotSort](src/test/scala/LinterPluginTest.scala#L1064), [UseMapNotFlatMap](src/test/scala/LinterPluginTest.scala#L1078), [UseFilterNotFlatMap](src/test/scala/LinterPluginTest.scala#L1089), AvoidOptionMethod, [TransformNotMap](src/test/scala/LinterPluginTest.scala#L484), [DuplicateKeyInMap](src/test/scala/LinterPluginTest.scala#L967), [InefficientUseOfListSize](src/test/scala/LinterPluginTest.scala#L987), [OnceEvaluatedStatementsInBlockReturningFunction](src/test/scala/LinterPluginTest.scala#L1526), [IntDivisionAssignedToFloat](src/test/scala/LinterPluginTest.scala#L1534), [UseFlattenNotFilterOption](src/test/scala/LinterPluginTest.scala#L980), [UseExistsNotFilterEmpty](src/test/scala/LinterPluginTest.scala#L524), [UseCountNotFilterLength](src/test/scala/LinterPluginTest.scala#L550), [UseExistsNotCountCompare](src/test/scala/LinterPluginTest.scala#L580), [PassPartialFunctionDirectly](src/test/scala/LinterPluginTest.scala#L1515), [UnitImplicitOrdering](src/test/scala/LinterPluginTest.scala#L270), [RegexWarning](src/test/scala/LinterPluginTest.scala#L401), [InvariantCondition](src/test/scala/LinterPluginTest.scala#L438), DecomposingEmptyCollection, InvariantExtrema, [UnnecessaryMethodCall](src/test/scala/LinterPluginTest.scala#L1002), ProducesEmptyCollection, OperationAlwaysProducesZero, ModuloByOne, DivideByOne, DivideByZero, ZeroDivideBy, [UseUntilNotToMinusOne](src/test/scala/LinterPluginTest.scala#L1484), [InvalidParamToRandomNextInt](src/test/scala/LinterPluginTest.scala#L1547), UnusedForLoopIteratorValue, StringMultiplicationByNonPositive, LikelyIndexOutOfBounds, UnnecessaryReturn, InvariantReturn, [UnusedParameter](src/test/scala/LinterPluginTest.scala#L860), [InvalidStringFormat](src/test/scala/LinterPluginTest.scala#L329), InvalidStringConversion, UnnecessaryStringNonEmpty, UnnecessaryStringIsEmpty, [PossibleLossOfPrecision](src/test/scala/LinterPluginTest.scala#L255), [UnsafeAbs](src/test/scala/LinterPluginTest.scala#L282), [TypeToType](src/test/scala/LinterPluginTest.scala#L298), [EmptyStringInterpolator](src/test/scala/LinterPluginTest.scala#L346), [UnlikelyToString](src/test/scala/LinterPluginTest.scala#L357), [UnthrownException](src/test/scala/LinterPluginTest.scala#L367), [SuspiciousMatches](src/test/scala/LinterPluginTest.scala#L376), [IfDoWhile](src/test/scala/LinterPluginTest.scala#L456)
+[[UnextendedSealedTrait](src/test/scala/LinterPluginTest.scala#L1497), [UnlikelyEquality](src/test/scala/LinterPluginTest.scala#L1573), [UseLog1p](src/test/scala/LinterPluginTest.scala#L884), [UseLog10](src/test/scala/LinterPluginTest.scala#L246), [UseExpm1](src/test/scala/LinterPluginTest.scala#L930), [UseHypot](src/test/scala/LinterPluginTest.scala#L193), [UseCbrt](src/test/scala/LinterPluginTest.scala#L215), [UseSqrt](src/test/scala/LinterPluginTest.scala#L225), [UseExp](src/test/scala/LinterPluginTest.scala#L235), [UseAbsNotSqrtSquare](src/test/scala/LinterPluginTest.scala#L1012), [UseIsNanNotSelfComparison](src/test/scala/LinterPluginTest.scala#L1448), [UseIsNanNotNanComparison](src/test/scala/LinterPluginTest.scala#L1467), [UseSignum](src/test/scala/LinterPluginTest.scala#L1284), BigDecimalNumberFormat, BigDecimalPrecisionLoss, [ReflexiveAssignment](src/test/scala/LinterPluginTest.scala#L1125), [CloseSourceFile](src/test/scala/LinterPluginTest.scala#L718), [JavaConverters](src/test/scala/LinterPluginTest.scala#L729), [ContainsTypeMismatch](src/test/scala/LinterPluginTest.scala#L735), [NumberInstanceOf](src/test/scala/LinterPluginTest.scala#L172), [PatternMatchConstant](src/test/scala/LinterPluginTest.scala#L841), PreferIfToBooleanMatch, [IdenticalCaseBodies](src/test/scala/LinterPluginTest.scala#L795), [IdenticalCaseConditions](src/test/scala/LinterPluginTest.scala#L1349), ReflexiveComparison, [YodaConditions](src/test/scala/LinterPluginTest.scala#L1208), [UseConditionDirectly](src/test/scala/LinterPluginTest.scala#L746), [UseIfExpression](src/test/scala/LinterPluginTest.scala#L130), [UnnecessaryElseBranch](src/test/scala/LinterPluginTest.scala#L140), [DuplicateIfBranches](src/test/scala/LinterPluginTest.scala#L771), [IdenticalIfElseCondition](src/test/scala/LinterPluginTest.scala#L1151), [MergeNestedIfs](src/test/scala/LinterPluginTest.scala#L1231), [VariableAssignedUnusedValue](src/test/scala/LinterPluginTest.scala#L1381), [MalformedSwap](src/test/scala/LinterPluginTest.scala#L1327), IdenticalIfCondition, [IdenticalStatements](src/test/scala/LinterPluginTest.scala#L1430), IndexingWithNegativeNumber, OptionOfOption, [UndesirableTypeInference](src/test/scala/LinterPluginTest.scala#L1361), AssigningOptionToNull, WrapNullWithOption, AvoidOptionStringSize, AvoidOptionCollectionSize, UseGetOrElseOnOption, UseOptionOrNull, UseOptionGetOrElse, UseExistsOnOption, [UseFindNotFilterHead](src/test/scala/LinterPluginTest.scala#L393), [UseContainsNotExistsEquals](src/test/scala/LinterPluginTest.scala#L624), [UseQuantifierFuncNotFold](src/test/scala/LinterPluginTest.scala#L643), [UseFuncNotReduce](src/test/scala/LinterPluginTest.scala#L678), [UseFuncNotFold](src/test/scala/LinterPluginTest.scala#L659), [MergeMaps](src/test/scala/LinterPluginTest.scala#L1026), [FuncFirstThenMap](src/test/scala/LinterPluginTest.scala#L1035), [FilterFirstThenSort](src/test/scala/LinterPluginTest.scala#L1050), [UseMinOrMaxNotSort](src/test/scala/LinterPluginTest.scala#L1064), [UseMapNotFlatMap](src/test/scala/LinterPluginTest.scala#L1078), [UseFilterNotFlatMap](src/test/scala/LinterPluginTest.scala#L1089), AvoidOptionMethod, [TransformNotMap](src/test/scala/LinterPluginTest.scala#L485), [DuplicateKeyInMap](src/test/scala/LinterPluginTest.scala#L968), [InefficientUseOfListSize](src/test/scala/LinterPluginTest.scala#L988), [OnceEvaluatedStatementsInBlockReturningFunction](src/test/scala/LinterPluginTest.scala#L1523), [IntDivisionAssignedToFloat](src/test/scala/LinterPluginTest.scala#L1531), [UseFlattenNotFilterOption](src/test/scala/LinterPluginTest.scala#L981), [UseExistsNotFilterEmpty](src/test/scala/LinterPluginTest.scala#L525), [UseCountNotFilterLength](src/test/scala/LinterPluginTest.scala#L551), [UseExistsNotCountCompare](src/test/scala/LinterPluginTest.scala#L581), [PassPartialFunctionDirectly](src/test/scala/LinterPluginTest.scala#L1512), [UnitImplicitOrdering](src/test/scala/LinterPluginTest.scala#L271), [RegexWarning](src/test/scala/LinterPluginTest.scala#L402), [InvariantCondition](src/test/scala/LinterPluginTest.scala#L439), DecomposingEmptyCollection, InvariantExtrema, [UnnecessaryMethodCall](src/test/scala/LinterPluginTest.scala#L1002), ProducesEmptyCollection, OperationAlwaysProducesZero, ModuloByOne, DivideByOne, DivideByZero, ZeroDivideBy, [UseUntilNotToMinusOne](src/test/scala/LinterPluginTest.scala#L1481), [InvalidParamToRandomNextInt](src/test/scala/LinterPluginTest.scala#L1544), UnusedForLoopIteratorValue, StringMultiplicationByNonPositive, LikelyIndexOutOfBounds, UnnecessaryReturn, InvariantReturn, [UnusedParameter](src/test/scala/LinterPluginTest.scala#L861), [InvalidStringFormat](src/test/scala/LinterPluginTest.scala#L330), InvalidStringConversion, UnnecessaryStringNonEmpty, UnnecessaryStringIsEmpty, [PossibleLossOfPrecision](src/test/scala/LinterPluginTest.scala#L256), [UnsafeAbs](src/test/scala/LinterPluginTest.scala#L283), [TypeToType](src/test/scala/LinterPluginTest.scala#L299), [EmptyStringInterpolator](src/test/scala/LinterPluginTest.scala#L347), [UnlikelyToString](src/test/scala/LinterPluginTest.scala#L358), [UnthrownException](src/test/scala/LinterPluginTest.scala#L368), [SuspiciousMatches](src/test/scala/LinterPluginTest.scala#L377), [IfDoWhile](src/test/scala/LinterPluginTest.scala#L457)
 
 __Note:__ Links currently go to the test for that check.
 
@@ -65,135 +66,182 @@ __Note:__ Links currently go to the test for that check.
 
 ### If checks
 #### Repeated condition in an else-if chain
-    scala> if(a == 10 || b == 10) 0 else if(a == 20 && b == 10) 1 else 2
-    <console>:10: warning: This condition has appeared earlier in the if-else chain and will never hold here.
-                  if(a == 10 || b == 10) 0 else if(a == 20 && b == 10) 1 else 2
-                                                                ^
+```scala
+scala> if(a == 10 || b == 10) 0 else if(a == 20 && b == 10) 1 else 2
+<console>:10: warning: This condition has appeared earlier in the if-else chain and will never hold here.
+              if(a == 10 || b == 10) 0 else if(a == 20 && b == 10) 1 else 2
+                                                            ^
+```
 
 #### Identical branches
-    scala> if(b > 4) (2,a) else (2,a)
-    <console>:9: warning: If statement branches have the same structure.
-                  if(b > 4) (2,a) else (2,a)
-                       ^
+```scala
+scala> if(b > 4) (2,a) else (2,a)
+<console>:9: warning: If statement branches have the same structure.
+              if(b > 4) (2,a) else (2,a)
+                   ^
+```
 
 #### Unnecessary if
-    scala> if(a == b) true else false
-    <console>:9: warning: Remove the if expression and use the condition directly.
-            if(a == b) true else false
-            ^
+```scala
+scala> if(a == b) true else false
+<console>:9: warning: Remove the if expression and use the condition directly.
+              if(a == b) true else false
+              ^
+```
 
 ### Pattern matching checks
 #### Detect some unreachable cases
-    scala> (x,y) match { case (a,5) if a > 5 => 0 case (c,5) if c > 5 => 1 }
-    <console>:10: warning: Identical case condition detected above. This case will never match.
-                  (x,y) match { case (a,5) if a > 5 => 0 case (c,5) if c > 5 => 1 }
-                                                              ^
+```scala
+scala> (x,y) match { case (a,5) if a > 5 => 0 case (c,5) if c > 5 => 1 }
+<console>:10: warning: Identical case condition detected above. This case will never match.
+              (x,y) match { case (a,5) if a > 5 => 0 case (c,5) if c > 5 => 1 }
+                                                          ^
+```
 
 #### Identical neighbouring cases
-    scala> a match { case 3 => "hello" case 4 => "hello" case 5 => "hello" case _ => "how low" }
-    <console>:9: warning: Bodies of 3 neighbouring cases are identical and could be merged.
-                  a match { case 3 => "hello" case 4 => "hello" case 5 => "hello" case _ => "how low" }
-                                                                          ^
+```scala
+scala> a match { case 3 => "hello" case 4 => "hello" case 5 => "hello" case _ => "how low" }
+<console>:9: warning: Bodies of 3 neighbouring cases are identical and could be merged.
+              a match { case 3 => "hello" case 4 => "hello" case 5 => "hello" case _ => "how low" }
+                                                                      ^
+```
 
 #### Match better written as if
-    scala> bool match { case true => 0 case false => 1 }
-    <console>:9: warning: Pattern matching on Boolean is probably better written as an if statement.
-                  a match { case true => 0 case false => 1 }
-                    ^
+```scala
+scala> bool match { case true => 0 case false => 1 }
+<console>:9: warning: Pattern matching on Boolean is probably better written as an if statement.
+              a match { case true => 0 case false => 1 }
+                ^
+```
 
 ### Integer checks (some abstract intepretation)
 #### Check conditions
-    scala> for(i <- 10 to 20) { if(i > 20) "" }
-    <console>:8: warning: This condition will never hold.
-                  for(i <- 10 to 20) { if(i > 20) "" }
-                                            ^
+```scala
+scala> for(i <- 10 to 20) { if(i > 20) "" }
+<console>:8: warning: This condition will never hold.
+              for(i <- 10 to 20) { if(i > 20) "" }
+                                        ^
+```
+
 #### Detect division by zero
-    scala> for(i <- 1 to 10) { 1/(i-1)  }
-    <console>:8: warning: You will likely divide by zero here.
-                  for(i <- 1 to 10) { 1/(i-1)  }
-                                       ^
+```scala
+scala> for(i <- 1 to 10) { 1/(i-1)  }
+<console>:8: warning: You will likely divide by zero here.
+              for(i <- 1 to 10) { 1/(i-1)  }
+                                   ^
+```
+
 #### Detect too large, or negative indices
-    scala> { val a = List(1,2,3); for(i <- 1 to 10) { println(a(i)) } }
-    <console>:8: warning: You will likely use a too large index.
-                  { val a = List(1,2,3); for(i <- 1 to 10) { println(a(i)) } }
-                                                                      ^
+```scala
+scala> { val a = List(1,2,3); for(i <- 1 to 10) { println(a(i)) } }
+<console>:8: warning: You will likely use a too large index.
+              { val a = List(1,2,3); for(i <- 1 to 10) { println(a(i)) } }
+                                                                  ^
+```
 
 ### String checks (some abstract intepretation)
 #### Attempt to verify string length conditions
-    scala> for(i <- 10 to 20) { if(i.toString.length == 3) "" }
-    <console>:8: warning: This condition will never hold.
-                  for(i <- 10 to 20) { if(i.toString.length == 3) "" }
-                                                            ^
+```scala
+scala> for(i <- 10 to 20) { if(i.toString.length == 3) "" }
+<console>:8: warning: This condition will never hold.
+              for(i <- 10 to 20) { if(i.toString.length == 3) "" }
+                                                        ^
+```
+
 #### Attempt to track the prefix, suffix, and pieces
-    scala> { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(a contains "world") ""; if(a startsWith "hell") "" }
-    <console>:8: warning: This contains will always returns the same value: true
-                  { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(a contains "world") ""; if(a startsWith "hell") "" }
-                                                                                                                     ^
-    <console>:8: warning: This startsWith always returns the same value: true
-                  { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(a contains "world") ""; if(a startsWith "hell") "" }
-                                                                                                                                                  ^
+```scala
+scala> { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(a contains "world") ""; if(a startsWith "hell") "" }
+<console>:8: warning: This contains will always returns the same value: true
+              { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(a contains "world") ""; if(a startsWith "hell") "" }
+                                                                                                                 ^
+<console>:8: warning: This startsWith always returns the same value: true
+              { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(a contains "world") ""; if(a startsWith "hell") "" }
+                                                                                                                                              ^
+```
 
 #### Regex syntax warnings
-    scala> str.replaceAll("?", ".")
-    <console>:9: warning: Regex pattern syntax error: Dangling meta character '?'
-                  str.replaceAll("?", ".")
-                                 ^
+```scala
+scala> str.replaceAll("?", ".")
+<console>:9: warning: Regex pattern syntax error: Dangling meta character '?'
+              str.replaceAll("?", ".")
+                             ^
+```
+
 ### Numeric checks
 #### Using `log(1 + a)` instead of `log1p(a)`
-    scala> math.log(1d + a)
-    <console>:9: warning: Use math.log1p(x), instead of math.log(1 + x) for added accuracy when x is near 0.
-                  math.log(1 + a)
-                          ^
+```scala
+scala> math.log(1d + a)
+<console>:9: warning: Use math.log1p(x), instead of math.log(1 + x) for added accuracy when x is near 0.
+              math.log(1 + a)
+                      ^
+```
 
 #### Loss of precision on BigDecimal
-    scala> BigDecimal(0.555555555555555555555555555)
-    <console>:8: warning: Possible loss of precision. Literal cannot be represented exactly by Double. (0.555555555555555555555555555 != 0.5555555555555556)
-                  BigDecimal(0.555555555555555555555555555)
-                            ^
+```scala
+scala> BigDecimal(0.555555555555555555555555555)
+<console>:8: warning: Possible loss of precision. Literal cannot be represented exactly by Double. (0.555555555555555555555555555 != 0.5555555555555556)
+              BigDecimal(0.555555555555555555555555555)
+                        ^
+```
 
 ### Option checks
 #### Using Option.size
-    scala> val a = Some(List(1,2,3)); if(a.size > 3) ""
-    <console>:9: warning: Did you mean to take the size of the collection inside the Option?
-            if(a.size > 3) ""
-                 ^
+```scala
+scala> val a = Some(List(1,2,3)); if(a.size > 3) ""
+<console>:9: warning: Did you mean to take the size of the collection inside the Option?
+              if(a.size > 3) ""
+                   ^
+```
 
 #### Using if-else instead of getOrElse
-    scala> if(strOption.isDefined) strOption.get else ""
-    <console>:9: warning: Use strOption.getOrElse(...) instead of if(strOption.isDefined) strOption.get else ...
-                  if(strOption.isDefined) strOption.get else ""
-                                          ^
+```scala
+scala> if(strOption.isDefined) strOption.get else ""
+<console>:9: warning: Use strOption.getOrElse(...) instead of if(strOption.isDefined) strOption.get else ...
+              if(strOption.isDefined) strOption.get else ""
+                                      ^
+```
 
 ### Collection checks
 #### Use exists(...) instead of find(...).isDefined
-    scala> List(1,2,3,4).find(x => x % 2 == 0).isDefined
-    <console>:8: warning: Use col.exists(...) instead of col.find(...).isDefined.
-                  List(1,2,3,4).find(x => x % 2 == 0).isDefined
-                                ^
+```scala
+scala> List(1,2,3,4).find(x => x % 2 == 0).isDefined
+<console>:8: warning: Use col.exists(...) instead of col.find(...).isDefined.
+              List(1,2,3,4).find(x => x % 2 == 0).isDefined
+                            ^
+```
 
 #### Use filter(...) instead of flatMap(...)
-    scala> List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)
-    <console>:8: warning: Use col.filter(x => condition) instead of col.flatMap(x => if(condition) ... else ...).
-                  List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)
-                                       ^
+```scala
+scala> List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)
+<console>:8: warning: Use col.filter(x => condition) instead of col.flatMap(x => if(condition) ... else ...).
+              List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)
+                                   ^
+```
 
 ### Various possible bugs
 #### Unused method parameters
-    scala> def func(b: Int, c: String, d: String) = { println(b); b+c }
-    <console>:7: warning: Parameter d is not used in method func
-           def func(b: Int, c: String, d: String) = { println(b); b+c }
-               ^
+```scala
+scala> def func(b: Int, c: String, d: String) = { println(b); b+c }
+<console>:7: warning: Parameter d is not used in method func
+              def func(b: Int, c: String, d: String) = { println(b); b+c }
+                  ^
+```
 
 #### Unsafe `contains`
-    scala> List(1, 2, 3).contains("4")
-    <console>:29: warning: List[Int].contains(String) will probably return false, since the collection and target element are of unrelated types.
-                  List(1, 2, 3).contains("4")
-                                ^
+```scala
+scala> List(1, 2, 3).contains("4")
+<console>:29: warning: List[Int].contains(String) will probably return false, since the collection and target element are of unrelated types.
+               List(1, 2, 3).contains("4")
+                             ^
+```
+
 #### Unsafe `==`
-    scala> Nil == None
-    <console>:29: warning: Comparing with == on instances of unrelated types (scala.collection.immutable.Nil.type, None.type) will probably return false.
-                  Nil == None
-                      ^
+```scala
+scala> Nil == None
+<console>:29: warning: Comparing with == on instances of unrelated types (scala.collection.immutable.Nil.type, None.type) will probably return false.
+               Nil == None
+                   ^
+```
 
 ## Future Work
 
