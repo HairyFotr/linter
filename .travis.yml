@@ -13,8 +13,4 @@
    - oraclejdk7
    - oraclejdk8
  sudo: false
- cache:
-   directories:
-     - $HOME/.ivy2
-     - $HOME/.sbt
  script: "sbt ++$TRAVIS_SCALA_VERSION scalastyle test"
