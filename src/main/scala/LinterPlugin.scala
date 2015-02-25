@@ -93,6 +93,11 @@ class LinterPlugin(val global: Global) extends Plugin {
         superTraverse = true
         //if(showRaw(tree).contains("Hello"))println(showRaw(tree))
         tree match {
+          /// quick hack for nowarnMergeNestedIfsPositions, see issue #18
+          case If(_, apply @ Apply(_, _), Literal(Constant(())))
+            if !(linterOptions.disabledWarningNames contains MergeNestedIfs.name)
+            && { nowarnMergeNestedIfsPositions += apply.pos; false } => //Fallthrough
+
           /// Unused sealed traits (Idea by edofic)
           case ClassDef(mods, _name, _, Template(extendsList, _, body)) if !mods.isSealed && mods.isTrait =>
             for(Ident(traitName) <- extendsList) usedTraits += traitName
@@ -1045,7 +1050,10 @@ class LinterPlugin(val global: Global) extends Plugin {
           } => //Fallthrough
 
           /// if(cond1) { if(cond2) { ... } } is the same as if(cond1 && cond2) { ... }
-          case If(_cond1, If(_cond2, _body, else1), else2) if else1 equalsStructure else2 =>
+          case If(_cond1, iff @ If(_cond2, _body, else1), else2)
+            if (else1 equalsStructure else2)
+            && !(nowarnMergeNestedIfsPositions contains iff.pos) =>
+            
             warn(tree, MergeNestedIfs)
           
           /// ifdowhile loop (idea by OpenSSL Valhalla Rampage) :)
