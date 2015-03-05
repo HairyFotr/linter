@@ -139,7 +139,7 @@ case object UseLog10 extends
 case object UseExpm1 extends
   Warning("Use math.expm1(x), instead of math.exp(x) - 1 for added accuracy when x is near 0.")
 case object UseHypot extends
-  Warning("Use math.hypot(x, y), instead of sqrt(x^2, y^2) for improved accuracy (but diminished performance).")
+  Warning("Use math.hypot(x, y), instead of sqrt(x^2 + y^2) for improved accuracy (but diminished performance).")
 case object UseCbrt extends
   Warning("Use math.cbrt(x), instead of pow(x, 1/3) for improved accuracy and performance.")
 case object UseSqrt extends
