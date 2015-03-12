@@ -18,7 +18,7 @@ package com.foursquare.lint
 
 import scala.collection.mutable
 import scala.tools.nsc.plugins.{ Plugin, PluginComponent }
-import scala.tools.nsc.{ Global, Phase }
+import scala.tools.nsc.{ Global, Phase, Properties }
 
 class LinterPlugin(val global: Global) extends Plugin {
   import com.foursquare.lint.Utils._
@@ -1367,21 +1367,21 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// exists(a == ...) is better written as contains(...)
           case Apply(Select(col, exists), List(Function(List(ValDef(_, param1, _, _)), Apply(Select(param2, eq), List(id @ Ident(_))))))
             if (exists is "exists") && ((eq is "$eq$eq") || (eq is "eq"))
-            && (col.tpe.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || c.tpe =:= OptionClass.tpe))
+            && (col.tpe.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || (c.tpe =:= OptionClass.tpe && !Properties.versionString.contains("2.10"))))
             && (param1.toString == param2.toString) =>
             
             warn(tree, UseContainsNotExistsEquals(identOrCol(col), id.toString, param2.toString, id.toString))
 
           case Apply(Select(col, exists), List(Function(List(ValDef(_, param1, _, _)), Apply(Select(id @ Ident(_), eq), List(param2)))))
             if (exists is "exists") && ((eq is "$eq$eq") || (eq is "eq"))
-            && (col.tpe.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || c.tpe =:= OptionClass.tpe))
+            && (col.tpe.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || (c.tpe =:= OptionClass.tpe && !Properties.versionString.contains("2.10"))))
             && (param1.toString == param2.toString) =>
             
             warn(tree, UseContainsNotExistsEquals(identOrCol(col), id.toString, id.toString, param2.toString))
 
           case Apply(Select(col, exists), List(Function(List(ValDef(_, param1, _, _)), Apply(Select(param2, eq), List(Literal(Constant(lit)))))))
             if (exists is "exists") && ((eq is "$eq$eq") || (eq is "eq"))
-            && (col.tpe.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || c.tpe =:= OptionClass.tpe))
+            && (col.tpe.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || (c.tpe =:= OptionClass.tpe && !Properties.versionString.contains("2.10"))))
             && (param1.toString == param2.toString) =>
             
             warn(tree, UseContainsNotExistsEquals(identOrCol(col), String.valueOf(lit.toString), param2.toString, String.valueOf(lit.toString)))

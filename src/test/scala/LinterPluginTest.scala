@@ -633,7 +633,10 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("Array(1,2,3).exists(a => a == 2) ")
     should("collection.mutable.ListBuffer(1,2,3).exists(a => a == 2) ")
     
-    if (!Properties.versionString.contains("2.10")) {
+    if (Properties.versionString.contains("2.10")) {
+      noLint("val b = 5; Option(2).exists(_ == b)")
+      noLint("Option(2).exists(_ == 2)")
+    } else {
       should("val b = 5; Option(2).exists(_ == b)")
       should("Option(2).exists(_ == 2)")
     }
