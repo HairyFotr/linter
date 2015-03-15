@@ -7,9 +7,9 @@ Add Linter to your project by appending these lines to your `build.sbt`:
 
     resolvers += "Linter Repository" at "https://hairyfotr.github.io/linteRepo/releases"
 
-    addCompilerPlugin("com.foursquare.lint" %% "linter" % "0.1-SNAPSHOT")
+    addCompilerPlugin("com.foursquare.lint" %% "linter" % "0.1.9")
 
-There are also published releases - the current version is `"0.1.8"`.
+There are also snapshot releases published under `"0.1-SNAPSHOT"`.
 
 ## Manual usage
 Another possible way to use Linter is to manually download and use these jars:<br>
