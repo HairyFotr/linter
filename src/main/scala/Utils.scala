@@ -24,9 +24,12 @@ object Utils {
   val nowarnPositions = mutable.HashSet[Global#Position]()
   val nowarnMergeNestedIfsPositions = mutable.HashSet[Global#Position]() // TODO hack
   
-  def warn(tree: Global#Tree, warning: Warning)(implicit unit: Global#CompilationUnit): Unit = { 
+  def warn(tree: Global#Tree, warning: Warning)(implicit unit: Global#CompilationUnit): Unit = {
+    val checkSep = "([+:]|[,] )"
+    val partSep = "[ :]"
+    val checkReg = "[A-Z][a-zA-Z]+"
     if((linterOptions.disabledWarningNames contains warning.name)
-    || (tree.pos.lineContent matches ".*// *linter:(nowarn|ignore|disable)(:([a-zA-Z]+[+])*?"+warning.name+"([+][a-zA-Z]+)*?)? *(//.*)?")
+    || (tree.pos.lineContent matches s".*// *linter${partSep}(nowarn|ignore|disable)(${partSep}(${checkReg}${checkSep})*${warning.name}(${checkSep}${checkReg})*)? *(//.*)?")
     || (nowarnPositions contains tree.pos)) {
       // skip
     } else {
@@ -56,7 +59,7 @@ class Utils[G <: Global](val global: G) {
   }
   
   def getUsed(tree: Tree): Set[String] = {
-    var used = Set[String]()
+    var used = Set.empty[String]
     for(Ident(id) <- tree) used += id.toString
     used
   }

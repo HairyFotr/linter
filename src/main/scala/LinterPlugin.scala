@@ -438,9 +438,9 @@ class LinterPlugin(val global: Global) extends Plugin {
           ///Workaround: suppresse a null warning and a "remove the if" check for """case class A()""" - see case class unapply's AST)
           case If(Apply(Select(_, nme.EQ), List(Literal(Constant(null)))), Literal(Constant(false)), Literal(Constant(true))) => superTraverse = false; return
           ///Workaround: ignores "Assignment right after declaration..." in case class hashcode
-          case DefDef(_mods, name, _, _, _, Block(block, last)) if (name is "hashCode") && {
-            (block :+ last) match { 
-              case ValDef(_modifiers, _id1, _, _) :: Assign(_id2, _) :: _ => true
+          case DefDef(_, name, _, _, _, Block(block, last)) if (name is "hashCode") && {
+            (block :+ last) match {
+              case ValDef(_, _id1, _, _) :: Assign(_id2, _) :: _ => true
               case _ => false
             }} => superTraverse = false; return
 
@@ -991,7 +991,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case If(cond, Apply(Select(id1, setter1), List(_)), Apply(Select(id2, setter2), List(_)))
             if (setter1 endsWith "_$eq") && (setter2 endsWith "_$eq") && (id1.toString == id2.toString) && !(id1.toString contains ".this") =>
             warn(cond, UseIfExpression(id1.toString))
-          case If(cond, Block(block, ret), Block(_, _)) if (block :+ ret) exists isReturnStatement => // Idea from oclint
+          case If(cond, Block(block, ret), Block(_, _)) if isReturnStatement(ret) || (block exists isReturnStatement) => // Idea from oclint
             warn(cond, UnnecessaryElseBranch)
           case If(_cond, a, b) if (a equalsStructure b) && (a.children.nonEmpty) => 
             //TODO: empty if statement (if(...) { }) triggers this - issue warning for that case?
@@ -1584,12 +1584,12 @@ class LinterPlugin(val global: Global) extends Plugin {
                 Nil
             }
             
-            val unitResult = keys.foldLeft(List[Tree]())((acc, newItem) => 
+            val unitResult = keys.foldLeft(List.empty[Tree])((acc, newItem) => 
               if(acc.exists(item => item equalsStructure newItem)) {
                 warn(newItem, DuplicateKeyInMap)
                 acc
               } else {
-                acc :+ newItem
+                newItem :: acc
               }
             )
             
@@ -2526,11 +2526,11 @@ class LinterPlugin(val global: Global) extends Plugin {
       }
       //val exprs = mutable.HashSet[String]()
           
-      var vals = Map[String, Values]().withDefaultValue(Values.empty)
-      var vars = Set[String]()
-      var stringVals = Set[StringAttrs]()
-      var defModels = Map[String, Either[Values, StringAttrs]]().withDefaultValue(Left(Values.empty))
-      var labels = Map[String, Tree]()
+      var vals = Map.empty[String, Values] withDefaultValue Values.empty
+      var vars = Set.empty[String]
+      var stringVals = Set.empty[StringAttrs]
+      var defModels = Map.empty[String, Either[Values, StringAttrs]] withDefaultValue Left(Values.empty)
+      var labels = Map.empty[String, Tree]
       def discardVars(): Unit = {
         for(v <- vars) vals += v -> Values.empty
       }
@@ -2669,7 +2669,7 @@ class LinterPlugin(val global: Global) extends Plugin {
         // scalastyle:on magic.number
         
         //// Tries to execute string functions and returns either a String or Int representation
-        def stringFunc(string: Tree, func: Name, params: List[Tree] = List[Tree]()): Either[StringAttrs, Values] = {
+        def stringFunc(string: Tree, func: Name, params: List[Tree] = List.empty[Tree]): Either[StringAttrs, Values] = {
           val str = StringAttrs(string)
           val paramsSize = params.size
           lazy val intParam = if(paramsSize == 1 && params.head.tpe.widen <:< IntClass.tpe) computeExpr(params.head) else Values.empty
@@ -3141,13 +3141,13 @@ class LinterPlugin(val global: Global) extends Plugin {
           private val trimmedMaxLength: Int = Int.MaxValue,
           private var prefix: String = "",
           private var suffix: String = "",
-          private var knownPieces: Set[String] = Set[String]()) {
+          private var knownPieces: Set[String] = Set.empty[String]) {
         
         // Keep this in mind, make getters
         if(exactValue.isDefined) {
           prefix = exactValue.get
           suffix = exactValue.get
-          knownPieces = Set[String]()
+          knownPieces = Set.empty[String]
         }
         //println(this)
 

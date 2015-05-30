@@ -1,7 +1,6 @@
 import de.johoop.cpd4sbt.CopyPasteDetector._
 import de.johoop.cpd4sbt.{OutputType => CPDOutputType, ReportType => CPDReportType}
 import de.johoop.findbugs4sbt._
-import org.scalastyle.sbt.{PluginKeys, ScalastylePlugin}
 
 scalacOptions ++= Seq(
   "-feature",
@@ -32,15 +31,15 @@ scalacOptions ++= Seq(
 
 //scalacOptions += "-Xplugin:../linteRepo/releases/com/foursquare/lint/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar"
 
-// Wartremover
-//addCompilerPlugin("org.brianmckenna" %% "wartremover" % "0.10")
+// self-test :)
 
-//scalacOptions in (Compile, compile) += "-P:wartremover:only-warn-traverser:org.brianmckenna.wartremover.warts.Unsafe"
+scalacOptions in console in Compile <+= (packageBin in Compile) map { pluginJar => "-Xplugin:"+pluginJar }
+
+// Wartremover
+//wartremoverWarnings ++= Warts.unsafe
 
 // Scalastyle
-ScalastylePlugin.Settings
-
-PluginKeys.config <<= baseDirectory { base => base / "sca" / "scalastyle-config.xml" }
+scalastyleConfig <<= baseDirectory { base => base / "sca" / "scalastyle-config.xml" }
 
 // Findbugs (optionally put findbugs plugins (such as fb-contrib and findsecbugs) jars into ~/.findbugs/plugin)
 findbugsSettings
