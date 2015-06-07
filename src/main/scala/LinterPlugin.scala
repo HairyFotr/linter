@@ -1078,6 +1078,9 @@ class LinterPlugin(val global: Global) extends Plugin {
             val assigns = mutable.HashMap[Name, AssignStatus]() withDefaultValue Unknown
             def checkAssigns(tree: Tree, onlySetUsed: Boolean): Unit = {
               tree match {
+                case ClassDef(_, _, _, _) | DefDef(_, _, _, _, _, _) =>
+                  // see issue 21 - skip assignments that are not executed immediately
+                  
                 //TODO: It could check if it gets set in all branches - Ignores currently
                 case If(_, _, _) | Match(_, _) =>
                   for(t <- tree.children) checkAssigns(t, onlySetUsed = true)

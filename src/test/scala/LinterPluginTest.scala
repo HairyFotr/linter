@@ -1430,6 +1430,29 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       a = 3
     """)
 
+    // see issue 21
+    noLint("""
+      var a = 0
+      
+      val x1 = new Runnable() {
+        override def run(): Unit = a = 1
+      }
+      val x2 = new Runnable() {
+        override def run(): Unit = a = 2
+      }
+    """)
+    noLint("""
+      var a = 0
+      
+      def x1() {
+        a = 1
+      }
+      def x2() {
+        a = 2
+      }
+    """)
+
+
     // TODO: If fails, look at isUsed first
     noLint("""
       var a = "A6"
