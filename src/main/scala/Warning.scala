@@ -89,7 +89,6 @@ object Warning {
     UseAbsNotSqrtSquare,
     UseConditionDirectly(true),
     UseIfExpression(""),
-    UseExistsOnOption("", "", ""),
     MergeMaps,
     FuncFirstThenMap(""),
     FilterFirstThenSort,
@@ -101,6 +100,8 @@ object Warning {
     UseCountNotFilterLength("", ""),
     UseExistsNotCountCompare(""),
     UseGetOrElseOnOption(""),
+    UseExistsNotFindIsDefined("", ""),
+    UseExistsNotFilterIsEmpty("", "", ""),
     UseFindNotFilterHead(""),
     UseContainsNotExistsEquals("", "", "", ""),
     UseQuantifierFuncNotFold("", "", ""),
@@ -220,8 +221,10 @@ case class UseOptionOrNull(varname: String, insteadOf: String) extends
   Warning(s"Use $varname.orNull or $varname.getOrElse(null) instead of if ($insteadOf) $varname.get else null.")
 case class UseOptionGetOrElse(varname: String, insteadOf: String) extends
   Warning(s"Use $varname.getOrElse(...) instead of if($insteadOf) $varname.get else ...")
-case class UseExistsOnOption(varName: String, find_filter: String, isEmpty_isDefined: String) extends
-  Warning(s"Use $varName.exists(...) instead of $varName.$find_filter(...).$isEmpty_isDefined.")
+case class UseExistsNotFindIsDefined(varName: String, isEmpty_isDefined: String) extends
+  Warning(s"Use $varName.exists(...) instead of $varName.find(...).$isEmpty_isDefined.")
+case class UseExistsNotFilterIsEmpty(varName: String, filter: String, empty: String) extends
+  Warning(s"Use $varName.exists(...) instead of $varName.$filter(...).$empty.")
 case class UseFindNotFilterHead(varName: String) extends
   Warning(s"Unless there are side-effects, $varName.filter(...).headOption can be replaced by $varName.find(...).")
 case class UseContainsNotExistsEquals(colName: String, valCmp: String, val1: String, val2: String) extends

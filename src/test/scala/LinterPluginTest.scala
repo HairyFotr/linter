@@ -264,7 +264,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
       should("""val x = 0.555555555f""")
       noLint("""val x = 0.555555555d""")
-    } 
+    }
   }
 
   @Test
@@ -1103,25 +1103,35 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   @Test
   def UseExistsNotFindIsDefined(): Unit = {
     implicit var msg = ".exists(...) instead of "
-    //find.isDefined 
     should("""List(1,2,3).find(_ == 2).isDefined""")
     should("""Set(1,2,3).find(_ == 2).isDefined""")
     should("""collection.mutable.HashSet(1,2,3).find(_ == 2).isDefined""")
     should("""Array(1,2,3).find(_ == 2).isDefined""")
     should("""def a(x:Int) = x == 2; List(1,2,3).find(a).isDefined""")
+    should("""Seq(1,2,3).find(_ > 1).isDefined""")
 
     should("""List(1,2,3).find(_ == 2).isEmpty""")
     should("""Set(1,2,3).find(_ == 2).isEmpty""")
+    should("""Seq(1,2,3).find(_ == 2).isEmpty""")
+    should("""Seq(1,2,3).find(_ == 2).nonEmpty""")
 
     noLint("""List(1,2,3).headOption.isDefined""")
     noLint("""List(1,2,3).headOption.isEmpty""")
-
-    // find.isEmpty 
+  }
+  
+  @Test
+  def UseExistsNotFilterIsEmpty(): Unit = {
+    implicit var msg = ".exists(...) instead of "
     should("""List(1,2,3).filter(_ == 2).isEmpty""")
     should("""Set(1,2,3).filter(_ == 2).isEmpty""")
+    should("""Seq(1,2,3).filter(_ == 2).isEmpty""")
     should("""collection.mutable.HashSet(1,2,3).filter(_ == 2).isEmpty""")
-    //should("""Array(1,2,3).filter(_ == 2).isEmpty""") gets wrapped probably... don't care
+    //should("""Array(1,2,3).filter(_ == 2).isEmpty""") // TODO: gets wrapped probably...
     should("""def a(x:Int) = x == 2; List(1,2,3).filter(a).isEmpty""")
+
+    should("""Seq(1,2,3).filter(_ == 2).nonEmpty""")
+    should("""Seq(1,2,3).filterNot(_ == 2).isEmpty""")
+    should("""Some(1).filter(_ > 1).isDefined""")
   }
 
   @Test

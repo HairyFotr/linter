@@ -31,10 +31,6 @@ scalacOptions ++= Seq(
 
 //scalacOptions += "-Xplugin:../linteRepo/releases/com/foursquare/lint/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar"
 
-// self-test :)
-
-scalacOptions in console in Compile <+= (packageBin in Compile) map { pluginJar => "-Xplugin:"+pluginJar }
-
 // Wartremover
 //wartremoverWarnings ++= Warts.unsafe
 

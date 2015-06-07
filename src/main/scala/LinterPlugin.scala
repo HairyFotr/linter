@@ -1358,11 +1358,14 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           /// find(...).isDefined is better written as exists(...)
           /// filter(...).isEmpty is better written as exists(...)
-          case Select(Apply(pos @ Select(col, find_filter), _func), isEmpty_isDefined) 
-            if ((find_filter isAny ("find", "filter")) && (isEmpty_isDefined isAny ("isEmpty", "isDefined")))
-            && (col startsWithAny ("scala.", "immutable.")) =>
+          case Select(Apply(pos @ Select(col, find_filter), _func), empty_defined) 
+            if ((find_filter isAny ("find", "filter", "filterNot")) && (empty_defined isAny ("isEmpty", "nonEmpty", "isDefined")))
+            && (col startsWithAny ("scala.", "immutable.this", "collection.this")) =>
             
-            warn(pos, UseExistsOnOption(identOrCol(col), find_filter.toString, isEmpty_isDefined.toString))
+            if (find_filter is "find")
+              warn(pos, UseExistsNotFindIsDefined(identOrCol(col), empty_defined.toString))
+            else
+              warn(pos, UseExistsNotFilterIsEmpty(identOrCol(col), find_filter.toString, empty_defined.toString))
 
           /// exists(a == ...) is better written as contains(...)
           case Apply(Select(col, exists), List(Function(List(ValDef(_, param1, _, _)), Apply(Select(param2, eq), List(id @ Ident(_))))))
