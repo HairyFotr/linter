@@ -273,6 +273,7 @@ Rule lists from other static analysis tools:
 * ($)SuperSafe™(Scala) - http://www.artima.com/supersafe_user_guide.html
 * IntelliJ IDEA(Scala/...) - https://www.jetbrains.com/idea/features/scala.html
 * Findbugs(JVM) - http://findbugs.sourceforge.net/bugDescriptions.html
+* ($)Julia(JVM) - http://www.juliasoft.com/warnings
 * CheckStyle(Java) - http://checkstyle.sourceforge.net/availablechecks.html
 * PMD(Java) - http://pmd.sourceforge.net/snapshot/pmd-java/rules/index.html
 * Error-prone(Java) - https://code.google.com/p/error-prone/wiki/BugPatterns
@@ -284,6 +285,7 @@ Rule lists from other static analysis tools:
 * Clang(C++/ObjC) - http://clang-analyzer.llvm.org/available_checks.html
 * OCLint(C++/ObjC) - http://docs.oclint.org/en/dev/rules/index.html
 * ($)Fortify(Java/C++/...) - http://www.hpenterprisesecurity.com/vulncat/en/vulncat/index.html
+* Infer(Java/C/ObjC) - http://fbinfer.com/docs/infer-bug-types.html
  
 ### Some resources
 * A quick overview of writing compiler plugins: http://www.scala-lang.org/node/140
