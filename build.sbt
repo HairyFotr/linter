@@ -6,7 +6,7 @@ organization := "com.foursquare.lint"
 
 scalaVersion := "2.10.5"
 
-crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.5", "2.11.6", "2.12.0-M1") }
+crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.5", "2.11.7", "2.12.0-M1") }
 
 resolvers ++= Seq("snapshots", "releases").map(Resolver.sonatypeRepo)
 
