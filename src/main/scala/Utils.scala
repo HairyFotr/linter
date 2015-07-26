@@ -14,7 +14,7 @@
  *   limitations under the License.
  */
 
-package com.foursquare.lint
+package org.psywerx.hairyfotr
 
 import scala.collection.mutable
 import scala.tools.nsc.Global

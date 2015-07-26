@@ -1,4 +1,4 @@
-package com.foursquare.lint
+package org.psywerx.hairyfotr
 
 import org.junit.Test
 import org.specs2.matcher.JUnitMustMatchers

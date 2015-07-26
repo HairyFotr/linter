@@ -1,4 +1,4 @@
 <plugin>
   <name>linter</name>
-  <classname>com.foursquare.lint.LinterPlugin</classname>
+  <classname>org.psywerx.hairyfotr.LinterPlugin</classname>
 </plugin>

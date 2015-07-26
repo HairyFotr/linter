@@ -1,8 +1,12 @@
 name := "linter"
 
-organization := "com.foursquare.lint"
+licenses := Seq("Apache License, Version 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt"))
 
-//version := "0.1.11"
+homepage := Some(url("https://github.com/HairyFotr/linter"))
+
+organization := "org.psywerx.hairyfotr"
+
+//version := "0.1.12"
 
 scalaVersion := "2.10.5"
 
@@ -40,3 +44,20 @@ libraryDependencies <+= scalaVersion { (scalaVersion) =>
 scalacOptions in console in Compile <+= (packageBin in Compile) map { pluginJar => "-Xplugin:"+pluginJar }
 
 publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
+
+publishMavenStyle := true
+
+publishArtifact in Test := false
+
+pomIncludeRepository := { _ => false }
+
+pomExtra := (
+  <scm>
+    <url>https://github.com/HairyFotr/linter.git</url>
+  </scm>
+  <developers>
+    <developer>
+      <id>HairyFotr</id>
+      <name>Matic Potočnik</name>
+    </developer>
+  </developers>)

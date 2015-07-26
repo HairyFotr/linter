@@ -14,7 +14,7 @@
  *   limitations under the License.
  */
 
-package com.foursquare.lint
+package org.psywerx.hairyfotr
 
 sealed abstract class Warning(val message: String) {
   def name: String = toString.takeWhile(_ != '(')

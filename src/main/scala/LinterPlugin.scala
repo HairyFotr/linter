@@ -14,14 +14,14 @@
  *   limitations under the License.
  */
 
-package com.foursquare.lint
+package org.psywerx.hairyfotr
 
 import scala.collection.mutable
 import scala.tools.nsc.plugins.{ Plugin, PluginComponent }
 import scala.tools.nsc.{ Global, Phase, Properties }
 
 class LinterPlugin(val global: Global) extends Plugin {
-  import com.foursquare.lint.Utils._
+  import org.psywerx.hairyfotr.Utils._
   import global._
 
   val name = "linter"
@@ -1751,7 +1751,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     class PostTyperInterpreterTraverser(unit: CompilationUnit) extends Traverser {
       implicit val unitt = unit
       var treePosHolder: Tree = null
-      import com.foursquare.lint.Utils._
+      import org.psywerx.hairyfotr.Utils._
       val utils = new Utils[global.type](global)
       import utils._
 
