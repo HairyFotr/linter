@@ -19,17 +19,15 @@ scalacOptions ++= Seq(
   "-Ywarn-value-discard")
 
 // Linter
-//resolvers += "Linter Repository" at "https://hairyfotr.github.io/linteRepo/releases"
+//resolvers += Resolver.sonatypeRepo("snapshots")
 
 //addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1-SNAPSHOT")
 
 //scalacOptions += "-P:linter:disable:UseHypot+CloseSourceFile"
 
-// or...
+// or manually, e.g.
 
-//scalacOptions += "-Xplugin:../linteRepo/releases/org/psywerx/hairyfotr/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar"
-
-//scalacOptions += "-Xplugin:../linteRepo/releases/org/psywerx/hairyfotr/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar"
+//scalacOptions += "-Xplugin:lib/linter_2.11-0.1-SNAPSHOT.jar"
 
 // Wartremover
 //wartremoverWarnings ++= Warts.unsafe
