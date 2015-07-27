@@ -3,18 +3,21 @@
 Linter is a Scala static analysis compiler plugin which adds compile-time checks for various possible bugs, inefficiencies, and style problems.
 
 ## Usage from sbt
-Add Linter to your project by appending these lines to your `build.sbt`:
-
-    resolvers += "Linter Repository" at "https://hairyfotr.github.io/linteRepo/releases"
+Add Linter to your project by appending this line to your `build.sbt`:
 
     addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.12")
 
-There are also snapshot releases published under `"0.1-SNAPSHOT"`.
+If you would always like to have the latest changes, snapshots are also available:
+
+    resolvers += Resolver.sonatypeRepo("snapshots")
+
+    addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1-SNAPSHOT")
+
 
 ## Manual usage
 Another possible way to use Linter is to manually download and use these jars:<br>
-[Scala 2.11.x](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/org/psywerx/hairyfotr/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar?raw=true), <br>
-[Scala 2.10.x](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/org/psywerx/hairyfotr/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar?raw=true), <br>
+[Scala 2.11.x](https://oss.sonatype.org/content/repositories/snapshots/org/psywerx/hairyfotr/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar), <br>
+[Scala 2.10.x](https://oss.sonatype.org/content/repositories/snapshots/org/psywerx/hairyfotr/linter_2.10/0.1-SNAPSHOT/linter_2.10-0.1-SNAPSHOT.jar), <br>
 [Scala 2.9.3](https://github.com/HairyFotr/linteRepo/blob/gh-pages/releases/com/foursquare/lint/linter_2.9.3/0.1-SNAPSHOT/linter_2.9.3-0.1-SNAPSHOT.jar?raw=true) (outdated)
 
 

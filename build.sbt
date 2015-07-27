@@ -6,7 +6,7 @@ homepage := Some(url("https://github.com/HairyFotr/linter"))
 
 organization := "org.psywerx.hairyfotr"
 
-//version := "0.1.12"
+version := "0.1.12"
 
 scalaVersion := "2.10.5"
 
@@ -43,7 +43,16 @@ libraryDependencies <+= scalaVersion { (scalaVersion) =>
 // Enable linter in console
 scalacOptions in console in Compile <+= (packageBin in Compile) map { pluginJar => "-Xplugin:"+pluginJar }
 
-publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
+//publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
+
+publishTo := {
+  val nexus = "https://oss.sonatype.org/"
+  if (isSnapshot.value)
+    Some("snapshots" at nexus + "content/repositories/snapshots")
+  else
+    Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+
+}
 
 publishMavenStyle := true
 
@@ -59,5 +68,8 @@ pomExtra := (
     <developer>
       <id>HairyFotr</id>
       <name>Matic Potočnik</name>
+      <email>hairyfotr@gmail.com</email>
+      <url>https://github.com/HairyFotr</url>
     </developer>
-  </developers>)
+  </developers>
+)
