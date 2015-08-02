@@ -17,4 +17,4 @@ jdk:
   
 sudo: false
    
-script: "sbt ++$TRAVIS_SCALA_VERSION scalastyle test"
+script: "sbt ++$TRAVIS_SCALA_VERSION scalastyle stats test"
