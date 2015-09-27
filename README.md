@@ -291,6 +291,7 @@ Rule lists from other static analysis tools:
 * Infer(Java/C/ObjC) - http://fbinfer.com/docs/infer-bug-types.html
  
 ### Some resources
+* A repo with various resources about the scala compiler: https://github.com/illandan/scala.compiler.guides
 * A quick overview of writing compiler plugins: http://www.scala-lang.org/node/140
 * Basic tree example, and list of AST elements: http://stackoverflow.com/q/10419101/293115
 * Notes on compiler plugins from ScalaCL: http://code.google.com/p/scalacl/wiki/WritingScalaCompilerPlugins
