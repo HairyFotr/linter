@@ -48,11 +48,11 @@ class Utils[G <: Global](val global: G) {
   def isUsed(t: Tree, name: String, filter: String = ""): Boolean = {
     val tree = t.asInstanceOf[Tree]
     var used = 0
-    for(Ident(id) <- tree; if id.toString == name) used += 1
+    for (Ident(id) <- tree; if id.toString == name) used += 1
     //TODO: Only for select types, also, maybe this doesn't belong in all uses of isUsed (e.g. Assignment right after declaration)
     // isSideEffectFreeFor(...)
-    if(filter != "") {
-      for(Select(Ident(id), func) <- tree; if (func.toString matches filter) && (id.toString == name)) used -= 1
+    if (filter != "") {
+      for (Select(Ident(id), func) <- tree; if (func.toString matches filter) && (id.toString == name)) used -= 1
     }
     
     (used > 0)
@@ -60,7 +60,7 @@ class Utils[G <: Global](val global: G) {
   
   def getUsed(tree: Tree): Set[String] = {
     var used = Set.empty[String]
-    for(Ident(id) <- tree) used += id.toString
+    for (Ident(id) <- tree) used += id.toString
     used
   }
 
@@ -100,12 +100,12 @@ class Utils[G <: Global](val global: G) {
   }
       
   def getAssigned(tree: Tree): Set[String] = {
-    (for(Assign(Ident(id), _) <- tree) yield id.toString).toSet
-    //TODO: non-local stuff (for(Apply(Select(id, setter), List(_)) <- tree; if setter.toString endsWith "_$eq") yield setter.dropRight(4)).toSet
+    (for (Assign(Ident(id), _) <- tree) yield id.toString).toSet
+    //TODO: non-local stuff (for (Apply(Select(id, setter), List(_)) <- tree; if setter.toString endsWith "_$eq") yield setter.dropRight(4)).toSet
   }
 
   def isAssigned(tree: Tree, name: String): Boolean = {
-    for(Assign(Ident(id), _) <- tree; if id.toString == name) 
+    for (Assign(Ident(id), _) <- tree; if id.toString == name) 
       return true
     
     false
@@ -113,12 +113,12 @@ class Utils[G <: Global](val global: G) {
     
   def returnCount(tree: Tree): Int = {
     var used = 0
-    for(Return(id) <- tree) used += 1
+    for (Return(id) <- tree) used += 1
     used
   }
   def throwsCount(tree: Tree): Int = {
     var used = 0
-    for(Throw(id) <- tree) used += 1
+    for (Throw(id) <- tree) used += 1
     used
   }
 }

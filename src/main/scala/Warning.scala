@@ -220,7 +220,7 @@ case class UseGetOrElseOnOption(varname: String) extends
 case class UseOptionOrNull(varname: String, insteadOf: String) extends
   Warning(s"Use $varname.orNull or $varname.getOrElse(null) instead of if ($insteadOf) $varname.get else null.")
 case class UseOptionGetOrElse(varname: String, insteadOf: String) extends
-  Warning(s"Use $varname.getOrElse(...) instead of if($insteadOf) $varname.get else ...")
+  Warning(s"Use $varname.getOrElse(...) instead of if ($insteadOf) $varname.get else ...")
 case class UseExistsNotFindIsDefined(varName: String, isEmpty_isDefined: String) extends
   Warning(s"Use $varName.exists(...) instead of $varName.find(...).$isEmpty_isDefined.")
 case class UseExistsNotFilterIsEmpty(varName: String, filter: String, empty: String) extends
@@ -244,9 +244,9 @@ case object FilterFirstThenSort extends
 case class UseMinOrMaxNotSort(colName: String, sortFunc: String, op: String, replacement: String) extends
   Warning(s"Use $colName.$replacement instead of $colName.$sortFunc.$op.")
 case class UseMapNotFlatMap(varName: String) extends
-  Warning(s"Use $varName.map(x => if(...) y else z) instead of $varName.flatMap(x => if(...) Collection(y) else Collection(z)).") // Clean up warning
+  Warning(s"Use $varName.map(x => if (...) y else z) instead of $varName.flatMap(x => if (...) Collection(y) else Collection(z)).") // Clean up warning
 case class UseFilterNotFlatMap(varName: String) extends
-  Warning(s"Use $varName.filter(x => condition) instead of $varName.flatMap(x => if(condition) ... else ...).") // Clean up warning
+  Warning(s"Use $varName.filter(x => condition) instead of $varName.flatMap(x => if (condition) ... else ...).") // Clean up warning
 case class AvoidOptionMethod(method: String, explanation: String = "") extends
   Warning(s"Using Option.$method is not recommended. $explanation")
 case class TransformNotMap(varName: String) extends
@@ -272,7 +272,7 @@ case class PassPartialFunctionDirectly(matchVar: String) extends
 case class UnitImplicitOrdering(function: String) extends
   Warning(s"Unit is returned here, so this $function will always return the first element.")
 case class RegexWarning(errorMessage: String, error: Boolean = true) extends
-  Warning("Regex pattern "+(if(error) "syntax error" else "warning")+s": $errorMessage.")
+  Warning("Regex pattern "+(if (error) "syntax error" else "warning")+s": $errorMessage.")
 case class InvariantCondition(always: Boolean, doWhat: String) extends
   Warning(s"""This condition will ${ if (always) "always" else "never" } $doWhat.""")
 case class DecomposingEmptyCollection(method: String, collection: String = "collection") extends
@@ -312,7 +312,7 @@ case class UnusedParameter(parameters: Seq[String], method: String) extends
     (parameters match { case Seq(p) => " " + p + " is" case _ => "s (" + parameters.mkString(", ") + ") are" }) +
     s" not used in method $method.")
 case class InvalidStringFormat(errorMessage: String, exception: Boolean = true) extends
-  Warning(if(exception) s"This string format will throw: $errorMessage" else s"$errorMessage") // Likely Exception
+  Warning(if (exception) s"This string format will throw: $errorMessage" else s"$errorMessage") // Likely Exception
 case class InvalidStringConversion(conversionType: String) extends
   Warning(s"This String $conversionType conversion will likely fail.") // Likely Exception
 case object UnnecessaryStringNonEmpty extends

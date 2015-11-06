@@ -70,25 +70,25 @@ __Note:__ Links currently go to the test for that check.
 ### If checks
 #### Repeated condition in an else-if chain
 ```scala
-scala> if(a == 10 || b == 10) 0 else if(a == 20 && b == 10) 1 else 2
+scala> if (a == 10 || b == 10) 0 else if (a == 20 && b == 10) 1 else 2
 <console>:10: warning: This condition has appeared earlier in the if-else chain and will never hold here.
-              if(a == 10 || b == 10) 0 else if(a == 20 && b == 10) 1 else 2
-                                                            ^
+              if (a == 10 || b == 10) 0 else if (a == 20 && b == 10) 1 else 2
+                                                              ^
 ```
 
 #### Identical branches
 ```scala
-scala> if(b > 4) (2,a) else (2,a)
+scala> if (b > 4) (2,a) else (2,a)
 <console>:9: warning: If statement branches have the same structure.
-              if(b > 4) (2,a) else (2,a)
-                   ^
+              if (b > 4) (2,a) else (2,a)
+                    ^
 ```
 
 #### Unnecessary if
 ```scala
-scala> if(a == b) true else false
+scala> if (a == b) true else false
 <console>:9: warning: Remove the if expression and use the condition directly.
-              if(a == b) true else false
+              if (a == b) true else false
               ^
 ```
 
@@ -120,46 +120,46 @@ scala> bool match { case true => 0 case false => 1 }
 ### Integer checks (some abstract intepretation)
 #### Check conditions
 ```scala
-scala> for(i <- 10 to 20) { if(i > 20) "" }
+scala> for (i <- 10 to 20) { if (i > 20) "" }
 <console>:8: warning: This condition will never hold.
-              for(i <- 10 to 20) { if(i > 20) "" }
-                                        ^
+              for (i <- 10 to 20) { if (i > 20) "" }
+                                          ^
 ```
 
 #### Detect division by zero
 ```scala
-scala> for(i <- 1 to 10) { 1/(i-1)  }
+scala> for (i <- 1 to 10) { 1/(i-1)  }
 <console>:8: warning: You will likely divide by zero here.
-              for(i <- 1 to 10) { 1/(i-1)  }
-                                   ^
+              for (i <- 1 to 10) { 1/(i-1)  }
+                                    ^
 ```
 
 #### Detect too large, or negative indices
 ```scala
-scala> { val a = List(1,2,3); for(i <- 1 to 10) { println(a(i)) } }
+scala> { val a = List(1,2,3); for (i <- 1 to 10) { println(a(i)) } }
 <console>:8: warning: You will likely use a too large index.
-              { val a = List(1,2,3); for(i <- 1 to 10) { println(a(i)) } }
-                                                                  ^
+              { val a = List(1,2,3); for (i <- 1 to 10) { println(a(i)) } }
+                                                                   ^
 ```
 
 ### String checks (some abstract intepretation)
 #### Attempt to verify string length conditions
 ```scala
-scala> for(i <- 10 to 20) { if(i.toString.length == 3) "" }
+scala> for (i <- 10 to 20) { if (i.toString.length == 3) "" }
 <console>:8: warning: This condition will never hold.
-              for(i <- 10 to 20) { if(i.toString.length == 3) "" }
-                                                        ^
+              for (i <- 10 to 20) { if (i.toString.length == 3) "" }
+                                                          ^
 ```
 
 #### Attempt to track the prefix, suffix, and pieces
 ```scala
-scala> { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(a contains "world") ""; if(a startsWith "hell") "" }
+scala> { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if (a contains "world") ""; if (a startsWith "hell") "" }
 <console>:8: warning: This contains will always returns the same value: true
-              { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(a contains "world") ""; if(a startsWith "hell") "" }
-                                                                                                                 ^
+              { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if (a contains "world") ""; if (a startsWith "hell") "" }
+                                                                                                                   ^
 <console>:8: warning: This startsWith always returns the same value: true
-              { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if(a contains "world") ""; if(a startsWith "hell") "" }
-                                                                                                                                              ^
+              { val a = "hello"+util.Random.nextString(10)+"world"+util.Random.nextString(10)+"!"; if (a contains "world") ""; if (a startsWith "hell") "" }
+                                                                                                                                                ^
 ```
 
 #### Regex syntax warnings
@@ -190,18 +190,18 @@ scala> BigDecimal(0.555555555555555555555555555)
 ### Option checks
 #### Using Option.size
 ```scala
-scala> val a = Some(List(1,2,3)); if(a.size > 3) ""
+scala> val a = Some(List(1,2,3)); if (a.size > 3) ""
 <console>:9: warning: Did you mean to take the size of the collection inside the Option?
-              if(a.size > 3) ""
-                   ^
+              if (a.size > 3) ""
+                    ^
 ```
 
 #### Using if-else instead of getOrElse
 ```scala
-scala> if(strOption.isDefined) strOption.get else ""
-<console>:9: warning: Use strOption.getOrElse(...) instead of if(strOption.isDefined) strOption.get else ...
-              if(strOption.isDefined) strOption.get else ""
-                                      ^
+scala> if (strOption.isDefined) strOption.get else ""
+<console>:9: warning: Use strOption.getOrElse(...) instead of if (strOption.isDefined) strOption.get else ...
+              if (strOption.isDefined) strOption.get else ""
+                                       ^
 ```
 
 ### Collection checks
@@ -215,9 +215,9 @@ scala> List(1,2,3,4).find(x => x % 2 == 0).isDefined
 
 #### Use filter(...) instead of flatMap(...)
 ```scala
-scala> List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)
-<console>:8: warning: Use col.filter(x => condition) instead of col.flatMap(x => if(condition) ... else ...).
-              List(1,2,3,4).flatMap(x => if(x % 2 == 0) List(x) else Nil)
+scala> List(1,2,3,4).flatMap(x => if (x % 2 == 0) List(x) else Nil)
+<console>:8: warning: Use col.filter(x => condition) instead of col.flatMap(x => if (condition) ... else ...).
+              List(1,2,3,4).flatMap(x => if (x % 2 == 0) List(x) else Nil)
                                    ^
 ```
 
