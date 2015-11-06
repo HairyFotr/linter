@@ -1193,7 +1193,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               warn(tree, DivideByZero)
             } else if(denom == 1) {
               if(op == nme.DIV) warn(tree, DivideByOne)
-              else if(op == nme.MOD) warn(tree, ModuloByOne)
+              else if(op == nme.MOD && (num.tpe.widen weak_<:< LongClass.tpe)) warn(tree, ModuloByOne)
             }
           case Apply(Select(numLiteral @ Literal(Constant(num)), op), List(denom))
             if (op == nme.DIV || op == nme.MOD)
@@ -2360,10 +2360,11 @@ class LinterPlugin(val global: Global) extends Plugin {
             && (num.tpe.widen weak_<:< DoubleClass.tpe) && {
               val denom = computeExpr(expr)
               if(denom.isValue && denom.getValue == 1) {
-                if(op == nme.MOD)
-                  warn(pos, ModuloByOne)
-                else
+                if (op == nme.DIV) {
                   warn(pos, DivideByOne)
+                } else if(op == nme.MOD && (num.tpe.widen weak_<:< LongClass.tpe)) {
+                  warn(pos, ModuloByOne)
+                }
 
                 false //Fallthrough
               } else if(denom.contains(0)) {

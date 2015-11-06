@@ -35,6 +35,8 @@ scalacOptions ++= Seq(
 // Scalastyle
 scalastyleConfig <<= baseDirectory { base => base / "sca" / "scalastyle-config.xml" }
 
+watchSources += baseDirectory.value / "sca" / "scalastyle-config.xml"
+
 // Findbugs (optionally put findbugs plugins (such as fb-contrib and findsecbugs) jars into ~/.findbugs/plugin)
 findbugsSettings
 

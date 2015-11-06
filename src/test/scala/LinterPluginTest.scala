@@ -1586,6 +1586,18 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     noLint("""util.Random.nextInt(1)""")
     noLint("""var a = new util.Random; a.nextInt(1)""")
   }
+  
+  @Test 
+  def ModuloByOne(): Unit = {
+    implicit val msg = """Taking the modulo by one will return zero."""
+    
+    should("""def f(x: Int) = x % 1""")
+    should("""val a = 34; val b = a % 1""")
+    should("""val a = 34L; val b = a % 1""")
+
+    noLint("""def f(x: Double) = x % 1""") // Issue #27
+    noLint("""val a = 34d; val b = a % 1""") 
+  }
 
   // ^ New tests named after their Warning.scala name ^
   // --------------------------------------------------

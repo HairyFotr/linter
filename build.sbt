@@ -6,11 +6,11 @@ homepage := Some(url("https://github.com/HairyFotr/linter"))
 
 organization := "org.psywerx.hairyfotr"
 
-version := "0.1.12"
+//version := "0.1.12"
 
-scalaVersion := "2.10.5"
+scalaVersion := "2.10.6"
 
-crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.5", "2.11.7", "2.12.0-M2") }
+crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.6", "2.11.7", "2.12.0-M3") }
 
 resolvers ++= Seq("snapshots", "releases").map(Resolver.sonatypeRepo)
 
