@@ -1,7 +1,7 @@
 language: scala
  
 scala:
-  - 2.10.5
+  - 2.10.6
   - 2.11.7
    
 matrix:
@@ -17,4 +17,5 @@ jdk:
   
 sudo: false
    
-script: "sbt ++$TRAVIS_SCALA_VERSION scalastyle stats test"
+# Re-add scalastyle later
+script: "sbt ++$TRAVIS_SCALA_VERSION stats test"
