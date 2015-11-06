@@ -1221,8 +1221,8 @@ class LinterPlugin(val global: Global) extends Plugin {
             val exceptions = body match {
               case Apply(Select(New(_), nme.CONSTRUCTOR), _) => true
               case TypeApply(Select(_, asInstanceOf), _) if asInstanceOf is "asInstanceOf" => true
-              case Apply(TypeApply(Select(_collection, apply), List(typeTree: TypeTree)), _elems) 
-                if (apply is "apply") && !(typeTree.original == null) => true
+              case Apply(TypeApply(Select(_collection, apply), types), _elems) 
+                if (apply is "apply") && types.exists(t => t.isInstanceOf[TypeTree] && t.asInstanceOf[TypeTree].original != null) => true
               case Ident(_) => true
               case _ => false
             }

@@ -1388,6 +1388,10 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
     should("""{ var a = List(1, "2") }""")
     noLint("""{ var a = List[Any](1, "2") }""")
+    
+    // Issue #24
+    should("""{ val base = scala.collection.mutable.Map("review_id" -> "abcd", "review_id2" -> 1) }""")
+    noLint("""{ val base = scala.collection.mutable.Map[String, Any]("review_id" -> "abcd") }""")
   }
   
   @Test
@@ -1430,7 +1434,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       a = 3
     """)
 
-    // see issue 21
+    // Issue #21
     noLint("""
       var a = 0
       
