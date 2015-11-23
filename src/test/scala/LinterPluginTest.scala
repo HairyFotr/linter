@@ -725,7 +725,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     //should("""scala.io.Source.fromFile("README.md")""")
     
     noLint("""val a = scala.io.Source.fromFile("README.md"); a.mkString(""); a.close()""")
-    noLint("""def fromFile(s: String) = ""; fromFile("aaa").mkString("")""")
+    noLint("""def fromFile(s: String) = s; fromFile("aaa").mkString("")""")
   }
 
   @Test
@@ -866,11 +866,21 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     
     should("""def func(a:Int, b:Int) = { val c = a+1; c } """)
     should("""def func(a:Int)(implicit b:Int) = { val c = b+1; b }""")
+    should("""def foo(param1: String, param2: Int) = { param2 + 1 }""")
+    should("""def foo(a: String, b: String)(c: String): String = a+b""")
+    should("""def foo(a: String, b: String)(c: String): String = a+c""")
+    should("""object a { def foo(a: String, b: String)(c: String): String = { a+c } }""")
+    noLint("""def foo(a: String, b: String)(c: String): String = a+b+c""")
+
+    should("""def func(a:Int) = {}""")
+    should("""def func(a:Int) {}""")
+
+    should("""def foo(a: String, b: String)(c: String, d: String = "4"): String = a+b+d""")
+    should("""def foo(a: String, b: String)(c: String, d: String = "4"): String = a+b+c""")
+    noLint("""def foo(a: String, b: String)(c: String, d: String = "4"): String = a+b+c+d""")
 
     noLint("""def func(a:Int)(implicit b:Int) = a""")
     noLint("""def func(a:Int) = a""")
-    noLint("""def func(a:Int) = {}""")
-    noLint("""def func(a:Int) {}""")
     noLint("""def func(a:Int) = ???""")
 
     should("""

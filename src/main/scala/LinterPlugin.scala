@@ -3719,14 +3719,13 @@ class LinterPlugin(val global: Global) extends Plugin {
         tree match {
           case DefDef(mods: Modifiers, name, _, valDefs, _, body) =>
             /// Unused method parameters
-            if (name.toString != "<init>" && !body.isEmpty && !(mods.isOverride || tree.symbol.isOverridingSymbol)) {
+            if (name.toString != "<init>" && !name.toString.contains("$default$")
+            && !body.isEmpty && body.toString != "scala.this.Predef.???" 
+            && !(mods.isOverride || tree.symbol.isOverridingSymbol)) {
               // Get the parameters, except the implicit ones
               val params = valDefs.flatMap(_.filterNot(_.mods.isImplicit)).map(_.name.toString).toBuffer
-
-              // Is the body simple enough to ignore?
-              def isBodySimple(body: Tree): Boolean = !(body exists { case Block(_, _) => true; case _ => false })
-
-              if (!(name.toString == "main" && params.size == 1 && params.head == "args") && !isBodySimple(body)) { // Filter main method
+              
+              if (!(name.toString == "main" && params.size == 1 && params.head == "args")) { // Filter main method
                 val used = for (Ident(name) <- tree if params contains name.toString) yield name.toString
                 val unused = params -- used
                 
