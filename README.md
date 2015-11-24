@@ -271,7 +271,7 @@ Feel free to add your own ideas, or implement these. Pull requests welcome!
 Rule lists from other static analysis tools:
 * ScalaStyle(Scala) - https://github.com/scalastyle/scalastyle/wiki
 * Scapegoat(Scala) - https://github.com/sksamuel/scalac-scapegoat-plugin#inspections
-* WartRemover(Scala) - https://github.com/typelevel/wartremover#warts
+* WartRemover(Scala) - https://github.com/puffnfresh/wartremover#warts
 * Scala Abide(Scala) - https://github.com/scala/scala-abide
 * ($)SuperSafe™(Scala) - http://www.artima.com/supersafe_user_guide.html
 * IntelliJ IDEA(Scala/...) - https://www.jetbrains.com/idea/features/scala.html
@@ -279,7 +279,7 @@ Rule lists from other static analysis tools:
 * ($)Julia(JVM) - http://www.juliasoft.com/warnings
 * CheckStyle(Java) - http://checkstyle.sourceforge.net/availablechecks.html
 * PMD(Java) - http://pmd.sourceforge.net/snapshot/pmd-java/rules/index.html
-* Error-prone(Java) - https://code.google.com/p/error-prone/wiki/BugPatterns
+* Error-prone(Java) - https://github.com/google/error-prone
 * CodeNarc(Groovy) - http://codenarc.sourceforge.net/codenarc-rule-index.html
 * Shellcheck(shell) - http://www.shellcheck.net/about.html
 * ($)PVS-Studio(C++) - http://www.viva64.com/en/d/
@@ -292,7 +292,7 @@ Rule lists from other static analysis tools:
  
 ### Some resources
 * A repo with various resources about the scala compiler: https://github.com/illandan/scala.compiler.guides
-* A quick overview of writing compiler plugins: http://www.scala-lang.org/node/140
+* A quick overview of writing compiler plugins: http://www.scala-lang.org/old/node/140
 * Basic tree example, and list of AST elements: http://stackoverflow.com/q/10419101/293115
 * Notes on compiler plugins from ScalaCL: http://code.google.com/p/scalacl/wiki/WritingScalaCompilerPlugins
 * Notes and a similar compiler plugin from a while ago: https://github.com/ymasory/alacs/blob/master/dev/resources.md
