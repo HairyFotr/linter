@@ -180,7 +180,7 @@ case object IdenticalCaseConditions extends
 case object ReflexiveComparison extends
   Warning("Same expression on both sides of the comparison.")
 case object YodaConditions extends
-  Warning("You are using Yoda conditions.")
+  Warning("Yoda conditions using you are.")
 case class UseConditionDirectly(negated: Boolean = false) extends
   Warning(s"""Remove the if expression and use the ${if (negated) "negated " else ""}condition directly.""")
 case class UseIfExpression(varName: String) extends
