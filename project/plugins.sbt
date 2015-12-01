@@ -1,4 +1,4 @@
-addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "0.7.0")
+addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "0.8.0")
 
 addSbtPlugin("de.johoop" % "findbugs4sbt" % "1.3.0")
 
