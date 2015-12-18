@@ -429,6 +429,21 @@ class LinterPlugin(val global: Global) extends Plugin {
       def finalizer(tree: Tree): Unit = { 
         if (superTraverse) try { super.traverse(tree) } catch catcher
       }
+
+      object Name {
+        def unapply(name: Name): Option[String] = Some(name.toString)
+      }
+
+      object FPN {
+        def unapply(tree: Tree): Option[Tree] = {
+          tree match {
+            case Apply(xWrapper, List(FPN(x))) if xWrapper.toString endsWith "Wrapper" => Some(x)
+            case t if isSubtype(tree, DoubleClass.tpe) || isSubtype(tree, FloatClass.tpe) => Some(t)
+            case _ => None
+          }
+        }
+      }
+
       override def traverse(tree: Tree): Unit = try {
         superTraverse = true
         //Workarounds for some cases
@@ -650,6 +665,57 @@ class LinterPlugin(val global: Global) extends Plugin {
             if java_math_BigDecimal is "java.math.BigDecimal" =>
             
             warn(tree, BigDecimalPrecisionLoss)
+
+          // Warn about using NumericRange with floating point numbers because its broken:
+          //   NumericRange is broken for floating point numbers (float, double), that means, when using it
+          //   (collection methods: map, foreach, zip), it depends on which method is used for constructing
+          //   the new collections. You basically can go two paths on NumericRange:
+          //   1) The "apply" path:   @see scala.collection.immutable.NumericRange.locationAfterN
+          //   2) The "foreach" path: @see scala.collection.immutable.NumericRange.foreach
+          //
+          //   The difference between these paths is that "foreach" accumulates values to obtain the current value
+          //   (current += step), but "apply" will directly calculate the current value (start + (step * fromInt(n))).
+          //   The apply path is more accurate. This means that the values on these path will diverge due to other
+          //   rounding behavior.
+          //
+          //   For example:
+          //
+          //   val range = 0D to 1D by (1 / 7D)
+          //
+          //   1) Apply path
+          //   range.iterator.toVector // uses apply in range.iterator in the end
+          //   Vector(
+          //     0.0,
+          //     0.14285714285714285,
+          //     0.2857142857142857,
+          //     0.42857142857142855,
+          //     0.5714285714285714,
+          //     0.7142857142857142,
+          //     0.8571428571428571,
+          //     1.0
+          //   )
+          //
+          //   2) Foreach path
+          //   range.toVector // uses foreach at CanBuildFrom respectively ++= in the end
+          //   Vector(
+          //     0.0,
+          //     0.14285714285714285,
+          //     0.2857142857142857,
+          //     0.42857142857142855,
+          //     0.5714285714285714,
+          //     0.7142857142857142,
+          //     0.857142857142857,
+          //     0.9999999999999998
+          //   )
+          //
+          //   As one can see the last two values differ and iterator/apply is more accurate.
+          case Apply(Select(partialRangeTree, Name("by")), List(FPN(z)))
+              if {
+                val partialRangeClass = rootMirror.getClassByName(newTermName("scala.collection.immutable.Range.Partial"))
+                partialRangeTree.tpe/*.widen*/.typeConstructor =:= partialRangeClass.tpe/*.widen*/.typeConstructor &&
+                partialRangeTree.tpe.widen.typeArgs.headOption.fold(false)(isFloatingPointType)
+              }
+            => warn(tree, FloatingNumericRange)
 
           /// Checks for self-assignments: a = a
           case Assign(left, right) if left equalsStructure right =>
