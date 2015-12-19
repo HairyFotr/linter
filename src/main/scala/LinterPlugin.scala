@@ -434,10 +434,10 @@ class LinterPlugin(val global: Global) extends Plugin {
         def unapply(name: Name): Option[String] = Some(name.toString)
       }
 
-      object FPN {
+      object FloatingPointNumber {
         def unapply(tree: Tree): Option[Tree] = {
           tree match {
-            case Apply(xWrapper, List(FPN(x))) if xWrapper.toString endsWith "Wrapper" => Some(x)
+            case Apply(xWrapper, List(FloatingPointNumber(x))) if xWrapper.toString endsWith "Wrapper" => Some(x)
             case t if isSubtype(tree, DoubleClass.tpe) || isSubtype(tree, FloatClass.tpe) => Some(t)
             case _ => None
           }
@@ -709,13 +709,14 @@ class LinterPlugin(val global: Global) extends Plugin {
           //   )
           //
           //   As one can see the last two values differ and iterator/apply is more accurate.
-          case Apply(Select(partialRangeTree, Name("by")), List(FPN(z)))
+          case Apply(Select(partialRangeTree, Name("by")), List(FloatingPointNumber(_num)))
               if {
                 val partialRangeClass = rootMirror.getClassByName(newTermName("scala.collection.immutable.Range.Partial"))
-                partialRangeTree.tpe/*.widen*/.typeConstructor =:= partialRangeClass.tpe/*.widen*/.typeConstructor &&
-                partialRangeTree.tpe.widen.typeArgs.headOption.fold(false)(isFloatingPointType)
+                
+                (partialRangeTree.tpe.typeConstructor =:= partialRangeClass.tpe.typeConstructor &&
+                 partialRangeTree.tpe.widen.typeArgs.headOption.exists(isFloatingPointType))
               }
-            => warn(tree, FloatingNumericRange)
+            => warn(tree, FloatingPointNumericRange)
 
           /// Checks for self-assignments: a = a
           case Assign(left, right) if left equalsStructure right =>

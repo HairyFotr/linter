@@ -123,7 +123,7 @@ object Warning {
     UnthrownException,
     SuspiciousMatches,
     IfDoWhile,
-    FloatingNumericRange
+    FloatingPointNumericRange
   )
 
   final val AllNames = All.map(_.name)
@@ -337,5 +337,5 @@ case object SuspiciousMatches extends
   Warning("This regex starts with ^ or ends with $. The matches method always matches the entire string.")
 case object IfDoWhile extends
   Warning("The if and the do-while loop have the same condition. Use a while loop.")
-case object FloatingNumericRange extends
-  Warning("Do not use NumericRange with floating point numbers (Float, Double), it's broken.")
+case object FloatingPointNumericRange extends
+  Warning("Avoid NumericRange with floating point numbers, as results may differ depending on which methods are used to materialize it (apply vs. foreach).")

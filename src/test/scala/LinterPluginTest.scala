@@ -1613,6 +1613,16 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     noLint("""val a = 34d; val b = a % 1""") 
   }
 
+  @Test
+  def FloatingPointNumericRange(): Unit = {
+    implicit val msg = "NumericRange"
+    should("""1D to 8D by 0.5D""")
+    noLint("""2 to 8""")
+    should("""val x = 3D; val y = 8D; val z = 0.5D; x to y by z""")
+    should("""val r = 4D to 8D; r by (1 / 3D)""")
+    noLint("""object Bye { def by(d: Double) = d }; Bye by 8D""")
+  }
+
   // ^ New tests named after their Warning.scala name ^
   // --------------------------------------------------
 
@@ -2449,16 +2459,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     ///this one works in the console, but doesn't in tests
     //should(""" "dfd"*(-5) """)
 
-  }
-
-  @Test
-  def floatingPointNumericRange(): Unit = {
-    implicit val msg = "NumericRange"
-    should("""1D to 8D by 0.5D""")
-    noLint("""2 to 8""")
-    should("""val x = 3D; val y = 8D; val z = 0.5D; x to y by z""")
-    should("""val r = 4D to 8D; r by (1 / 3D)""")
-    noLint("""object Bye { def by(d: Double) = d }; Bye by 8D""")
   }
 
 /*
