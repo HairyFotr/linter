@@ -23,7 +23,7 @@ object Utils {
   var linterOptions = LinterOptions()
   val nowarnPositions = mutable.HashSet[Global#Position]()
   val nowarnMergeNestedIfsPositions = mutable.HashSet[Global#Position]() // TODO hack
-  
+
   def warn(tree: Global#Tree, warning: Warning)(implicit unit: Global#CompilationUnit): Unit = {
     val checkSep = "([+:]|[,] )"
     val partSep = "[ :]"
@@ -54,10 +54,10 @@ class Utils[G <: Global](val global: G) {
     if (filter != "") {
       for (Select(Ident(id), func) <- tree; if (func.toString matches filter) && (id.toString == name)) used -= 1
     }
-    
+
     (used > 0)
   }
-  
+
   def getUsed(tree: Tree): Set[String] = {
     var used = Set.empty[String]
     for (Ident(id) <- tree) used += id.toString
@@ -71,7 +71,7 @@ class Utils[G <: Global](val global: G) {
   val SeqLikeApply: Symbol = SeqLikeClass.info.member(newTermName("apply"))
 
   val OptionGet: Symbol = OptionClass.info.member(nme.get)
-  
+
   val IsInstanceOf = AnyClass.info.member(nme.isInstanceOf_)
   val AsInstanceOf = AnyClass.info.member(nme.asInstanceOf_)
   val ToString: Symbol = AnyClass.info.member(nme.toString_)
@@ -83,34 +83,34 @@ class Utils[G <: Global](val global: G) {
   def isSubtype(x: Tree, y: Tree): Boolean = { x.tpe.widen <:< y.tpe.widen }
   def isSubtype(x: Tree, y: Type): Boolean = { x.tpe.widen <:< y.widen }
 
-  def methodImplements(method: Symbol, target: Symbol): Boolean = 
+  def methodImplements(method: Symbol, target: Symbol): Boolean =
     try { method == target || method.allOverriddenSymbols.contains(target) } catch { case e: NullPointerException => false }
 
   def isGlobalImport(selector: ImportSelector): Boolean = {
     selector.name == nme.WILDCARD && selector.renamePos == -1
   }
-  
-  def isOptionOption(t: Tree): Boolean = 
-    (t.tpe.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe) 
+
+  def isOptionOption(t: Tree): Boolean =
+    (t.tpe.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe)
     && t.tpe.widen.typeArgs.exists(_.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe)))
-  
+
   def isLiteral(t: Tree): Boolean = t match {
     case Literal(_) => true
     case _ => false
   }
-      
+
   def getAssigned(tree: Tree): Set[String] = {
     (for (Assign(Ident(id), _) <- tree) yield id.toString).toSet
     //TODO: non-local stuff (for (Apply(Select(id, setter), List(_)) <- tree; if setter.toString endsWith "_$eq") yield setter.dropRight(4)).toSet
   }
 
   def isAssigned(tree: Tree, name: String): Boolean = {
-    for (Assign(Ident(id), _) <- tree; if id.toString == name) 
+    for (Assign(Ident(id), _) <- tree; if id.toString == name)
       return true
-    
+
     false
   }
-    
+
   def returnCount(tree: Tree): Int = {
     var used = 0
     for (Return(id) <- tree) used += 1

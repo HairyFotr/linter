@@ -111,11 +111,11 @@ class WarningTest extends JUnitMustMatchers {
       case UseMinOrMaxNotSort(_, _, _, _) => 1
       case FloatingPointNumericRange => 1
       // ------------------------------------------------------------------------------------------------------
-      // If you get a warning here, it's likely because you added a new warning type but forgot to add it here. 
+      // If you get a warning here, it's likely because you added a new warning type but forgot to add it here.
       // The real point is that you need to add the new Warning to Warning.All.
       // ------------------------------------------------------------------------------------------------------
     }.sum
-    
+
     val nonUnitResult = Warning.All.length must beEqualTo(count)
   }
 

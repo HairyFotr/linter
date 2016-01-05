@@ -30,18 +30,18 @@ object LinterOptions {
   final val OptionKeyValueDelimiter = ":"
 
   private def parseWarningList(fullOption: String): Either[String, Seq[String]] = fullOption.split(OptionKeyValueDelimiter) match {
-    case Array(option, warningNames) => 
-      val (validNames, invalidNames) = warningNames.split(WarningNameDelimiter).partition(Warning.NameToWarning.contains) 
+    case Array(option, warningNames) =>
+      val (validNames, invalidNames) = warningNames.split(WarningNameDelimiter).partition(Warning.NameToWarning.contains)
       if (validNames.nonEmpty && invalidNames.isEmpty) Right(validNames)
       else Left(s"The '$option' option referenced invalid warnings: ${invalidNames.mkString(", ")}")
     case _ => Left(s"The '$fullOption' option was not of the expected form.")
   }
-  
+
   @tailrec
   private def parse0(options: List[String], linterOptions: LinterOptions): Either[String, LinterOptions] = options match {
     case Nil => Right(linterOptions)
     case option :: xs if (option.startsWith(DisableArgument) || option.startsWith(EnableOnlyArgument)) => parseWarningList(option) match {
-      case Right(warnings) if option.startsWith(EnableOnlyArgument) => parse0(xs, linterOptions.copy(disabledWarningNames = Warning.AllNames.diff(warnings))) 
+      case Right(warnings) if option.startsWith(EnableOnlyArgument) => parse0(xs, linterOptions.copy(disabledWarningNames = Warning.AllNames.diff(warnings)))
       case Right(warnings) => parse0(xs, linterOptions.copy(disabledWarningNames = warnings))
       case Left(errorMessage) => Left(errorMessage)
     }

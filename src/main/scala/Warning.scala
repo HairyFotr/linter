@@ -167,7 +167,7 @@ case object CloseSourceFile extends
   Warning("You should close the file stream after use. (Streams get garbage collected, but it's possible to open too many at once)")
 case object JavaConverters extends
   Warning("Consider using the explicit collection.JavaConverters instead of implicit conversions in collection.JavaConversions.")
-case class ContainsTypeMismatch(seqType: String, targetType: String) extends 
+case class ContainsTypeMismatch(seqType: String, targetType: String) extends
   Warning(s"$seqType.contains($targetType) will probably return false, since the collection and target element are of unrelated types.")
 case class NumberInstanceOf(tpe: String) extends
   Warning(s"Use to$tpe instead of asInstanceOf[$tpe].")
