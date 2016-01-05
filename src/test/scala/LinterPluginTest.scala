@@ -40,7 +40,7 @@ final object Compiler {
   settings.classpath.value = Source.fromURL(loader.getResource("app.class.path")).mkString
   settings.bootclasspath.append(Source.fromURL(loader.getResource("boot.class.path")).mkString)
   //settings.deprecation.value = true // enable detailed deprecation warnings
-  //settings.unchecked.value = true // enable detailed unchecked warnings 
+  //settings.unchecked.value = true // enable detailed unchecked warnings
   settings.Xwarnfatal.value = true // warnings cause compile failures too
   //settings.stopAfter.value = List("linter-refchecked")
   //if (Properties.versionString contains "2.10") settings.stopAfter.value = List("linter-refchecked") // fails in 2.11
@@ -54,8 +54,9 @@ final object Compiler {
       val compiler = super.newCompiler(settings, reporter)
       val linterPlugin = new LinterPlugin(compiler)
       import scala.language.reflectiveCalls
-      for (phase <- linterPlugin.components)
+      for (phase <- linterPlugin.components) {
         compiler.asInstanceOf[{def phasesSet: mutable.HashSet[tools.nsc.SubComponent]}].phasesSet += phase
+      }
       compiler
     }
   }
@@ -208,7 +209,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     noLint("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 26)""")
     noLint("""val x,y = util.Random.nextDouble; math.sqrt(26 + x*x)""")
     noLint("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 2147395601)""")
-    noLint("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 2147395599)""") 
+    noLint("""val x,y = util.Random.nextDouble; math.sqrt(x*x + 2147395599)""")
   }
 
   @Test
@@ -740,7 +741,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
     should("""val x = List(4); x.contains("foo")""")
 
-    // Set and Map have type-safe contains methods so we don't want to warn on those. 
+    // Set and Map have type-safe contains methods so we don't want to warn on those.
     noLint("""val x = Set(scala.util.Random.nextInt); x.contains(3)""")
     noLint("""val x = Map(4 -> 5); x.contains(3)""")
   }
@@ -791,7 +792,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       if(b > 4)
         (3,a) 
       else if(b > 7)
-        (2,a)""") 
+        (2,a)""")
   }
 
   @Test
@@ -1136,7 +1137,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""Set(1,2,3).filter(_ == 2).isEmpty""")
     should("""Seq(1,2,3).filter(_ == 2).isEmpty""")
     should("""collection.mutable.HashSet(1,2,3).filter(_ == 2).isEmpty""")
-    //should("""Array(1,2,3).filter(_ == 2).isEmpty""") // TODO: gets wrapped probably...
+    //should("""Array(1,2,3).filter(_ == 2).isEmpty""") //TODO: gets wrapped probably...
     should("""def a(x:Int) = x == 2; List(1,2,3).filter(a).isEmpty""")
 
     should("""Seq(1,2,3).filter(_ == 2).nonEmpty""")
@@ -1467,7 +1468,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     """)
 
 
-    // TODO: If fails, look at isUsed first
+    //TODO: If fails, look at isUsed first
     noLint("""
       var a = "A6"
       println(a)
@@ -1610,7 +1611,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""val a = 34L; val b = a % 1""")
 
     noLint("""def f(x: Double) = x % 1""") // Issue #27
-    noLint("""val a = 34d; val b = a % 1""") 
+    noLint("""val a = 34d; val b = a % 1""")
   }
 
   @Test
@@ -1711,7 +1712,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     noLint("""val a = Option("str"); if(a.isEmpty) a.get else null""")
     noLint("""val a = Option("str"); if(!a.isEmpty) null else a.get""")
     noLint("""val a = Option("str"); if(a != None) null else a.get""")
-    noLint("""val a = Option("str"); if(a == None) a.get else null""") 
+    noLint("""val a = Option("str"); if(a == None) a.get else null""")
   }
 
   @Test
@@ -1730,7 +1731,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   def null__check(): Unit = {
     implicit val msg = "Using null is considered dangerous."
 
-    should("""val a = null""") 
+    should("""val a = null""")
     noLint("""val a = 5""")
   }
 
@@ -2226,7 +2227,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
         val out = 5 + 5
         out
       }
-    """) 
+    """)
 
     //TODO: some more cases to cover with val vs var
 
@@ -2301,7 +2302,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""
       val a = List(1,2,3)
       a(a.length)
-    """) 
+    """)
     should("""
       val a = List(1,2,3)
       val b = 5
@@ -2365,7 +2366,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""1/0""")
     should("""1/0L""")
     //should("""1/0f""") //parser makes it Infinity
-    //should("""1/0d""") 
+    //should("""1/0d""")
     should("""val a = 1; a/0""")
     should("""val a = 1; a/0d""")
     should("""val a = 1; a/0f""")

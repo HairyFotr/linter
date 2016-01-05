@@ -1607,7 +1607,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             && (xArrayOps.toString.contains("ArrayOps"))
             && (canBuildFrom.toString == "scala.this.Array.canBuildFrom") =>
 
-            warn(tree, TransformNotMap("col")) // FIXME name's inside xArrayOps, right?
+            warn(tree, TransformNotMap("col")) //FIXME: name's inside xArrayOps, right?
 
           case Assign(id1, col @ Apply(Apply(TypeApply(Select(id2, Name("map")), List(_, _)), List(_func)), List(_)))
             if (id1.toString == id2.toString) && col.tpe.baseClasses.exists(_.tpe =:= MutableSeqLike.tpe) =>

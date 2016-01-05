@@ -22,7 +22,7 @@ import scala.tools.nsc.Global
 object Utils {
   var linterOptions = LinterOptions()
   val nowarnPositions = mutable.HashSet[Global#Position]()
-  val nowarnMergeNestedIfsPositions = mutable.HashSet[Global#Position]() // TODO hack
+  val nowarnMergeNestedIfsPositions = mutable.HashSet[Global#Position]() //TODO: hack
 
   def warn(tree: Global#Tree, warning: Warning)(implicit unit: Global#CompilationUnit): Unit = {
     val checkSep = "([+:]|[,] )"
