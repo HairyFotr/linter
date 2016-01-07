@@ -53,8 +53,8 @@ class LinterPlugin(val global: Global) extends Plugin {
 
     val phaseName = "linter-parsed"
 
-    private val sealedTraits = mutable.Map[Name, Tree]()
-    private val usedTraits = mutable.Set[Name]()
+    private val sealedTraits = mutable.Map.empty[Name, Tree]
+    private val usedTraits = mutable.Set.empty[Name]
     private var inTrait = false
     private def resetTraits(): Unit = {
       sealedTraits.clear()
@@ -323,11 +323,11 @@ class LinterPlugin(val global: Global) extends Plugin {
       abstract class RichToStr[T](n: T) {
         val nstr = n.toString
         def is(str: String): Boolean = nstr == str
-        def isAny(str: String*): Boolean = str.exists(nstr == _)
+        def isAny(strs: String*): Boolean = strs contains nstr
         def startsWith(str: String): Boolean = nstr startsWith str
-        def startsWithAny(str: String*): Boolean = str.exists(nstr startsWith _)
+        def startsWithAny(strs: String*): Boolean = strs.exists(nstr startsWith _)
         def endsWith(str: String): Boolean = nstr endsWith str
-        def endsWithAny(str: String*): Boolean = str.exists(nstr endsWith _)
+        def endsWithAny(strs: String*): Boolean = strs.exists(nstr endsWith _)
       }
       implicit class richTree(n: Tree) extends RichToStr[Tree](n)
       implicit class richName(n: Name) extends RichToStr[Name](n)
@@ -3092,9 +3092,9 @@ class LinterPlugin(val global: Global) extends Plugin {
           def traverseString(tree: Tree): StringAttrs = tree match {
             case Literal(Constant(null)) => new StringAttrs(exactValue = Some("null"))
             case Literal(Constant(c)) =>
-              if (stringVals.filter(s => s.name.isDefined && !(vars contains s.name.get)).exists(_.exactValue == Some(c.toString))) {
+              //if (stringVals.filter(s => s.name.isDefined && !(vars contains s.name.get)).exists(_.exactValue == Some(c.toString))) {
                 //warn(tree, "You have defined that string as a val already, maybe use that?")
-              }
+              //}
 
               new StringAttrs(exactValue = Some(c.toString))
 

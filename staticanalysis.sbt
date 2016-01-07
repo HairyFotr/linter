@@ -32,6 +32,9 @@ scalacOptions ++= Seq(
 // Wartremover
 //wartremoverWarnings ++= Warts.unsafe
 
+// Scapegoat
+//scapegoatVersion := "1.1.1"
+
 // Scalastyle
 scalastyleConfig <<= baseDirectory { base => base / "sca" / "scalastyle-config.xml" }
 

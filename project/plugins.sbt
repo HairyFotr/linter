@@ -12,6 +12,6 @@ addSbtPlugin("com.orrsella" % "sbt-stats" % "1.0.5")
 
 //addSbtPlugin("de.johoop" % "jacoco4sbt" % "2.1.6")
 
-//addSbtPlugin("com.sksamuel.scapegoat" %% "sbt-scapegoat" % "1.0.0")
+//addSbtPlugin("com.sksamuel.scapegoat" %% "sbt-scapegoat" % "1.0.4")
 
 //addSbtPlugin("org.brianmckenna" % "sbt-wartremover" % "0.14")
