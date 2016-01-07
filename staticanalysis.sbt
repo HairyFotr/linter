@@ -31,6 +31,7 @@ scalacOptions ++= Seq(
 
 // Wartremover
 //wartremoverWarnings ++= Warts.unsafe
+//wartremoverWarnings ++= Seq(Wart.Any2StringAdd, Wart.Enumeration, Wart.Serializable, Wart.Product)
 
 // Scapegoat
 //scapegoatVersion := "1.1.1"

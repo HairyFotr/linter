@@ -937,14 +937,14 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
 
             /// Checking for unused variables in pattern matching (disabled)
-            def checkUsage(c: CaseDef): Unit = {
+            //def checkUsage(c: CaseDef): Unit = {
               //TODO: use for self-testing from time to time - ~100 warnings currently :/
               /*val binds = for (b @ Bind(name, _) <- c.pat; if !name.toString.startsWith("_")) yield (b, name.toString)
               for (unused <- binds.filter { case (b, name) => !abstractInterpretation.isUsed(c, name)}) {
                 println(showRaw(pat))
                 warn(unused._1, "Unused value in pattern matching, use _ instead. (or prefix with _ to get rid of me)")
               }*/
-            }
+            //}
 
             /// Detect some unreachable cases
             //TODO: move to abs. interpreter to detect impossible guards
@@ -1001,7 +1001,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             for (c <- cases) {
               checkCase(c)
               checkStreak(c)
-              checkUsage(c)
+              //checkUsage(c)
               checkUnreachable(c)
             }
 

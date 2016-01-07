@@ -23,7 +23,8 @@ libraryDependencies := {
     case Some((2, scalaMajor)) if scalaMajor <= 11 =>
       libraryDependencies.value :+ "org.specs2" %% "specs2" % "2.4" % "test"
     case _ =>
-      libraryDependencies.value // Tests won't work in Scala 2.12 for now
+      // Tests won't work in Scala 2.12 for now
+      libraryDependencies.value
   }
 }
 
@@ -43,15 +44,12 @@ libraryDependencies <+= scalaVersion { (scalaVersion) =>
 // Enable linter in console
 scalacOptions in console in Compile <+= (packageBin in Compile) map { pluginJar => "-Xplugin:"+pluginJar }
 
-//publishTo := Some(Resolver.file("file",  new File( "../linteRepo/releases" )) )
-
 publishTo := {
   val nexus = "https://oss.sonatype.org/"
   if (isSnapshot.value)
     Some("snapshots" at nexus + "content/repositories/snapshots")
   else
     Some("releases"  at nexus + "service/local/staging/deploy/maven2")
-
 }
 
 publishMavenStyle := true

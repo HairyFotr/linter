@@ -21,7 +21,7 @@ sealed abstract class Warning(val message: String) {
 }
 
 object Warning {
-  final val All: Seq[Warning] = Vector(
+  final val All = Seq[Warning](
     AssigningOptionToNull,
     AvoidOptionCollectionSize,
     AvoidOptionMethod("", ""),
