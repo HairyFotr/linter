@@ -274,6 +274,7 @@ Rule lists from other static analysis tools:
 * WartRemover(Scala) - https://github.com/puffnfresh/wartremover#warts
 * Scala Abide(Scala) - https://github.com/scala/scala-abide
 * ($)SuperSafe™(Scala) - http://www.artima.com/supersafe_user_guide.html
+* Scala Clippy(Scala) - https://scala-clippy.org/
 * IntelliJ IDEA(Scala/...) - https://www.jetbrains.com/idea/features/scala.html
 * Findbugs(JVM) - http://findbugs.sourceforge.net/bugDescriptions.html
 * ($)Julia(JVM) - http://www.juliasoft.com/warnings
