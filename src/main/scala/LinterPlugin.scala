@@ -2453,7 +2453,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case t @ Apply(TypeApply(genApply @ Select(_, _), _), genVals)
             if methodImplements(genApply.symbol, SeqLikeGenApply) && (!t.tpe.widen.toString.contains("collection.mutable.")) =>
 
-            val values = genVals.map(v => computeExpr(v))
+            val values = genVals.map(computeExpr)
             if (values.forall(_.isValue)) new Values(values = values.map(_.getValue).toSet, isSeq = true, actualSize = values.size) else Values.empty.addActualSize(genVals.size)
 
           //TODO: Array isn't immutable
