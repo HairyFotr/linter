@@ -1146,6 +1146,18 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
+  def UseInitNotReverseTailReverse(): Unit = {
+    implicit val msg = "reverse.tail.reverse can be replaced by"
+    should("""List(1, 2, 3).reverse.tail.reverse""")
+  }
+
+  @Test
+  def UseLastNotReverseHead(): Unit = {
+    implicit val msg = "reverse.head can be replaced by"
+    should("""List(1, 2, 3).reverse.head""")
+  }
+
+  @Test
   def ReflexiveAssignment(): Unit = {
     implicit val msg = "Assigning a variable to itself?"
 

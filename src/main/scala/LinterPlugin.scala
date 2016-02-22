@@ -1736,6 +1736,12 @@ class LinterPlugin(val global: Global) extends Plugin {
 
               warn(tree, UseExistsNotCountCompare(identOrCol(col)))
 
+          case Select(Select(Select(col, Name("reverse")), Name("tail")), Name("reverse")) =>
+            warn(tree, UseInitNotReverseTailReverse(identOrCol(col)))
+
+          case Select(Select(col, Name("reverse")), Name("head")) =>
+            warn(tree, UseLastNotReverseHead(identOrCol(col)))
+
           /// Use partial function directly - temporary variable is unnecessary (idea by yzgw)
           case Apply(_, List(Function(List(ValDef(mods, x_1, typeTree: TypeTree, EmptyTree)), Match(x_1_, _))))
             if (((x_1 is "x$1") && (x_1_ is "x$1") && (mods.isSynthetic) && (mods.isParameter)) // _ match { ... }
