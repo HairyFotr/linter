@@ -1734,13 +1734,32 @@ class LinterPlugin(val global: Global) extends Plugin {
             if col.tpe.widen.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe) && isEmptyCompare(x, op)
             && !(op == nme.EQ || op == nme.LE || op == nme.LT) =>
 
-              warn(tree, UseExistsNotCountCompare(identOrCol(col)))
+            warn(tree, UseExistsNotCountCompare(identOrCol(col)))
 
-          case Select(Select(Select(col, Name("reverse")), Name("tail")), Name("reverse")) =>
+          case Select(Select(Select(col, Name("reverse")), Name("tail")), Name("reverse"))
+            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= TraversableClass.tpe) =>
+            
             warn(tree, UseInitNotReverseTailReverse(identOrCol(col)))
 
-          case Select(Select(col, Name("reverse")), Name("head")) =>
-            warn(tree, UseLastNotReverseHead(identOrCol(col)))
+          case Select(Apply(xArrayOps0, List(Select(Apply(xArrayOps1, List(Select(Apply(xArrayOps2, List(col)), Name("reverse")))), Name("tail")))), Name("reverse"))
+            if (xArrayOps0.toString.contains("ArrayOps"))
+            && (xArrayOps1.toString.contains("ArrayOps"))
+            && (xArrayOps2.toString.contains("ArrayOps")) =>
+
+            warn(tree, UseInitNotReverseTailReverse(identOrCol(col)))
+
+          case Select(Select(col, Name("reverse")), head)
+            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= TraversableClass.tpe)
+            && (head.isAny("head", "headOption")) =>
+
+            warn(tree, UseLastNotReverseHead(identOrCol(col), head is "headOption"))
+
+          case Select(Apply(xArrayOps1, List(Select(Apply(xArrayOps2, List(col)), Name("reverse")))), head)
+            if (xArrayOps1.toString.contains("ArrayOps"))
+            && (xArrayOps2.toString.contains("ArrayOps"))
+            && (head.isAny("head", "headOption")) =>
+
+            warn(tree, UseLastNotReverseHead(identOrCol(col), head is "headOption"))
 
           /// Use partial function directly - temporary variable is unnecessary (idea by yzgw)
           case Apply(_, List(Function(List(ValDef(mods, x_1, typeTree: TypeTree, EmptyTree)), Match(x_1_, _))))

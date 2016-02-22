@@ -110,7 +110,7 @@ class WarningTest extends JUnitMustMatchers {
       case UseFuncNotFold(_, _, _) => 1
       case UseMinOrMaxNotSort(_, _, _, _) => 1
       case UseInitNotReverseTailReverse(_) => 1
-      case UseLastNotReverseHead(_) => 1
+      case UseLastNotReverseHead(_, _) => 1
       case FloatingPointNumericRange => 1
       // ------------------------------------------------------------------------------------------------------
       // If you get a warning here, it's likely because you added a new warning type but forgot to add it here.

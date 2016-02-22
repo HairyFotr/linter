@@ -108,7 +108,7 @@ object Warning {
     UseFuncNotReduce("", "", ""),
     UseFuncNotFold("", "", ""),
     UseInitNotReverseTailReverse(""),
-    UseLastNotReverseHead(""),
+    UseLastNotReverseHead("", true),
     UseIsNanNotNanComparison,
     UseIsNanNotSelfComparison,
     UseOptionGetOrElse("", ""),
@@ -343,5 +343,5 @@ case object FloatingPointNumericRange extends
   Warning("Avoid NumericRange with floating point numbers, as results may differ depending on which methods are used to materialize it (apply vs. foreach).")
 case class UseInitNotReverseTailReverse(varName: String) extends
   Warning(s"$varName.reverse.tail.reverse can be replaced by $varName.init.")
-case class UseLastNotReverseHead(varName: String) extends
-  Warning(s"$varName.reverse.head can be replaced by $varName.last.")
+case class UseLastNotReverseHead(varName: String, option: Boolean) extends
+  Warning(s"""$varName.reverse.head${if (option) "Option" else ""} can be replaced by $varName.last${if (option) "Option" else ""}.""")
