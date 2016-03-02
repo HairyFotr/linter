@@ -1748,6 +1748,18 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             warn(tree, UseInitNotReverseTailReverse(identOrCol(col)))
 
+          case Select(Apply(Select(Select(col, Name("reverse")), Name("take")), _), Name("reverse"))
+            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= TraversableClass.tpe) =>
+
+            warn(tree, UseTakeRightNotReverseTakeReverse(identOrCol(col)))
+
+          case Select(Apply(xArrayOps0, List(Apply(Select(Apply(xArrayOps1, List(Select(Apply(xArrayOps2, List(col)), Name("reverse")))), Name("take")), _))), Name("reverse"))
+            if (xArrayOps0.toString.contains("ArrayOps"))
+            && (xArrayOps1.toString.contains("ArrayOps"))
+            && (xArrayOps2.toString.contains("ArrayOps")) =>
+
+            warn(tree, UseTakeRightNotReverseTakeReverse(identOrCol(col)))
+
           case Select(Select(col, Name("reverse")), head)
             if col.tpe.widen.baseClasses.exists(c => c.tpe =:= TraversableClass.tpe)
             && (head.isAny("head", "headOption")) =>
@@ -1760,6 +1772,19 @@ class LinterPlugin(val global: Global) extends Plugin {
             && (head.isAny("head", "headOption")) =>
 
             warn(tree, UseLastNotReverseHead(identOrCol(col), head is "headOption"))
+
+          case Select(Select(col, Name("reverse")), func)
+            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= TraversableClass.tpe)
+            && (func.isAny("map", "iterator")) =>
+
+            warn(tree, UseFuncNotReverse(identOrCol(col), func.toString))
+
+          case Select(Apply(xArrayOps1, List(Select(Apply(xArrayOps2, List(col)), Name("reverse")))), func)
+            if (xArrayOps1.toString.contains("ArrayOps"))
+            && (xArrayOps2.toString.contains("ArrayOps"))
+            && (func.isAny("map", "iterator")) =>
+
+            warn(tree, UseFuncNotReverse(identOrCol(col), func.toString))
 
           /// Use partial function directly - temporary variable is unnecessary (idea by yzgw)
           case Apply(_, List(Function(List(ValDef(mods, x_1, typeTree: TypeTree, EmptyTree)), Match(x_1_, _))))
