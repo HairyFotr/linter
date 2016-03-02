@@ -1748,6 +1748,18 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             warn(tree, UseInitNotReverseTailReverse(identOrCol(col)))
 
+          case Select(Apply(Select(Select(col, Name("reverse")), Name("take")), _), Name("reverse"))
+            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= TraversableClass.tpe) =>
+
+            warn(tree, UseTakeRightNotReverseTakeReverse(identOrCol(col)))
+
+          case Select(Apply(xArrayOps0, List(Apply(Select(Apply(xArrayOps1, List(Select(Apply(xArrayOps2, List(col)), Name("reverse")))), Name("take")), _))), Name("reverse"))
+            if (xArrayOps0.toString.contains("ArrayOps"))
+            && (xArrayOps1.toString.contains("ArrayOps"))
+            && (xArrayOps2.toString.contains("ArrayOps")) =>
+
+            warn(tree, UseTakeRightNotReverseTakeReverse(identOrCol(col)))
+
           case Select(Select(col, Name("reverse")), head)
             if col.tpe.widen.baseClasses.exists(c => c.tpe =:= TraversableClass.tpe)
             && (head.isAny("head", "headOption")) =>

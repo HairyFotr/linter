@@ -1155,6 +1155,15 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
+  def UseTakeRightNotReverseTakeReverse(): Unit = {
+    implicit val msg = "reverse.take(...).reverse can be replaced by"
+    should("""List(1, 2, 3).reverse.take(2).reverse""")
+    should("""Array(1, 2, 3).reverse.take(0).reverse""")
+    should("""val a = Array("a", "b"); val n = 3; a.reverse.take(n).reverse""")
+    should("""val a = Vector("a", "b"); val n = 1; a.reverse.take(n).reverse""")
+  }
+
+  @Test
   def UseLastNotReverseHead(): Unit = {
     implicit var msg = "reverse.head can be replaced by"
     should("""List(1, 2, 3).reverse.head""")
