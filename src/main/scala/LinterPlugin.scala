@@ -1761,6 +1761,19 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             warn(tree, UseLastNotReverseHead(identOrCol(col), head is "headOption"))
 
+          case Select(Select(col, Name("reverse")), func)
+            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= TraversableClass.tpe)
+            && (func.isAny("map", "iterator")) =>
+
+            warn(tree, UseFuncNotReverse(identOrCol(col), func.toString))
+
+          case Select(Apply(xArrayOps1, List(Select(Apply(xArrayOps2, List(col)), Name("reverse")))), func)
+            if (xArrayOps1.toString.contains("ArrayOps"))
+            && (xArrayOps2.toString.contains("ArrayOps"))
+            && (func.isAny("map", "iterator")) =>
+
+            warn(tree, UseFuncNotReverse(identOrCol(col), func.toString))
+
           /// Use partial function directly - temporary variable is unnecessary (idea by yzgw)
           case Apply(_, List(Function(List(ValDef(mods, x_1, typeTree: TypeTree, EmptyTree)), Match(x_1_, _))))
             if (((x_1 is "x$1") && (x_1_ is "x$1") && (mods.isSynthetic) && (mods.isParameter)) // _ match { ... }

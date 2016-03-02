@@ -107,6 +107,7 @@ object Warning {
     UseQuantifierFuncNotFold("", "", ""),
     UseFuncNotReduce("", "", ""),
     UseFuncNotFold("", "", ""),
+    UseFuncNotReverse("", ""),
     UseInitNotReverseTailReverse(""),
     UseLastNotReverseHead("", true),
     UseIsNanNotNanComparison,
@@ -345,3 +346,5 @@ case class UseInitNotReverseTailReverse(varName: String) extends
   Warning(s"$varName.reverse.tail.reverse can be replaced by $varName.init.")
 case class UseLastNotReverseHead(varName: String, option: Boolean) extends
   Warning(s"""$varName.reverse.head${if (option) "Option" else ""} can be replaced by $varName.last${if (option) "Option" else ""}.""")
+case class UseFuncNotReverse(varName: String, func: String) extends
+  Warning(s"""$varName.reverse.$func can be replaced by $varName.reverse${func.capitalize}.""")

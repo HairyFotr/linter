@@ -1167,6 +1167,21 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
+  def UseFuncNotReverse(): Unit = {
+    implicit var msg = "reverse.iterator can be replaced by"
+    should("""List(1, 2, 3).reverse.iterator""")
+    should("""Array(1, 2, 3).reverse.iterator""")
+    should("""val a = Array("a", "b"); a.reverse.iterator""")
+    should("""val a = Vector("a", "b"); a.reverse.iterator""")
+
+    msg = "reverse.map can be replaced by"
+    should("""List(1, 2, 3).reverse.map(_ + 1)""")
+    should("""Array(1, 2, 3).reverse.map(identity)""")
+    should("""val a = Array("a", "b"); a.reverse.map(_ * 2)""")
+    should("""val a = Vector("a", "b"); a.reverse.map(_.capitalize)""")
+  }
+
+  @Test
   def ReflexiveAssignment(): Unit = {
     implicit val msg = "Assigning a variable to itself?"
 
