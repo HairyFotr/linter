@@ -1793,6 +1793,13 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             warn(tree, UseHeadNotApply(identOrCol(col)))
 
+          case Apply(Select(col, Name("apply")), List(Apply(Select(Select(col1, size_length), Name("$minus")), List(Literal(Constant(1))))))
+            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= SeqClass.tpe)
+            && size_length.isAny("size", "length")
+            && (col equalsStructure col1) =>
+
+            warn(tree, UseLastNotApply(identOrCol(col)))
+
           /// Use partial function directly - temporary variable is unnecessary (idea by yzgw)
           case Apply(_, List(Function(List(ValDef(mods, x_1, typeTree: TypeTree, EmptyTree)), Match(x_1_, _))))
             if (((x_1 is "x$1") && (x_1_ is "x$1") && (mods.isSynthetic) && (mods.isParameter)) // _ match { ... }

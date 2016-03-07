@@ -1216,6 +1216,13 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
+  def UseLastNotApply(): Unit = {
+    implicit val msg = ".length - 1) can be replaced by"
+    should("""val l = List(1, 2, 3); l(l.length - 1)""")
+    should("""val a = Vector("a", "b"); a.apply(a.size - 1)""")
+  }
+
+  @Test
   def ReflexiveAssignment(): Unit = {
     implicit val msg = "Assigning a variable to itself?"
 
@@ -2375,14 +2382,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       a(b-1)
     """)
 
-    noLint("""
-      val a = List(1,2,3)
-      a(a.size-1)
-    """)
-    noLint("""
-      val a = List(1,2,3)
-      a(a.length-1)
-    """)
     noLint("""
       val a = List(1,2,3)
       val b = 5

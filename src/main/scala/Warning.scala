@@ -111,6 +111,7 @@ object Warning {
     UseHeadNotApply(""),
     UseInitNotReverseTailReverse(""),
     UseTakeRightNotReverseTakeReverse(""),
+    UseLastNotApply(""),
     UseLastNotReverseHead("", true),
     UseIsNanNotNanComparison,
     UseIsNanNotSelfComparison,
@@ -354,3 +355,5 @@ case class UseFuncNotReverse(varName: String, func: String) extends
   Warning(s"""$varName.reverse.$func can be replaced by $varName.reverse${func.capitalize}.""")
 case class UseHeadNotApply(varName: String) extends
   Warning(s"""$varName(0) can be replaced by $varName.head""")
+case class UseLastNotApply(varName: String) extends
+  Warning(s"""$varName($varName.length - 1) can be replaced by $varName.last""")
