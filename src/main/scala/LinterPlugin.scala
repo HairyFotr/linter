@@ -1788,6 +1788,11 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             warn(tree, UseFuncNotReverse(identOrCol(col), func.toString))
 
+          case Apply(Select(col, Name("apply")), List(Literal(Constant(0))))
+            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= SeqClass.tpe) =>
+
+            warn(tree, UseHeadNotApply(identOrCol(col)))
+
           /// Use partial function directly - temporary variable is unnecessary (idea by yzgw)
           case Apply(_, List(Function(List(ValDef(mods, x_1, typeTree: TypeTree, EmptyTree)), Match(x_1_, _))))
             if (((x_1 is "x$1") && (x_1_ is "x$1") && (mods.isSynthetic) && (mods.isParameter)) // _ match { ... }

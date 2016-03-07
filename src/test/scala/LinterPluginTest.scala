@@ -1171,10 +1171,10 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   @Test
   def UseTakeRightNotReverseTakeReverse(): Unit = {
     implicit val msg = "reverse.take(...).reverse can be replaced by"
-    should("""List(1, 2, 3).reverse.take(2).reverse""")
+    should("""List(1, 2, 3).reverse.take(1 + 1).reverse""")
     should("""Array(1, 2, 3).reverse.take(0).reverse""")
     should("""val a = Array("a", "b"); val n = 3; a.reverse.take(n).reverse""")
-    should("""val a = Vector("a", "b"); val n = 1; a.reverse.take(n).reverse""")
+    should("""val a = Vector("a", "b"); val n = 1; a.reverse.take(2 - n).reverse""")
     should(""""abc".reverse.take(2).reverse""")
   }
 
@@ -1206,6 +1206,13 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""val a = Array("a", "b"); a.reverse.map(_ * 2)""")
     should("""val a = Vector("a", "b"); a.reverse.map(_.capitalize)""")
     should(""""abc".reverse.map(_ + 1)""")
+  }
+
+  @Test
+  def UseHeadNotApply(): Unit = {
+    implicit val msg = "(0) can be replaced by"
+    should("""List(1, 2, 3)(0)""")
+    should("""val a = Vector("a", "b"); a(0)""")
   }
 
   @Test
@@ -2330,10 +2337,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       a(b.size-b.length-1)
     """)
 
-    noLint("""
-      val a = List(1,2,3)
-      a(0)
-    """)
     noLint("""
       val a = List(1,2,3)
       a(a.size-a.size)
