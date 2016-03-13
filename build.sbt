@@ -10,7 +10,7 @@ organization := "org.psywerx.hairyfotr"
 
 scalaVersion := "2.10.6"
 
-crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.6", "2.11.7", "2.12.0-M3") }
+crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.6", "2.11.8", "2.12.0-M3") }
 
 resolvers ++= Seq("snapshots", "releases").map(Resolver.sonatypeRepo)
 

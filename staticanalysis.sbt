@@ -34,7 +34,7 @@ scalacOptions ++= Seq(
 //wartremoverWarnings ++= Seq(Wart.Any2StringAdd, Wart.Enumeration, Wart.Serializable, Wart.Product)
 
 // Scapegoat
-//scapegoatVersion := "1.1.1"
+//scapegoatVersion := "1.2.1"
 
 // Scalastyle
 scalastyleConfig <<= baseDirectory { base => base / "sca" / "scalastyle-config.xml" }

@@ -546,6 +546,10 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       var a = Option(1);
       val b = !a.filter{ _ > 1 }.isEmpty
     """)
+    should(""" 
+      var a = "abc";
+      val b = a.filter{ _ > 'a' }.nonEmpty
+    """)
   }
 
   @Test
@@ -564,6 +568,11 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       var a = Set(1,2,3);
       val b = a.filter{ _ > 1 }.size
     """)
+    // FIXME
+    /*should(""" 
+      var a = "abc";
+      val b = a.filter{ _ > 'a' }.size
+    """)*/
     should(""" 
       var atte = Array(1,2,3);
       val b = atte.filter{ _ > 1 }.size
@@ -1081,10 +1090,14 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should(""" List(1,2,3).sorted.head """)
     should(""" List(1,2,3).sorted.last """)
     should(""" Array(1,2,3).sorted.last """)
+    should(""" collection.mutable.ArrayBuffer(1,2,3).sorted.last """)
+    should(""" "cba".sorted.last """)
 
     should(""" List(1,2,3).sortBy(x => x).head """)
     should(""" List(1,2,3).sortBy(x => x).last """)
     should(""" Array(1,2,3).sortBy(x => -x).last """)
+    should(""" collection.mutable.ArrayBuffer(1,2,3).sortBy(x => -x).last """)
+    should(""" "cba".sortBy(x => -x).last """)
 
   }
 
@@ -1152,6 +1165,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""Array(1, 2, 3).reverse.tail.reverse""")
     should("""val a = Array("a", "b"); a.reverse.tail.reverse""")
     should("""val a = Vector("a", "b"); a.reverse.tail.reverse""")
+    should(""""abc".reverse.tail.reverse""")
   }
 
   @Test
@@ -1161,6 +1175,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""Array(1, 2, 3).reverse.take(0).reverse""")
     should("""val a = Array("a", "b"); val n = 3; a.reverse.take(n).reverse""")
     should("""val a = Vector("a", "b"); val n = 1; a.reverse.take(n).reverse""")
+    should(""""abc".reverse.take(2).reverse""")
   }
 
   @Test
@@ -1170,6 +1185,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""Array(1, 2, 3).reverse.head""")
     should("""val a = Array("a", "b"); a.reverse.head""")
     should("""val a = Vector("a", "b"); a.reverse.head""")
+    should(""""abc".reverse.head""")
 
     msg = "reverse.headOption can be replaced by"
     should("""List(1, 2, 3).reverse.headOption""")
@@ -1182,12 +1198,14 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""Array(1, 2, 3).reverse.iterator""")
     should("""val a = Array("a", "b"); a.reverse.iterator""")
     should("""val a = Vector("a", "b"); a.reverse.iterator""")
+    should(""""abc".reverse.iterator""")
 
     msg = "reverse.map can be replaced by"
     should("""List(1, 2, 3).reverse.map(_ + 1)""")
     should("""Array(1, 2, 3).reverse.map(identity)""")
     should("""val a = Array("a", "b"); a.reverse.map(_ * 2)""")
     should("""val a = Vector("a", "b"); a.reverse.map(_.capitalize)""")
+    should(""""abc".reverse.map(_ + 1)""")
   }
 
   @Test

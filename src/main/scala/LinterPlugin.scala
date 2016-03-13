@@ -328,13 +328,15 @@ class LinterPlugin(val global: Global) extends Plugin {
         def startsWithAny(strs: String*): Boolean = strs.exists(nstr startsWith _)
         def endsWith(str: String): Boolean = nstr endsWith str
         def endsWithAny(strs: String*): Boolean = strs.exists(nstr endsWith _)
+        def contains(str: String): Boolean = nstr contains str
+        def containsAny(strs: String*): Boolean = strs.exists(nstr contains _)
       }
       implicit class richTree(n: Tree) extends RichToStr[Tree](n)
       implicit class richName(n: Name) extends RichToStr[Name](n)
 
 
       def identOrDefault(tree: Tree, default: String): String = {
-        if (tree.isInstanceOf[Ident] && !tree.toString.contains(".")) tree.toString else default
+        if (tree.isInstanceOf[Ident] && !tree.contains(".")) tree.toString else default
       }
       def identOrCol(tree: Tree): String = identOrDefault(tree, "col")
       def identOrOpt(tree: Tree): String = identOrDefault(tree, "opt")
@@ -867,7 +869,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           //// Pattern Matching checks
           case Match(pat, cases)
             if (pat match {
-              case Typed(_, t) if !t.toString.contains("switch") => false; // for scala.annotation.switch
+              case Typed(_, t) if !t.contains("switch") => false; // for scala.annotation.switch
               case _ => true })
             && pat.tpe.toString != "Any @unchecked"
             && cases.size >= 2 =>
@@ -1379,7 +1381,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Select(Apply(Apply(TypeApply(Select(col, Name("sortBy")), _), List(_func)), List(ordering)), head_last)
             if (head_last.isAny("head", "last"))
             && (col.tpe.baseClasses.exists(_.tpe =:= TraversableOnceClass.tpe))
-            && (ordering.toString.contains("Ordering")) =>
+            && (ordering.contains("Ordering")) =>
 
             val func = head_last.toString
             val replacement = if (func == "head") "minBy" else "maxBy"
@@ -1387,8 +1389,8 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           case Select(Apply(xArrayOps, List(Apply(Apply(TypeApply(Select(col, Name("sortBy")), _), List(_func)), List(ordering)))), head_last)
             if (head_last.isAny("head", "last"))
-            && (xArrayOps.toString.contains("ArrayOps"))
-            && (ordering.toString.contains("Ordering")) =>
+            && (xArrayOps.containsAny("ArrayOps", "augmentString"))
+            && (ordering.contains("Ordering")) =>
 
             val func = head_last.toString
             val replacement = if (func == "head") "minBy" else "maxBy"
@@ -1398,7 +1400,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           case Select(Apply(TypeApply(Select(col, Name("sorted")), _), List(ordering)), head_last)
             if (head_last.isAny("head", "last"))
             && (col.tpe.baseClasses.exists(_.tpe =:= TraversableOnceClass.tpe))
-            && (ordering.toString.contains("Ordering")) =>
+            && (ordering.contains("Ordering")) =>
 
             val func = head_last.toString
             val replacement = if (func == "head") "min" else "max"
@@ -1406,8 +1408,8 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           case Select(Apply(xArrayOps, List(Apply(TypeApply(Select(col, Name("sorted")), _), List(ordering)))), head_last)
             if (head_last.isAny("head", "last"))
-            && (xArrayOps.toString.contains("ArrayOps"))
-            && (ordering.toString.contains("Ordering")) =>
+            && (xArrayOps.containsAny("ArrayOps", "augmentString"))
+            && (ordering.contains("Ordering")) =>
 
             val func = head_last.toString
             val replacement = if (func == "head") "min" else "max"
@@ -1537,7 +1539,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// swap operations col.sortBy(...).filter(...)
           case Apply(Select(Apply(Apply(TypeApply(Select(col, Name("sortBy")), _), List(Function(List(ValDef(_, _, _, _)), _))), List(ordering)), filter), List(Function(List(ValDef(_, _, _, _)), _)))
             if (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
-            && (ordering.toString.contains("Ordering"))
+            && (ordering.contains("Ordering"))
             && (filter.isAny("filter", "filterNot")) =>
 
             warn(tree, FilterFirstThenSort)
@@ -1545,7 +1547,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// swap operations col.sorted.filter(...)
           case Apply(Select(Apply(TypeApply(Select(col, Name("sorted")), _), List(ordering)), filter), List(Function(List(ValDef(_, _, _, _)), _)))
             if (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe))
-            && (ordering.toString.contains("Ordering"))
+            && (ordering.contains("Ordering"))
             && (filter.isAny("filter", "filterNot")) =>
 
             warn(tree, FilterFirstThenSort)
@@ -1604,7 +1606,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           /// Use x.transform instead of x = x.map(...)
           case Assign(id1, Apply(Apply(TypeApply(Select(Apply(xArrayOps, List(id2)), Name("map")), List(_, _)), List(_func)), List(Apply(TypeApply(canBuildFrom, List(_)), List(_typeTag)))))
             if (id1.toString == id2.toString)
-            && (xArrayOps.toString.contains("ArrayOps"))
+            && (xArrayOps.contains("ArrayOps"))
             && (canBuildFrom.toString == "scala.this.Array.canBuildFrom") =>
 
             warn(tree, TransformNotMap("col")) //FIXME: name's inside xArrayOps, right?
@@ -1707,12 +1709,12 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, UseExistsNotFilterEmpty(identOrCol(col), bang = true))
 
           case Select(Apply(xArrayOps, List(Apply(Select(col, Name("filter")), List(_func)))), Name("nonEmpty"))
-            if xArrayOps.toString.contains("ArrayOps") =>
+            if xArrayOps.containsAny("ArrayOps", "augmentString") =>
 
             warn(tree, UseExistsNotFilterEmpty(identOrCol(col), bang = false))
 
           case Select(Select(Apply(xArrayOps, List(Apply(Select(col, Name("filter")), List(_func)))), Name("isEmpty")), Name("unary_$bang"))
-            if (xArrayOps.toString.contains("ArrayOps")) =>
+            if xArrayOps.containsAny("ArrayOps", "augmentString") =>
 
             warn(tree, UseExistsNotFilterEmpty(identOrCol(col), bang = true))
 
@@ -1724,7 +1726,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, UseCountNotFilterLength(identOrCol(col), size_length.toString))
 
           case Select(Apply(xArrayOps, List(Apply(Select(col, Name("filter")), List(_func)))), size_length)
-            if (xArrayOps.toString.contains("ArrayOps"))
+            if xArrayOps.containsAny("ArrayOps", "augmentString")
             && size_length.isAny("size", "length") =>
 
             warn(tree, UseCountNotFilterLength(identOrCol(col), size_length.toString))
@@ -1742,9 +1744,9 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, UseInitNotReverseTailReverse(identOrCol(col)))
 
           case Select(Apply(xArrayOps0, List(Select(Apply(xArrayOps1, List(Select(Apply(xArrayOps2, List(col)), Name("reverse")))), Name("tail")))), Name("reverse"))
-            if (xArrayOps0.toString.contains("ArrayOps"))
-            && (xArrayOps1.toString.contains("ArrayOps"))
-            && (xArrayOps2.toString.contains("ArrayOps")) =>
+            if (xArrayOps0.containsAny("ArrayOps", "augmentString"))
+            && (xArrayOps1.containsAny("ArrayOps", "augmentString"))
+            && (xArrayOps2.containsAny("ArrayOps", "augmentString")) =>
 
             warn(tree, UseInitNotReverseTailReverse(identOrCol(col)))
 
@@ -1754,9 +1756,9 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, UseTakeRightNotReverseTakeReverse(identOrCol(col)))
 
           case Select(Apply(xArrayOps0, List(Apply(Select(Apply(xArrayOps1, List(Select(Apply(xArrayOps2, List(col)), Name("reverse")))), Name("take")), _))), Name("reverse"))
-            if (xArrayOps0.toString.contains("ArrayOps"))
-            && (xArrayOps1.toString.contains("ArrayOps"))
-            && (xArrayOps2.toString.contains("ArrayOps")) =>
+            if (xArrayOps0.containsAny("ArrayOps", "augmentString"))
+            && (xArrayOps1.containsAny("ArrayOps", "augmentString"))
+            && (xArrayOps2.containsAny("ArrayOps", "augmentString")) =>
 
             warn(tree, UseTakeRightNotReverseTakeReverse(identOrCol(col)))
 
@@ -1767,8 +1769,8 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, UseLastNotReverseHead(identOrCol(col), head is "headOption"))
 
           case Select(Apply(xArrayOps1, List(Select(Apply(xArrayOps2, List(col)), Name("reverse")))), head)
-            if (xArrayOps1.toString.contains("ArrayOps"))
-            && (xArrayOps2.toString.contains("ArrayOps"))
+            if (xArrayOps1.containsAny("ArrayOps", "augmentString"))
+            && (xArrayOps2.containsAny("ArrayOps", "augmentString"))
             && (head.isAny("head", "headOption")) =>
 
             warn(tree, UseLastNotReverseHead(identOrCol(col), head is "headOption"))
@@ -1780,8 +1782,8 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, UseFuncNotReverse(identOrCol(col), func.toString))
 
           case Select(Apply(xArrayOps1, List(Select(Apply(xArrayOps2, List(col)), Name("reverse")))), func)
-            if (xArrayOps1.toString.contains("ArrayOps"))
-            && (xArrayOps2.toString.contains("ArrayOps"))
+            if (xArrayOps1.containsAny("ArrayOps", "augmentString"))
+            && (xArrayOps2.containsAny("ArrayOps", "augmentString"))
             && (func.isAny("map", "iterator")) =>
 
             warn(tree, UseFuncNotReverse(identOrCol(col), func.toString))
