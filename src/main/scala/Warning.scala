@@ -109,6 +109,7 @@ object Warning {
     UseFuncNotFold("", "", ""),
     UseFuncNotReverse("", ""),
     UseHeadNotApply(""),
+    UseHeadOptionNotIf(""),
     UseInitNotReverseTailReverse(""),
     UseTakeRightNotReverseTakeReverse(""),
     UseLastNotApply(""),
@@ -357,3 +358,5 @@ case class UseHeadNotApply(varName: String) extends
   Warning(s"""$varName(0) can be replaced by $varName.head""")
 case class UseLastNotApply(varName: String) extends
   Warning(s"""$varName($varName.length - 1) can be replaced by $varName.last""")
+case class UseHeadOptionNotIf(varName: String) extends
+  Warning(s"""if ($varName.nonEmpty) Some($varName.head) else None can be replaced by $varName.headOption""")

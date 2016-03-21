@@ -1223,6 +1223,14 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
+  def UseHeadOptionNotIf(): Unit = {
+    implicit val msg = ".head) else None can be replaced by"
+    should("""def headOpt[A](l: List[A]) = if (l.nonEmpty) Some(l.head) else None""")
+    should("""if (!Vector("a").isEmpty) Some(Vector("a").head) else None""")
+    should("""if (Seq("a").isEmpty) None else Some(Seq("a").head)""")
+  }
+
+  @Test
   def ReflexiveAssignment(): Unit = {
     implicit val msg = "Assigning a variable to itself?"
 
