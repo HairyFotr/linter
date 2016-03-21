@@ -1821,6 +1821,27 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             warn(tree, UseHeadOptionNotIf(identOrCol(col)))
 
+          case If(Select(col, Name("nonEmpty")), Apply(TypeApply(Select(scala_Some, Name("apply")), _), List(Select(col1, Name("last")))), scala_None)
+            if (col equalsStructure col1)
+            && (scala_Some is "scala.Some")
+            && (scala_None is "scala.None") =>
+
+            warn(tree, UseLastOptionNotIf(identOrCol(col)))
+
+          case If(Select(col, Name("isEmpty")), scala_None, Apply(TypeApply(Select(scala_Some, Name("apply")), _), List(Select(col1, Name("last")))))
+            if (col equalsStructure col1)
+            && (scala_Some is "scala.Some")
+            && (scala_None is "scala.None") =>
+
+            warn(tree, UseLastOptionNotIf(identOrCol(col)))
+
+          case If(Select(Select(col, Name("isEmpty")), nme.UNARY_!), Apply(TypeApply(Select(scala_Some, Name("apply")), _), List(Select(col1, Name("last")))), scala_None)
+            if (col equalsStructure col1)
+            && (scala_Some is "scala.Some")
+            && (scala_None is "scala.None") =>
+
+            warn(tree, UseLastOptionNotIf(identOrCol(col)))
+
           /// Use partial function directly - temporary variable is unnecessary (idea by yzgw)
           case Apply(_, List(Function(List(ValDef(mods, x_1, typeTree: TypeTree, EmptyTree)), Match(x_1_, _))))
             if (((x_1 is "x$1") && (x_1_ is "x$1") && (mods.isSynthetic) && (mods.isParameter)) // _ match { ... }

@@ -114,6 +114,7 @@ object Warning {
     UseTakeRightNotReverseTakeReverse(""),
     UseLastNotApply(""),
     UseLastNotReverseHead("", true),
+    UseLastOptionNotIf(""),
     UseIsNanNotNanComparison,
     UseIsNanNotSelfComparison,
     UseOptionGetOrElse("", ""),
@@ -360,3 +361,5 @@ case class UseLastNotApply(varName: String) extends
   Warning(s"""$varName($varName.length - 1) can be replaced by $varName.last""")
 case class UseHeadOptionNotIf(varName: String) extends
   Warning(s"""if ($varName.nonEmpty) Some($varName.head) else None can be replaced by $varName.headOption""")
+case class UseLastOptionNotIf(varName: String) extends
+  Warning(s"""if ($varName.nonEmpty) Some($varName.last) else None can be replaced by $varName.lastOption""")

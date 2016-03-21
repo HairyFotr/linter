@@ -116,6 +116,7 @@ class WarningTest extends JUnitMustMatchers {
       case UseHeadNotApply(_) => 1
       case UseLastNotApply(_) => 1
       case UseHeadOptionNotIf(_) => 1
+      case UseLastOptionNotIf(_) => 1
       case FloatingPointNumericRange => 1
       // ------------------------------------------------------------------------------------------------------
       // If you get a warning here, it's likely because you added a new warning type but forgot to add it here.

@@ -1231,6 +1231,14 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
+  def UseLastOptionNotIf(): Unit = {
+    implicit val msg = ".last) else None can be replaced by"
+    should("""def lastOpt[A](l: List[A]) = if (l.nonEmpty) Some(l.last) else None""")
+    should("""if (!Vector("a").isEmpty) Some(Vector("a").last) else None""")
+    should("""if (Seq("a").isEmpty) None else Some(Seq("a").last)""")
+  }
+
+  @Test
   def ReflexiveAssignment(): Unit = {
     implicit val msg = "Assigning a variable to itself?"
 
