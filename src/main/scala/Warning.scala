@@ -121,6 +121,7 @@ object Warning {
     UseOptionOrNull("", ""),
     UseSignum,
     UseUntilNotToMinusOne,
+    UseZipWithIndexNotZipIndices(""),
     VariableAssignedUnusedValue(""),
     WrapNullWithOption,
     YodaConditions,
@@ -363,3 +364,5 @@ case class UseHeadOptionNotIf(varName: String) extends
   Warning(s"""if ($varName.nonEmpty) Some($varName.head) else None can be replaced by $varName.headOption""")
 case class UseLastOptionNotIf(varName: String) extends
   Warning(s"""if ($varName.nonEmpty) Some($varName.last) else None can be replaced by $varName.lastOption""")
+case class UseZipWithIndexNotZipIndices(varName: String) extends
+  Warning(s"""$varName.zip($varName.indices) can be replaced with $varName.zipWithIndex""")

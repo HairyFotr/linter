@@ -1239,6 +1239,14 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
+  def UseZipWithIndexNotZipIndices(): Unit = {
+    implicit val msg = ".indices) can be replaced with"
+    should("""val l = List(1, 2, 3); l.zip(l.indices)""")
+    should("""val a = Array('a', 'b', 'c'); a.zip(a.indices)""")
+    should("""val s = "abc"; s.zip(s.indices)""")
+  }
+
+  @Test
   def ReflexiveAssignment(): Unit = {
     implicit val msg = "Assigning a variable to itself?"
 

@@ -1842,6 +1842,19 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             warn(tree, UseLastOptionNotIf(identOrCol(col)))
 
+          case Apply(TypeApply(Select(col, Name("zip")), _), List(Select(col1, Name("indices"))))
+            if (col equalsStructure col1)
+            && col.tpe.widen.baseClasses.exists(c => c.tpe =:= TraversableClass.tpe) =>
+
+            warn(tree, UseZipWithIndexNotZipIndices(identOrCol(col)))
+
+          case Apply(TypeApply(Select(Apply(xArrayOps1, List(col)), Name("zip")), _), List(Select(Apply(xArrayOps2, List(col1)), Name("indices"))))
+            if (col equalsStructure col1)
+            && (xArrayOps1.containsAny("ArrayOps", "augmentString"))
+            && (xArrayOps2.containsAny("ArrayOps", "augmentString")) =>
+
+            warn(tree, UseZipWithIndexNotZipIndices(identOrCol(col)))
+
           /// Use partial function directly - temporary variable is unnecessary (idea by yzgw)
           case Apply(_, List(Function(List(ValDef(mods, x_1, typeTree: TypeTree, EmptyTree)), Match(x_1_, _))))
             if (((x_1 is "x$1") && (x_1_ is "x$1") && (mods.isSynthetic) && (mods.isParameter)) // _ match { ... }
