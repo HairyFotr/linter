@@ -1800,47 +1800,82 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             warn(tree, UseLastNotApply(identOrCol(col)))
 
-          case If(Select(col, Name("nonEmpty")), Apply(TypeApply(Select(scala_Some, Name("apply")), _), List(Select(col1, Name("head")))), scala_None)
+          // if (list.nonEmpty) Some(list.head) else None
+          case If(Select(col, Name("nonEmpty")), Apply(TypeApply(Select(scala_Some, Name("apply")), _), List(Select(col1, head_last))), scala_None)
             if (col equalsStructure col1)
+            && head_last.isAny("head", "last")
             && (scala_Some is "scala.Some")
             && (scala_None is "scala.None") =>
 
-            warn(tree, UseHeadOptionNotIf(identOrCol(col)))
+            head_last match {
+              case Name("head") => warn(tree, UseHeadOptionNotIf(identOrCol(col)))
+              case Name("last") => warn(tree, UseLastOptionNotIf(identOrCol(col)))
+            }
 
-          case If(Select(col, Name("isEmpty")), scala_None, Apply(TypeApply(Select(scala_Some, Name("apply")), _), List(Select(col1, Name("head")))))
+
+          // if (str.nonEmpty) Some(str.head) else None
+          case If(Select(Apply(xArrayOps1, List(col)), Name("nonEmpty")), Apply(TypeApply(Select(scala_Some, Name("apply")), _), List(Select(Apply(xArrayOps2, List(col1)), head_last))), scala_None)
             if (col equalsStructure col1)
+            && head_last.isAny("head", "last")
+            && (xArrayOps1.containsAny("ArrayOps", "augmentString"))
+            && (xArrayOps2.containsAny("ArrayOps", "augmentString"))
             && (scala_Some is "scala.Some")
             && (scala_None is "scala.None") =>
 
-            warn(tree, UseHeadOptionNotIf(identOrCol(col)))
+            head_last match {
+              case Name("head") => warn(tree, UseHeadOptionNotIf(identOrCol(col)))
+              case Name("last") => warn(tree, UseLastOptionNotIf(identOrCol(col)))
+            }
 
-          case If(Select(Select(col, Name("isEmpty")), nme.UNARY_!), Apply(TypeApply(Select(scala_Some, Name("apply")), _), List(Select(col1, Name("head")))), scala_None)
+          // if (list.isEmpty) None else Some(list.head)
+          case If(Select(col, Name("isEmpty")), scala_None, Apply(TypeApply(Select(scala_Some, Name("apply")), _), List(Select(col1, head_last))))
             if (col equalsStructure col1)
+            && head_last.isAny("head", "last")
             && (scala_Some is "scala.Some")
             && (scala_None is "scala.None") =>
 
-            warn(tree, UseHeadOptionNotIf(identOrCol(col)))
+            head_last match {
+              case Name("head") => warn(tree, UseHeadOptionNotIf(identOrCol(col)))
+              case Name("last") => warn(tree, UseLastOptionNotIf(identOrCol(col)))
+            }
 
-          case If(Select(col, Name("nonEmpty")), Apply(TypeApply(Select(scala_Some, Name("apply")), _), List(Select(col1, Name("last")))), scala_None)
+          // if (str.isEmpty) None else Some(s.head)
+          case If(Apply(Select(col, Name("isEmpty")), _), scala_None, Apply(TypeApply(Select(scala_Some, Name("apply")), _), List(Select(Apply(xArrayOps, List(col1)), head_last))))
             if (col equalsStructure col1)
+            && head_last.isAny("head", "last")
+            && (xArrayOps.containsAny("ArrayOps", "augmentString"))
             && (scala_Some is "scala.Some")
             && (scala_None is "scala.None") =>
 
-            warn(tree, UseLastOptionNotIf(identOrCol(col)))
+            head_last match {
+              case Name("head") => warn(tree, UseHeadOptionNotIf(identOrCol(col)))
+              case Name("last") => warn(tree, UseLastOptionNotIf(identOrCol(col)))
+            }
 
-          case If(Select(col, Name("isEmpty")), scala_None, Apply(TypeApply(Select(scala_Some, Name("apply")), _), List(Select(col1, Name("last")))))
+          // if (!list.isEmpty) Some(list.head) else None
+          case If(Select(Select(col, Name("isEmpty")), nme.UNARY_!), Apply(TypeApply(Select(scala_Some, Name("apply")), _), List(Select(col1, head_last))), scala_None)
             if (col equalsStructure col1)
+            && head_last.isAny("head", "last")
             && (scala_Some is "scala.Some")
             && (scala_None is "scala.None") =>
 
-            warn(tree, UseLastOptionNotIf(identOrCol(col)))
+            head_last match {
+              case Name("head") => warn(tree, UseHeadOptionNotIf(identOrCol(col)))
+              case Name("last") => warn(tree, UseLastOptionNotIf(identOrCol(col)))
+            }
 
-          case If(Select(Select(col, Name("isEmpty")), nme.UNARY_!), Apply(TypeApply(Select(scala_Some, Name("apply")), _), List(Select(col1, Name("last")))), scala_None)
+          // if (!str.isEmpty) Some(str.head) else None
+          case If(Select(Apply(Select(col, Name("isEmpty")), _), nme.UNARY_!), Apply(TypeApply(Select(scala_Some, Name("apply")), _), List(Select(Apply(xArrayOps, List(col1)), head_last))), scala_None)
             if (col equalsStructure col1)
+            && head_last.isAny("head", "last")
+            && (xArrayOps.containsAny("ArrayOps", "augmentString"))
             && (scala_Some is "scala.Some")
             && (scala_None is "scala.None") =>
 
-            warn(tree, UseLastOptionNotIf(identOrCol(col)))
+            head_last match {
+              case Name("head") => warn(tree, UseHeadOptionNotIf(identOrCol(col)))
+              case Name("last") => warn(tree, UseLastOptionNotIf(identOrCol(col)))
+            }
 
           case Apply(TypeApply(Select(col, Name("zip")), _), List(Select(col1, Name("indices"))))
             if (col equalsStructure col1)

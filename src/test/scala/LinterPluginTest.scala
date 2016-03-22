@@ -1226,16 +1226,28 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   def UseHeadOptionNotIf(): Unit = {
     implicit val msg = ".head) else None can be replaced by"
     should("""def headOpt[A](l: List[A]) = if (l.nonEmpty) Some(l.head) else None""")
-    should("""if (!Vector("a").isEmpty) Some(Vector("a").head) else None""")
-    should("""if (Seq("a").isEmpty) None else Some(Seq("a").head)""")
+    should("""def headOpt[A](l: List[A]) = if (l.isEmpty) None else Some(l.head)""")
+    should("""def headOpt[A](l: List[A]) = if (!l.isEmpty) Some(l.head) else None""")
+    should("""def headOpt[A](l: Array[A]) = if (l.nonEmpty) Some(l.head) else None""")
+    should("""def headOpt[A](l: Array[A]) = if (l.isEmpty) None else Some(l.head)""")
+    should("""def headOpt[A](l: Array[A]) = if (!l.isEmpty) Some(l.head) else None""")
+    should("""def headOpt[A](l: String) = if (l.nonEmpty) Some(l.head) else None""")
+    should("""def headOpt[A](l: String) = if (l.isEmpty) None else Some(l.head)""")
+    should("""def headOpt[A](l: String) = if (!l.isEmpty) Some(l.head) else None""")
   }
 
   @Test
   def UseLastOptionNotIf(): Unit = {
     implicit val msg = ".last) else None can be replaced by"
     should("""def lastOpt[A](l: List[A]) = if (l.nonEmpty) Some(l.last) else None""")
-    should("""if (!Vector("a").isEmpty) Some(Vector("a").last) else None""")
-    should("""if (Seq("a").isEmpty) None else Some(Seq("a").last)""")
+    should("""def lastOpt[A](l: List[A]) = if (l.isEmpty) None else Some(l.last)""")
+    should("""def lastOpt[A](l: List[A]) = if (!l.isEmpty) Some(l.last) else None""")
+    should("""def lastOpt[A](l: Array[A]) = if (l.nonEmpty) Some(l.last) else None""")
+    should("""def lastOpt[A](l: Array[A]) = if (l.isEmpty) None else Some(l.last)""")
+    should("""def lastOpt[A](l: Array[A]) = if (!l.isEmpty) Some(l.last) else None""")
+    should("""def lastOpt[A](l: String) = if (l.nonEmpty) Some(l.last) else None""")
+    should("""def lastOpt[A](l: String) = if (l.isEmpty) None else Some(l.last)""")
+    should("""def lastOpt[A](l: String) = if (!l.isEmpty) Some(l.last) else None""")
   }
 
   @Test
