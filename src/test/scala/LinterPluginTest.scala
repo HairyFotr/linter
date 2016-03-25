@@ -1212,14 +1212,20 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   def UseHeadNotApply(): Unit = {
     implicit val msg = "(0) can be replaced by"
     should("""List(1, 2, 3)(0)""")
-    should("""val a = Vector("a", "b"); a(0)""")
+    noLint("""val seq = Seq("a", "b"); seq(0)""")
+    noLint("""val v = Vector("a", "b"); v(0)""")
+    noLint("""val a = Array(1, 2); a(0)""")
+    noLint("""val s = "abc; s(0)"""")
   }
 
   @Test
   def UseLastNotApply(): Unit = {
     implicit val msg = ".length - 1) can be replaced by"
     should("""val l = List(1, 2, 3); l(l.length - 1)""")
-    should("""val a = Vector("a", "b"); a.apply(a.size - 1)""")
+    noLint("""val seq = Seq("a", "b"); seq(seq.size - 1)""")
+    noLint("""val v = Vector("a", "b"); v(v.length - 1)""")
+    noLint("""val a = Array(4, 2); a(a.size - 1)""")
+    noLint("""val s = "xyz"; s(s.length - 1)""")
   }
 
   @Test

@@ -1789,12 +1789,12 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, UseFuncNotReverse(identOrCol(col), func.toString))
 
           case Apply(Select(col, Name("apply")), List(Literal(Constant(0))))
-            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= SeqClass.tpe) =>
+            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= ListClass.tpe) =>
 
             warn(tree, UseHeadNotApply(identOrCol(col)))
 
           case Apply(Select(col, Name("apply")), List(Apply(Select(Select(col1, size_length), Name("$minus")), List(Literal(Constant(1))))))
-            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= SeqClass.tpe)
+            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= ListClass.tpe)
             && size_length.isAny("size", "length")
             && (col equalsStructure col1) =>
 
