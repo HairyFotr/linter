@@ -1228,12 +1228,12 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""def headOpt[A](l: List[A]) = if (l.nonEmpty) Some(l.head) else None""")
     should("""def headOpt[A](l: List[A]) = if (l.isEmpty) None else Some(l.head)""")
     should("""def headOpt[A](l: List[A]) = if (!l.isEmpty) Some(l.head) else None""")
-    should("""def headOpt[A](l: Array[A]) = if (l.nonEmpty) Some(l.head) else None""")
-    should("""def headOpt[A](l: Array[A]) = if (l.isEmpty) None else Some(l.head)""")
-    should("""def headOpt[A](l: Array[A]) = if (!l.isEmpty) Some(l.head) else None""")
-    should("""def headOpt[A](l: String) = if (l.nonEmpty) Some(l.head) else None""")
-    should("""def headOpt[A](l: String) = if (l.isEmpty) None else Some(l.head)""")
-    should("""def headOpt[A](l: String) = if (!l.isEmpty) Some(l.head) else None""")
+    should("""def headOpt[A](a: Array[A]) = if (a.nonEmpty) Some(a.head) else None""")
+    should("""def headOpt[A](a: Array[A]) = if (a.isEmpty) None else Some(a.head)""")
+    should("""def headOpt[A](a: Array[A]) = if (!a.isEmpty) Some(a.head) else None""")
+    should("""def headOpt[A](s: String) = if (s.nonEmpty) Some(s.head) else None""")
+    should("""def headOpt[A](s: String) = if (s.isEmpty) None else Some(s.head)""")
+    should("""def headOpt[A](s: String) = if (!s.isEmpty) Some(s.head) else None""")
   }
 
   @Test
@@ -1242,12 +1242,12 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""def lastOpt[A](l: List[A]) = if (l.nonEmpty) Some(l.last) else None""")
     should("""def lastOpt[A](l: List[A]) = if (l.isEmpty) None else Some(l.last)""")
     should("""def lastOpt[A](l: List[A]) = if (!l.isEmpty) Some(l.last) else None""")
-    should("""def lastOpt[A](l: Array[A]) = if (l.nonEmpty) Some(l.last) else None""")
-    should("""def lastOpt[A](l: Array[A]) = if (l.isEmpty) None else Some(l.last)""")
-    should("""def lastOpt[A](l: Array[A]) = if (!l.isEmpty) Some(l.last) else None""")
-    should("""def lastOpt[A](l: String) = if (l.nonEmpty) Some(l.last) else None""")
-    should("""def lastOpt[A](l: String) = if (l.isEmpty) None else Some(l.last)""")
-    should("""def lastOpt[A](l: String) = if (!l.isEmpty) Some(l.last) else None""")
+    should("""def lastOpt[A](a: Array[A]) = if (a.nonEmpty) Some(a.last) else None""")
+    should("""def lastOpt[A](a: Array[A]) = if (a.isEmpty) None else Some(a.last)""")
+    should("""def lastOpt[A](a: Array[A]) = if (!a.isEmpty) Some(a.last) else None""")
+    should("""def lastOpt[A](s: String) = if (s.nonEmpty) Some(s.last) else None""")
+    should("""def lastOpt[A](s: String) = if (s.isEmpty) None else Some(s.last)""")
+    should("""def lastOpt[A](s: String) = if (!s.isEmpty) Some(s.last) else None""")
   }
 
   @Test
