@@ -2870,8 +2870,8 @@ class LinterPlugin(val global: Global) extends Plugin {
           val paramsSize = params.size
           lazy val intParam = if (paramsSize == 1 && params.head.tpe.widen <:< IntClass.tpe) computeExpr(params.head) else Values.empty
           lazy val intParams = if (params.forall(_.tpe.widen <:< IntClass.tpe)) params.map(computeExpr) else Nil //option?
-          lazy val stringParam = if (paramsSize == 1 && params.head.tpe.widen <:< StringClass.tpe) StringAttrs(params.head) else empty
-          lazy val stringParams = if (params.forall(_.tpe.widen <:< StringClass.tpe)) params.map(StringAttrs.apply) else Nil
+          lazy val stringParam: StringAttrs = if (paramsSize == 1 && params.head.tpe.widen <:< StringClass.tpe) StringAttrs(params.head) else empty
+          lazy val stringParams: Seq[StringAttrs] = if (params.forall(_.tpe.widen <:< StringClass.tpe)) params.map(StringAttrs.apply) else Nil
 
           //println((string, func, params, str, intParam))
           //println(str.exactValue)
@@ -3056,7 +3056,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             //str.func(Int, Int)
             case f @ ("substring"|"codePointCount") if intParams.size == 2 && intParams.forall(_.isValue) =>
               lazy val string = str.exactValue.get //lazy to avoid None.get... didn't use monadic, because I was lazy
-              val param = intParams.map(_.getValue)
+              val param: Seq[Int] = intParams.map(_.getValue)
 
               //println((string, param))
 

@@ -173,7 +173,7 @@ case object BigDecimalPrecisionLoss extends
 case object ReflexiveAssignment extends
   Warning("Assigning a variable to itself?")
 case object CloseSourceFile extends
-  Warning("You should close the file stream after use. (Streams get garbage collected, but it's possible to open too many at once)")
+  Warning("You should close the file stream after use. (Streams get garbage collected, but it is possible to open too many at once)")
 case object JavaConverters extends
   Warning("Consider using the explicit collection.JavaConverters instead of implicit conversions in collection.JavaConversions.")
 case class ContainsTypeMismatch(seqType: String, targetType: String) extends
@@ -357,9 +357,9 @@ case class UseLastNotReverseHead(varName: String, option: Boolean) extends
 case class UseFuncNotReverse(varName: String, func: String) extends
   Warning(s"""$varName.reverse.$func can be replaced by $varName.reverse${func.capitalize}.""")
 case class UseHeadNotApply(varName: String) extends
-  Warning(s"""$varName(0) can be replaced by $varName.head""")
+  Warning(s"""It is idiomatic to use $varName.head instead of $varName(0) for List""")
 case class UseLastNotApply(varName: String) extends
-  Warning(s"""$varName($varName.length - 1) can be replaced by $varName.last""")
+  Warning(s"""It is idiomatic to use $varName.last instead of $varName($varName.length - 1) for List""")
 case class UseHeadOptionNotIf(varName: String) extends
   Warning(s"""if ($varName.nonEmpty) Some($varName.head) else None can be replaced by $varName.headOption""")
 case class UseLastOptionNotIf(varName: String) extends
