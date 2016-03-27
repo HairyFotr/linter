@@ -523,36 +523,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def UseExistsNotFilterEmpty(): Unit = {
-    implicit val msg = ".exists(...) instead of "
-
-    should(""" 
-      var a = Seq(1,2,3);
-      val b = a.filter{ _ > 1 }.nonEmpty
-    """)
-    should(""" 
-      var a = Seq(1,2,3);
-      val b = !a.filter{ _ > 1 }.isEmpty
-    """)
-    should(""" 
-      var a = Set(1,2,3);
-      val b = !a.filter{ _ > 1 }.isEmpty
-    """)
-    should(""" 
-      var a = Array(1,2,3);
-      val b = !a.filter{ _ > 1 }.isEmpty
-    """)
-    should(""" 
-      var a = Option(1);
-      val b = !a.filter{ _ > 1 }.isEmpty
-    """)
-    should(""" 
-      var a = "abc";
-      val b = a.filter{ _ > 'a' }.nonEmpty
-    """)
-  }
-
-  @Test
   def UseCountNotFilterLength(): Unit = {
     implicit val msg = "Use a.count(...) instead of a.filter(...)."
 
@@ -1145,7 +1115,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
   @Test
   def UseExistsNotFilterIsEmpty(): Unit = {
-    implicit var msg = ".exists(...) instead of "
+    implicit var msg = "...) instead of "
     should("""List(1,2,3).filter(_ == 2).isEmpty""")
     should("""Set(1,2,3).filter(_ == 2).isEmpty""")
     should("""Seq(1,2,3).filter(_ == 2).isEmpty""")
@@ -1156,6 +1126,103 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""Seq(1,2,3).filter(_ == 2).nonEmpty""")
     should("""Seq(1,2,3).filterNot(_ == 2).isEmpty""")
     should("""Some(1).filter(_ > 1).isDefined""")
+
+    should(""" 
+      var a = Seq(1,2,3);
+      val b = a.filter{ _ > 1 }.nonEmpty
+    """)
+    should(""" 
+      var a = Seq(1,2,3);
+      val b = !a.filter{ _ > 1 }.isEmpty
+    """)
+    should(""" 
+      var a = Set(1,2,3);
+      val b = !a.filter{ _ > 1 }.isEmpty
+    """)
+    should(""" 
+      var a = Array(1,2,3);
+      val b = !a.filter{ _ > 1 }.isEmpty
+    """)
+    should(""" 
+      var a = Option(1);
+      val b = !a.filter{ _ > 1 }.isEmpty
+    """)
+    should(""" 
+      var a = "abc";
+      val b = a.filter{ _ > 'a' }.nonEmpty
+    """)
+
+    should(""" val tt="a"; tt.filter(_ == 'a').isEmpty """)
+    should(""" val tt="a"; tt.filter(_ == 'a').nonEmpty """)
+    should(""" val tt="a"; tt.filterNot(_ == 'a').isEmpty """)
+    should(""" val tt="a"; tt.filterNot(_ == 'a').nonEmpty """)
+    should(""" val tt="a"; !tt.filter(_ == 'a').isEmpty """)
+    should(""" val tt="a"; !tt.filter(_ == 'a').nonEmpty """)
+    should(""" val tt="a"; !tt.filterNot(_ == 'a').isEmpty """)
+    should(""" val tt="a"; !tt.filterNot(_ == 'a').nonEmpty """)
+
+    should(""" "a".filter(_ == 'a').isEmpty """)
+    should(""" "a".filter(_ == 'a').nonEmpty """)
+    should(""" "a".filterNot(_ == 'a').isEmpty """)
+    should(""" "a".filterNot(_ == 'a').nonEmpty """)
+    should(""" !"a".filter(_ == 'a').isEmpty """)
+    should(""" !"a".filter(_ == 'a').nonEmpty """)
+    should(""" !"a".filterNot(_ == 'a').isEmpty """)
+    should(""" !"a".filterNot(_ == 'a').nonEmpty """)
+
+    should(""" val tt=Array('a'); tt.filter(_ == 'a').isEmpty """)
+    should(""" val tt=Array('a'); tt.filter(_ == 'a').nonEmpty """)
+    should(""" val tt=Array('a'); tt.filterNot(_ == 'a').isEmpty """)
+    should(""" val tt=Array('a'); tt.filterNot(_ == 'a').nonEmpty """)
+    should(""" val tt=Array('a'); !tt.filter(_ == 'a').isEmpty """)
+    should(""" val tt=Array('a'); !tt.filter(_ == 'a').nonEmpty """)
+    should(""" val tt=Array('a'); !tt.filterNot(_ == 'a').isEmpty """)
+    should(""" val tt=Array('a'); !tt.filterNot(_ == 'a').nonEmpty """)
+
+    should(""" Array('a').filter(_ == 'a').isEmpty """)
+    should(""" Array('a').filter(_ == 'a').nonEmpty """)
+    should(""" Array('a').filterNot(_ == 'a').isEmpty """)
+    should(""" Array('a').filterNot(_ == 'a').nonEmpty """)
+    should(""" !Array('a').filter(_ == 'a').isEmpty """)
+    should(""" !Array('a').filter(_ == 'a').nonEmpty """)
+    should(""" !Array('a').filterNot(_ == 'a').isEmpty """)
+    should(""" !Array('a').filterNot(_ == 'a').nonEmpty """)
+
+    should(""" val tt=Seq('a'); tt.filter(_ == 'a').isEmpty """)
+    should(""" val tt=Seq('a'); tt.filter(_ == 'a').nonEmpty """)
+    should(""" val tt=Seq('a'); tt.filterNot(_ == 'a').isEmpty """)
+    should(""" val tt=Seq('a'); tt.filterNot(_ == 'a').nonEmpty """)
+    should(""" val tt=Seq('a'); !tt.filter(_ == 'a').isEmpty """)
+    should(""" val tt=Seq('a'); !tt.filter(_ == 'a').nonEmpty """)
+    should(""" val tt=Seq('a'); !tt.filterNot(_ == 'a').isEmpty """)
+    should(""" val tt=Seq('a'); !tt.filterNot(_ == 'a').nonEmpty """)
+
+    should(""" val tt=Option('a'); tt.filter(_ == 'a').isEmpty """)
+    should(""" val tt=Option('a'); tt.filter(_ == 'a').nonEmpty """)
+    should(""" val tt=Option('a'); tt.filterNot(_ == 'a').isEmpty """)
+    should(""" val tt=Option('a'); tt.filterNot(_ == 'a').nonEmpty """)
+    should(""" val tt=Option('a'); !tt.filter(_ == 'a').isEmpty """)
+    should(""" val tt=Option('a'); !tt.filter(_ == 'a').nonEmpty """)
+    should(""" val tt=Option('a'); !tt.filterNot(_ == 'a').isEmpty """)
+    should(""" val tt=Option('a'); !tt.filterNot(_ == 'a').nonEmpty """)
+
+    should(""" Seq('a').filter(_ == 'a').isEmpty """)
+    should(""" Seq('a').filter(_ == 'a').nonEmpty """)
+    should(""" Seq('a').filterNot(_ == 'a').isEmpty """)
+    should(""" Seq('a').filterNot(_ == 'a').nonEmpty """)
+    should(""" !Seq('a').filter(_ == 'a').isEmpty """)
+    should(""" !Seq('a').filter(_ == 'a').nonEmpty """)
+    should(""" !Seq('a').filterNot(_ == 'a').isEmpty """)
+    should(""" !Seq('a').filterNot(_ == 'a').nonEmpty """)
+
+    should(""" Option('a').filter(_ == 'a').isEmpty """)
+    should(""" Option('a').filter(_ == 'a').nonEmpty """)
+    should(""" Option('a').filterNot(_ == 'a').isEmpty """)
+    should(""" Option('a').filterNot(_ == 'a').nonEmpty """)
+    should(""" !Option('a').filter(_ == 'a').isEmpty """)
+    should(""" !Option('a').filter(_ == 'a').nonEmpty """)
+    should(""" !Option('a').filterNot(_ == 'a').isEmpty """)
+    should(""" !Option('a').filterNot(_ == 'a').nonEmpty """)
   }
 
   @Test
@@ -1262,6 +1329,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""val l = List(1, 2, 3); l.zip(l.indices)""")
     should("""val a = Array('a', 'b', 'c'); a.zip(a.indices)""")
     should("""val s = "abc"; s.zip(s.indices)""")
+    noLint("""val z = "abc"; val x = "cb" ; z.zip(x.indices)""")
   }
 
   @Test

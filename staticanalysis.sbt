@@ -8,6 +8,8 @@ scalacOptions ++= Seq(
   "-unchecked",
   "-Yrangepos",
   "-Xlint",
+  //"-Xdev",//2.11
+  //"-Xcheckinit",
   //"-Xstrict-inference",
   "-Ywarn-adapted-args",
   "-Ywarn-dead-code",

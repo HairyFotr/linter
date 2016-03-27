@@ -336,7 +336,19 @@ class LinterPlugin(val global: Global) extends Plugin {
 
 
       def identOrDefault(tree: Tree, default: String): String = {
-        if (tree.isInstanceOf[Ident] && !tree.contains(".")) tree.toString else default
+        tree match {
+          case Ident(_) if !tree.contains(".") => 
+          
+            tree.toString
+            
+          case Apply(scala_Predef_augmentString, List(str @ Ident(name))) 
+            if str.tpe <:< StringClass.tpe
+            && (scala_Predef_augmentString endsWith "Predef.augmentString") =>
+            
+            name.toString
+          
+          case _ => default
+        }
       }
       def identOrCol(tree: Tree): String = identOrDefault(tree, "col")
       def identOrOpt(tree: Tree): String = identOrDefault(tree, "opt")
@@ -350,7 +362,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
         case Select(Apply(scala_Predef_augmentString, List(str)), Name("size"))
           if str.tpe <:< StringClass.tpe
-          && (scala_Predef_augmentString is "scala.this.Predef.augmentString") =>
+          && (scala_Predef_augmentString endsWith "Predef.augmentString") =>
 
           Some(str)
 
@@ -1415,16 +1427,112 @@ class LinterPlugin(val global: Global) extends Plugin {
             val replacement = if (func == "head") "min" else "max"
             warn(tree, UseMinOrMaxNotSort(identOrCol(col), "sorted", func, replacement))
 
-          /// find(...).isDefined is better written as exists(...)
-          /// filter(...).isEmpty is better written as exists(...)
-          case Select(Apply(pos @ Select(col, find_filter), _func), empty_defined)
-            if ((find_filter isAny ("find", "filter", "filterNot")) && (empty_defined isAny ("isEmpty", "nonEmpty", "isDefined")))
-            && (col startsWithAny ("scala.", "immutable.this", "collection.this")) =>
+          case Select(_, _) if {
+          
+            // TODO Possibly a bug - tried with regular class too
+            import scala.language.reflectiveCalls
+          
+            /// find(...).isDefined is better written as exists(...)
+            case class FindIsDefined(col: String, isDefinedFunc: String, pos: Position) {
+              def getReplacement(): (String, Boolean) = (
+                  if (isDefinedFunc == "isEmpty") {
+                    ("exists", true)
+                  } else {
+                    ("exists", false)
+                  }
+              )
+            }
 
-            if (find_filter is "find")
-              warn(pos, UseExistsNotFindIsDefined(identOrCol(col), empty_defined.toString))
-            else
-              warn(pos, UseExistsNotFilterIsEmpty(identOrCol(col), find_filter.toString, empty_defined.toString))
+            for (findIsDefined <- Option(tree match {
+              case Select(Apply(pos @ Select(col, Name("find")), _cond), isDefinedFunc)
+                if isDefinedFunc.isAny("isEmpty", "nonEmpty", "isDefined")
+                && col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe) =>
+              
+                FindIsDefined(identOrCol(col), isDefinedFunc.toString, pos.pos)
+                
+              case Select(Apply(xArrayOps, List(Apply(pos @ Select(col, Name("find")), List(_cond)))), isDefinedFunc)
+                if isDefinedFunc.isAny("isEmpty", "nonEmpty", "isDefined")
+                && xArrayOps.containsAny("ArrayOps", "augmentString") =>
+             
+                FindIsDefined(identOrCol(col), isDefinedFunc.toString, pos.pos)
+
+              case Select(Apply(Select(Apply(xArrayOps, List(pos @ col)), Name("find")), List(_cond)), isDefinedFunc)
+                if isDefinedFunc.isAny("isEmpty", "nonEmpty", "isDefined")
+                && xArrayOps.containsAny("ArrayOps", "augmentString") =>
+
+                FindIsDefined(identOrCol(col), isDefinedFunc.toString, pos.pos)
+
+              case _ =>
+                null
+            })) {
+              warn(findIsDefined.pos, UseExistsNotFindIsDefined(findIsDefined.col, findIsDefined.getReplacement, findIsDefined.isDefinedFunc))
+            }
+
+            ///[!]filter[Not](cond).[is|non]Empty -> [!]seq.[exists|forall]([!]cond) ... o_O
+            // TODO parse cond for simple _ ==/!= x conditions to improve suggestions
+            case class FilterEmpty(col: String, stmtNegated: Boolean, filterFunc: String, emptyFunc: String, pos: Position) {
+              def getReplacements(): Seq[(String, Boolean, Boolean)] = (
+                if (filterFunc == "filter") {
+                  if (emptyFunc == "isEmpty" ^ stmtNegated) {
+                    Seq(("exists", true, false), ("forall", false, true))
+                  } else {
+                    Seq(("exists", false, false))
+                  }
+                } else {
+                  if (emptyFunc == "isEmpty" ^ stmtNegated) {
+                    Seq(("forall", false, false))
+                  } else {
+                    Seq(("exists", false, true), ("forall", true, false))
+                  }
+                }
+              )
+            }
+
+            def allowedFuncs(filterFunc: Name, emptyFunc: Name): Boolean = (
+                 (filterFunc isAny ("filter", "filterNot"))
+              && (emptyFunc isAny ("isEmpty", "nonEmpty", "isDefined"))
+            )
+
+            for (filterEmpty <- Option(tree match {
+              case Select(Select(Apply(pos @ Select(col, filterFunc), _cond), emptyFunc), nme.UNARY_!)
+                if allowedFuncs(filterFunc, emptyFunc)
+                && col.tpe.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || c.tpe =:= OptionClass.tpe) =>
+                  
+                FilterEmpty(identOrCol(col), true, filterFunc.toString, emptyFunc.toString, pos.pos)
+
+              case Select(Apply(pos @ Select(col, filterFunc), _cond), emptyFunc)
+                if allowedFuncs(filterFunc, emptyFunc)
+                && col.tpe.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || c.tpe =:= OptionClass.tpe) =>
+
+                FilterEmpty(identOrCol(col), false, filterFunc.toString, emptyFunc.toString, pos.pos)
+              
+              case Select(Apply(Select(Apply(Select(Apply(xArrayOps, List(pos @ col)), filterFunc), List(_cond)), emptyFunc), List()), nme.UNARY_!)
+                if allowedFuncs(filterFunc, emptyFunc)
+                && xArrayOps.containsAny("ArrayOps", "augmentString") =>
+
+                FilterEmpty(identOrCol(col), false, filterFunc.toString, emptyFunc.toString, pos.pos)
+
+              case Select(Apply(xArrayOps, List(Apply(pos @ Select(col, filterFunc), List(_cond)))), emptyFunc)
+                if allowedFuncs(filterFunc, emptyFunc)
+                && xArrayOps.containsAny("ArrayOps", "augmentString") =>
+             
+                FilterEmpty(identOrCol(col), false, filterFunc.toString, emptyFunc.toString, pos.pos)
+
+              case Select(Apply(Select(Apply(xArrayOps, List(pos @ col)), filterFunc), List(_cond)), emptyFunc)
+                if allowedFuncs(filterFunc, emptyFunc)
+                && xArrayOps.containsAny("ArrayOps", "augmentString") =>
+
+                FilterEmpty(identOrCol(col), false, filterFunc.toString, emptyFunc.toString, pos.pos)
+
+              case _ =>
+                null
+            })) {
+              warn(filterEmpty.pos, UseExistsNotFilterIsEmpty(filterEmpty.col, filterEmpty.getReplacements, filterEmpty.stmtNegated, filterEmpty.filterFunc, filterEmpty.emptyFunc))
+              //Utils.noWarnPositions += filterEmpty.posHolder.pos // Prevents re-warning on negation
+            }
+
+            false
+          } => //Fallthrough
 
           /// exists(a == ...) is better written as contains(...)
           case Apply(Select(col, Name("exists")), List(Function(List(ValDef(_, param1, _, _)), Apply(Select(param2, eq), List(id @ Ident(_))))))
@@ -1509,6 +1617,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             }
 
           /// col.map(...).map(...)
+          // TODO too noisy
           case Apply(TypeApply(Select(Apply(Apply(TypeApply(Select(col, Name("map")), _), List(Function(List(ValDef(_, _, _, _)), _))), List(_canBuildFrom)), Name("map")), _), List(Function(List(ValDef(_, _, _, _)), _)))
             if (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe)) =>
 
@@ -1696,27 +1805,6 @@ class LinterPlugin(val global: Global) extends Plugin {
             && (p2.toString == p2_.toString) && (p2_.tpe.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe)) =>
 
             warn(tree, UseFlattenNotFilterOption(identOrCol(col)))
-
-          /// col.exists(...) instead of !col.filter(...).isEmpty / col.filter(...).nonEmpty (idea from pippi)
-          case Select(Apply(Select(col, Name("filter")), List(_func)), Name("nonEmpty"))
-            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || c.tpe =:= OptionClass.tpe) =>
-
-            warn(tree, UseExistsNotFilterEmpty(identOrCol(col), bang = false))
-
-          case Select(Select(Apply(Select(col, Name("filter")), List(_func)), Name("isEmpty")), Name("unary_$bang"))
-            if col.tpe.widen.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || c.tpe =:= OptionClass.tpe) =>
-
-            warn(tree, UseExistsNotFilterEmpty(identOrCol(col), bang = true))
-
-          case Select(Apply(xArrayOps, List(Apply(Select(col, Name("filter")), List(_func)))), Name("nonEmpty"))
-            if xArrayOps.containsAny("ArrayOps", "augmentString") =>
-
-            warn(tree, UseExistsNotFilterEmpty(identOrCol(col), bang = false))
-
-          case Select(Select(Apply(xArrayOps, List(Apply(Select(col, Name("filter")), List(_func)))), Name("isEmpty")), Name("unary_$bang"))
-            if xArrayOps.containsAny("ArrayOps", "augmentString") =>
-
-            warn(tree, UseExistsNotFilterEmpty(identOrCol(col), bang = true))
 
           /// col.count(...) instead of col.filter(...).size/length (idea from pippi)
           case Select(Apply(Select(col, Name("filter")), List(_func)), size_length)

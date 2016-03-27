@@ -25,6 +25,9 @@ object Utils {
   val nowarnMergeNestedIfsPositions = mutable.HashSet[Global#Position]() //TODO: hack
 
   def warn(tree: Global#Tree, warning: Warning)(implicit unit: Global#CompilationUnit): Unit = {
+    warn(tree.pos, warning)(unit)
+  }
+  def warn(tree: Global#Position, warning: Warning)(implicit unit: Global#CompilationUnit): Unit = {
     val checkSep = "([+:]|[,] )"
     val partSep = "[ :]"
     val checkReg = "[A-Z][a-zA-Z]+"
@@ -38,6 +41,8 @@ object Utils {
       // scalastyle:on regex
     }
   }
+  
+  def toBang(b: Boolean) = if (b) "!" else ""  
 }
 
 // Put only those that need the right global here:

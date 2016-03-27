@@ -96,12 +96,11 @@ object Warning {
     UseMapNotFlatMap(""),
     UseFilterNotFlatMap(""),
     UseFlattenNotFilterOption(""),
-    UseExistsNotFilterEmpty("", true),
     UseCountNotFilterLength("", ""),
     UseExistsNotCountCompare(""),
     UseGetOrElseOnOption(""),
-    UseExistsNotFindIsDefined("", ""),
-    UseExistsNotFilterIsEmpty("", "", ""),
+    UseExistsNotFindIsDefined("", ("", false), ""),
+    UseExistsNotFilterIsEmpty("", Nil, false, "", ""),
     UseFindNotFilterHead(""),
     UseContainsNotExistsEquals("", "", "", ""),
     UseQuantifierFuncNotFold("", "", ""),
@@ -232,10 +231,14 @@ case class UseOptionOrNull(varname: String, insteadOf: String) extends
   Warning(s"Use $varname.orNull or $varname.getOrElse(null) instead of if ($insteadOf) $varname.get else null.")
 case class UseOptionGetOrElse(varname: String, insteadOf: String) extends
   Warning(s"Use $varname.getOrElse(...) instead of if ($insteadOf) $varname.get else ...")
-case class UseExistsNotFindIsDefined(varName: String, isEmpty_isDefined: String) extends
-  Warning(s"Use $varName.exists(...) instead of $varName.find(...).$isEmpty_isDefined.")
-case class UseExistsNotFilterIsEmpty(varName: String, filter: String, empty: String) extends
-  Warning(s"Use $varName.exists(...) instead of $varName.$filter(...).$empty.")
+case class UseExistsNotFindIsDefined(varName: String, replacement: (String, Boolean), isEmpty_isDefined: String) extends
+  Warning(s"""Use ${Utils.toBang(replacement._2)}$varName.${replacement._1}(...) instead of $varName.find(...).$isEmpty_isDefined.""")
+case class UseExistsNotFilterIsEmpty(varName: String, replacements: Seq[(String, Boolean, Boolean)], stmtNegated: Boolean, filter: String, empty: String) extends
+  Warning(s"""Use ${
+      replacements.map{
+        case (rep, negStmt, negCond) => s"${Utils.toBang(negStmt)}$varName.$rep(${Utils.toBang(negCond)}...)"
+      }.mkString(" or ")
+    } instead of ${Utils.toBang(stmtNegated)}$varName.$filter(...).$empty.""")
 case class UseFindNotFilterHead(varName: String) extends
   Warning(s"Unless there are side-effects, $varName.filter(...).headOption can be replaced by $varName.find(...).")
 case class UseContainsNotExistsEquals(colName: String, valCmp: String, val1: String, val2: String) extends
@@ -272,8 +275,6 @@ case object IntDivisionAssignedToFloat extends
   Warning("Integer division detected in an expression assigned to a floating point variable.")
 case class UseFlattenNotFilterOption(varName: String) extends
   Warning(s"Use $varName.flatten instead of $varName.filter(_.isDefined).map(_.get).") // Cover isEmpty, etc
-case class UseExistsNotFilterEmpty(varName: String, bang: Boolean) extends
-  Warning(s"""Use $varName.exists(...) instead of ${ if (bang) s"!$varName.filter(...).isEmpty" else s"$varName.filter(...).nonEmpty" }""")
 case class UseCountNotFilterLength(varName: String, func: String) extends
   Warning(s"Use $varName.count(...) instead of $varName.filter(...).$func")
 case class UseExistsNotCountCompare(varName: String) extends
