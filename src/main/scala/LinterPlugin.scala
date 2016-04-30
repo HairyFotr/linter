@@ -4002,24 +4002,28 @@ class LinterPlugin(val global: Global) extends Plugin {
       override def traverse(tree: Tree): Unit = try {
         superTraverse = true
         tree match {
-          case DefDef(mods: Modifiers, name, _, valDefs, _, body) =>
-            /// Unused method parameters
-            if (name.toString != "<init>" && !name.toString.contains("$default$")
+          /// Unused method parameters
+          case DefDef(mods: Modifiers, name, _, valDefs, _, body) 
+            //TODO: write tests for the special cases - isSynthetic might cover some
+            //TODO: scalaz is a good codebase for finding interesting false positives
+            //TODO: macro impl is special case?
+            if (name.toString != "<init>" && !name.toString.contains("$default$"))
             && !body.isEmpty && body.toString != "scala.this.Predef.???"
-            && !(mods.isOverride || tree.symbol.isOverridingSymbol)) {
-              // Get the parameters, except the implicit ones
-              val params = valDefs.flatMap(_.filterNot(_.mods.isImplicit)).map(_.name.toString).toBuffer
+            && !mods.isSynthetic && !(mods.isOverride || tree.symbol.isOverridingSymbol) =>
 
-              if (!(name.toString == "main" && params.size == 1 && params.head == "args")) { // Filter main method
-                val used = for (Ident(name) <- tree if params contains name.toString) yield name.toString
-                val unused = params -- used
+            // Get the parameters, except the implicit/synthetic ones
+            val params = 
+              valDefs
+                .flatMap(_.filterNot(valDef => valDef.mods.isImplicit || valDef.mods.isSynthetic || valDef.name.toString == "$this"))
+                .map(_.name.toString)
+                .toBuffer
 
-                //TODO: scalaz is a good codebase for finding interesting false positives
-                //TODO: macro impl is special case?
-                unused.size match {
-                  case 0 => //Ignore
-                  case _ => warn(tree, UnusedParameter(unused, name.toString))
-                }
+            if (!(name.toString == "main" && params.size == 1 && params.head == "args")) { // Filter main method
+              val used = for (Ident(name) <- tree if params contains name.toString) yield name.toString
+              val unused = params -- used
+
+              if (unused.size > 0) {
+                warn(tree, UnusedParameter(unused, name.toString.stripSuffix("$extension")))
               }
             }
 
