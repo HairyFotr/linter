@@ -14,14 +14,14 @@ crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.6", "2.11.8", "2
 
 resolvers ++= Seq("snapshots", "releases").map(Resolver.sonatypeRepo)
 
-libraryDependencies in Test ++= Seq(
-  "junit"          % "junit"           % "4.12" % "test",
-  "com.novocode"   % "junit-interface" % "0.11" % "test")
+libraryDependencies ++= Seq(
+  "junit"          % "junit"           % "4.12" % Test,
+  "com.novocode"   % "junit-interface" % "0.11" % Test)
   
-libraryDependencies in Test := {
+libraryDependencies := {
   CrossVersion.partialVersion(scalaVersion.value) match {
     case Some((2, scalaMajor)) if scalaMajor <= 11 =>
-      libraryDependencies.value :+ "org.specs2" %% "specs2" % "2.4" % "test"
+      libraryDependencies.value :+ "org.specs2" %% "specs2" % "2.4" % Test
     case _ =>
       // Tests won't work in Scala 2.12 for now
       libraryDependencies.value
