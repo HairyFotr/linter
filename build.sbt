@@ -6,7 +6,7 @@ homepage := Some(url("https://github.com/HairyFotr/linter"))
 
 organization := "org.psywerx.hairyfotr"
 
-//version := "0.1.13"
+//version := "0.1.14"
 
 scalaVersion := "2.10.6"
 

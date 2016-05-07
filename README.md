@@ -5,7 +5,7 @@ Linter is a Scala static analysis compiler plugin which adds compile-time checks
 ## Usage from sbt
 Add Linter to your project by appending this line to your `build.sbt`:
 
-    addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.13")
+    addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.14")
 
 If you would always like to have the latest changes, snapshots are also available:
 
