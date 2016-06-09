@@ -277,7 +277,7 @@ Rule lists from other static analysis tools:
 * Scala Clippy(Scala) - https://scala-clippy.org/
 * IntelliJ IDEA(Scala/...) - https://www.jetbrains.com/idea/features/scala.html
 * Findbugs(JVM) - http://findbugs.sourceforge.net/bugDescriptions.html
-* ($)Julia(JVM) - http://www.juliasoft.com/warnings
+* ($)Julia(JVM) - http://www.juliasoft.com/solutions/warnings
 * CheckStyle(Java) - http://checkstyle.sourceforge.net/availablechecks.html
 * PMD(Java) - http://pmd.sourceforge.net/snapshot/pmd-java/rules/index.html
 * Error-prone(Java) - https://github.com/google/error-prone
