@@ -14,6 +14,19 @@ If you would always like to have the latest changes, snapshots are also availabl
     addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1-SNAPSHOT")
 
 
+## Usage from maven
+Add Linter to your project by updating your `pom.xml` with a "compilerPlugin" section.
+
+    <configuration>
+      <compilerPlugins>
+        <compilerPlugin>
+          <groupId>org.psywerx.hairyfotr</groupId>
+          <artifactId>linter_2.11</artifactId>
+          <version>0.1.14</version>
+        </compilerPlugin>
+      </compilerPlugins>
+    </configuration>
+
 ## Manual usage
 Another possible way to use Linter is to manually download and use these jars:<br>
 [Scala 2.11.x](https://oss.sonatype.org/content/repositories/snapshots/org/psywerx/hairyfotr/linter_2.11/0.1-SNAPSHOT/linter_2.11-0.1-SNAPSHOT.jar), <br>
