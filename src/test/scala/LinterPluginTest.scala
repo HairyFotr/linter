@@ -636,6 +636,8 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should(""" val a = List(true, true, false); a.reduceLeft((acc, n) => !n || acc) """)
     should(""" val a = Set(true, true, false); a.reduceLeft((acc, n) => !n || acc) """)
 
+    // Issue #42
+    noLint(""" class col { def foldLeft(a: Any)(b: Any) = a.toString+b.toString }; val a = new col; a.foldLeft(false)((acc: Boolean, n: Int) => n > 5 || acc) """)
   }
 
   @Test

@@ -1562,6 +1562,7 @@ class LinterPlugin(val global: Global) extends Plugin {
           //TODO: fix foldRight, reduceRight
           case Apply(Apply(TypeApply(Select(col, fold), List(_)), List(lit @ Literal(Constant(start)))), List(Function(List(ValDef(_, arg1, _, _), ValDef(_, arg2, _, _)), Apply(Select(arg1u, op), List(arg2u)))))
             if (fold.isAny("fold", "foldLeft", "$div$colon"))
+            && (col.tpe.baseClasses.exists(_.tpe =:= TraversableOnceClass.tpe))
             && (((true == start || false == start)
                 && ((arg1.toString == arg1u.toString) || (arg1.toString == arg2u.toString))
                 && (op.isAny("$amp$amp", "$bar$bar")))
