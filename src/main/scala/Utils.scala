@@ -42,7 +42,7 @@ object Utils {
     }
   }
   
-  def toBang(b: Boolean) = if (b) "!" else ""  
+  def toBang(b: Boolean): String = if (b) "!" else ""  
 }
 
 // Put only those that need the right global here:
