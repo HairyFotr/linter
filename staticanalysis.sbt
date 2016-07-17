@@ -22,9 +22,7 @@ scalacOptions ++= Seq(
 
 // Linter
 //resolvers += Resolver.sonatypeRepo("snapshots")
-
 //addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1-SNAPSHOT")
-
 //scalacOptions += "-P:linter:disable:UseHypot+CloseSourceFile"
 
 // or manually, e.g.
@@ -40,23 +38,16 @@ scalacOptions ++= Seq(
 
 // Scalastyle
 scalastyleConfig <<= baseDirectory { base => base / "sca" / "scalastyle-config.xml" }
-
 watchSources += baseDirectory.value / "sca" / "scalastyle-config.xml"
 
 // Findbugs (optionally put findbugs plugins (such as fb-contrib and findsecbugs) jars into ~/.findbugs/plugin)
 findbugsSettings
-
 findbugsEffort := Effort.Maximum
-
 findbugsReportPath <<= baseDirectory { base => Some(base / "sca" / "findbugsoutput.xml") }
 
 // CPD
 cpdSettings
-
 cpdTargetPath <<= baseDirectory { base => base / "sca" }
-
 cpdReportName := "cpdoutput.txt"
-
 cpdReportType := CPDReportType.Simple
-
 cpdOutputType := CPDOutputType.Console
