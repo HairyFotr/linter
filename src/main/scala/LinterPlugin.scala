@@ -765,7 +765,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
             warn(eqeq, UnlikelyEquality(lhs.tpe.widen.toString, rhs.tpe.widen.toString, if (op == nme.EQ) "==" else "!="))
 
-          /// Warn agains importing from collection.JavaConversions
+          /// Warn against importing from collection.JavaConversions
           case Import(pkg, selectors) if (pkg.symbol == JavaConversionsModule) && (selectors exists isGlobalImport) =>
             warn(pkg, JavaConverters)
 

@@ -130,7 +130,7 @@ scala> bool match { case true => 0 case false => 1 }
                 ^
 ```
 
-### Integer checks (some abstract intepretation)
+### Integer checks (some abstract interpretation)
 #### Check conditions
 ```scala
 scala> for (i <- 10 to 20) { if (i > 20) "" }
@@ -155,7 +155,7 @@ scala> { val a = List(1,2,3); for (i <- 1 to 10) { println(a(i)) } }
                                                                    ^
 ```
 
-### String checks (some abstract intepretation)
+### String checks (some abstract interpretation)
 #### Attempt to verify string length conditions
 ```scala
 scala> for (i <- 10 to 20) { if (i.toString.length == 3) "" }
