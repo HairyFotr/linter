@@ -118,6 +118,16 @@ class WarningTest extends JUnitMustMatchers {
       case UseLastOptionNotIf(_) => 1
       case UseZipWithIndexNotZipIndices(_) => 1
       case FloatingPointNumericRange => 1
+      case UseGetOrElseNotPatMatch(_) => 1
+      case UseOrElseNotPatMatch(_) => 1
+      case UseOptionFlatMapNotPatMatch(_) => 1
+      case UseOptionMapNotPatMatch(_) => 1
+      case UseOptionFlattenNotPatMatch => 1
+      case UseOptionForeachNotPatMatch(_) => 1
+      case UseOptionIsDefinedNotPatMatch => 1
+      case UseOptionIsEmptyNotPatMatch => 1
+      case UseOptionForallNotPatMatch(_) => 1
+      case UseOptionExistsNotPatMatch(_) => 1
       // ------------------------------------------------------------------------------------------------------
       // If you get a warning here, it's likely because you added a new warning type but forgot to add it here.
       // The real point is that you need to add the new Warning to Warning.All.

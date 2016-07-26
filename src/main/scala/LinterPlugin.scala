@@ -1022,6 +1022,78 @@ class LinterPlugin(val global: Global) extends Plugin {
             printStreakWarning()
             printCaseWarning()
 
+            def orderOption(cases: List[CaseDef]) = cases match {
+              case List(none @ CaseDef(scala_None, EmptyTree, y), some) if scala_None is "scala.None" => List(some, none)
+              case x => x
+            }
+
+            def matchOption(cases: List[CaseDef]) = cases match {
+              case List(CaseDef(Apply(scala_Some @ TypeTree(), List(Bind(x1, Ident(nme.WILDCARD)))), EmptyTree, x2), CaseDef(scala_None1, EmptyTree, scala_None2))
+                if (scala_Some.original is "scala.Some") &&
+                   (scala_None1 is "scala.None") &&
+                   (scala_None2 is "scala.None") &&
+                   (x1.toString == x2.toString) =>
+
+                warn(tree, UseOptionFlattenNotPatMatch)
+
+              case List(CaseDef(Apply(scala_Some1 @ TypeTree(), List(Bind(x1, Ident(nme.WILDCARD)))), EmptyTree, Apply(TypeApply(Select(scala_Some2, Name("apply")), _), List(x2))), CaseDef(scala_None, EmptyTree, y))
+                if (scala_Some1.original is "scala.Some") &&
+                   (scala_Some2 is "scala.Some") &&
+                   (scala_None is "scala.None") &&
+                   (x1.toString == x2.toString) =>
+
+                warn(tree, UseOrElseNotPatMatch(y.toString))
+
+              case List(CaseDef(Apply(scala_Some @ TypeTree(), List(Bind(x1, Ident(nme.WILDCARD)))), EmptyTree, x2), CaseDef(scala_None, EmptyTree, y))
+                if (scala_Some.original is "scala.Some") &&
+                   (scala_None is "scala.None") &&
+                   (x1.toString == x2.toString) =>
+
+                warn(tree, UseGetOrElseNotPatMatch(y.toString))
+
+              case List(CaseDef(Apply(scala_Some1 @ TypeTree(), List(Bind(_, Ident(nme.WILDCARD)))), EmptyTree, Apply(TypeApply(Select(scala_Some2, Name("apply")), _), List(y))), CaseDef(scala_None1, EmptyTree, scala_None2))
+                if (scala_Some1.original is "scala.Some") &&
+                   (scala_Some2 is "scala.Some") &&
+                   (scala_None1 is "scala.None") &&
+                   (scala_None2 is "scala.None") =>
+
+                warn(tree, UseOptionMapNotPatMatch(y.toString))
+
+              case List(CaseDef(Apply(scala_Some @ TypeTree(), List(Bind(_, Ident(nme.WILDCARD)))), EmptyTree, y), CaseDef(scala_None1, EmptyTree, scala_None2))
+                if (scala_Some.original is "scala.Some") &&
+                   (scala_None1 is "scala.None") &&
+                   (scala_None2 is "scala.None") =>
+
+                warn(tree, UseOptionFlatMapNotPatMatch(y.toString))
+
+              case List(CaseDef(Apply(scala_Some @ TypeTree(), List(Bind(_, Ident(nme.WILDCARD)))), EmptyTree, y), CaseDef(scala_None, EmptyTree, unit))
+                if (scala_Some.original is "scala.Some") &&
+                   (scala_None is "scala.None") &&
+                   (unit is "()") =>
+
+                warn(tree, UseOptionForeachNotPatMatch(y.toString))
+
+              case List(CaseDef(Apply(scala_Some @ TypeTree(), List(Bind(x1, Ident(nme.WILDCARD)))), EmptyTree, Literal(Constant(true))), CaseDef(scala_None, EmptyTree, Literal(Constant(false))))
+                if (scala_Some.original is "scala.Some") =>
+
+                warn(tree, UseOptionIsDefinedNotPatMatch)
+
+              case List(CaseDef(Apply(scala_Some @ TypeTree(), List(Bind(x1, Ident(nme.WILDCARD)))), EmptyTree, Literal(Constant(false))), CaseDef(scala_None, EmptyTree, Literal(Constant(true))))
+                if (scala_Some.original is "scala.Some") =>
+
+                warn(tree, UseOptionIsEmptyNotPatMatch)
+
+              case List(CaseDef(Apply(scala_Some @ TypeTree(), List(Bind(x1, Ident(nme.WILDCARD)))), EmptyTree, y), CaseDef(scala_None, EmptyTree, Literal(Constant(false))))
+                if (scala_Some.original is "scala.Some") =>
+
+                warn(tree, UseOptionExistsNotPatMatch(y.toString))
+
+              case List(CaseDef(Apply(scala_Some @ TypeTree(), List(Bind(x1, Ident(nme.WILDCARD)))), EmptyTree, y), CaseDef(scala_None, EmptyTree, Literal(Constant(true))))
+                if (scala_Some.original is "scala.Some") =>
+
+                warn(tree, UseOptionForallNotPatMatch(y.toString))
+            }
+            matchOption(orderOption(cases))
           //// If checks
           /// Same expression on both sides of comparison.
           case Apply(Select(left, func), List(right))
