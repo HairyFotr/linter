@@ -1761,8 +1761,6 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""List(Some(1), None) map { item => item match { case Some(x) => x; case None => 10 }}""")
     should("""List(1,2,3) map { a => a match { case _ => 5 }}""")
     noLint("""List(1,2,3) map { a: AnyVal => a match { case _ => 5 }}""")
-    noLint("""List(Some(1), None) map { case Some(x) => x; case None => 10 }""")
-    noLint("""for(a <- List(Some(1), None)) a match { case Some(x) => x; case None => 10 }""")
   }
 
   @Test // see http://scalapuzzlers.com/#pzzlr-001
@@ -1963,6 +1961,86 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
         case Some(x) => x
         case _ => null
       }""")
+  }
+
+  @Test
+  def UseGetOrElseNotPatMatch(): Unit = {
+    implicit val msg = "can be replaced with .getOrElse"
+
+    should("""val o = Option(3); o match { case Some(x) => x; case None => 123}""")
+    should("""Option("hey") match {case None => ""; case Some(x) => x }""")
+  }
+
+  @Test
+  def UseOrElseNotPatMatch(): Unit = {
+    implicit val msg = "can be replaced with .orElse"
+
+    should("""val o = Option(3); o match { case Some(x) => Some(x); case None => 123}""")
+    should("""Option("hey") match {case None => ""; case Some(x) => Some(x) }""")
+  }
+
+  @Test
+  def UseOptionFlatMapNotPatMatch(): Unit = {
+    implicit val msg = "can be replaced with .flatMap"
+
+    should("""val o = Option(3); o match { case Some(x) => 123; case None => None}""")
+    should("""Option("hey") match {case None => None; case Some(x) => 123 }""")
+  }
+
+  @Test
+  def UseOptionMapPatMatch(): Unit = {
+    implicit val msg = "can be replaced with .map"
+
+    should("""val o = Option(3); o match { case Some(x) => Some(123); case None => None}""")
+    should("""Option("hey") match {case None => None; case Some(x) => Some(123) }""")
+  }
+
+  @Test
+  def UseOptionFlattenNotPatMatch(): Unit = {
+    implicit val msg = "can be replaced with .flatten"
+
+    should("""val o = Option(3); o match { case Some(x) => x; case None => None}""")
+    should("""Option("hey") match {case None => None; case Some(x) => x }""")
+  }
+
+  @Test
+  def UseOptionForeachNotPatMatch(): Unit = {
+    implicit val msg = "can be replaced with .foreach"
+
+    should("""val o = Option(3); o match { case Some(x) => 123; case None => }""")
+    should("""Option("hey") match {case None => {}; case Some(x) => 123 }""")
+  }
+
+  @Test
+  def UseOptionIsDefinedNotPatMatch(): Unit = {
+    implicit val msg = "can be replaced with .isDefined"
+
+    should("""val o = Option(3); o match { case Some(x) => true; case None => false }""")
+    should("""Option("hey") match {case None => false; case Some(x) => true }""")
+  }
+
+  @Test
+  def UseOptionIsEmptyNotPatMatch(): Unit = {
+    implicit val msg = "can be replaced with .isEmpty"
+
+    should("""val o = Option(3); o match { case Some(x) => false; case None => true }""")
+    should("""Option("hey") match {case None => true; case Some(x) => false }""")
+  }
+
+  @Test
+  def UseOptionExistsNotPatMatch(): Unit = {
+    implicit val msg = "can be replaced with .exists"
+
+    should("""val o = Option(3); o match { case Some(x) => x % 2 == 0; case None => false }""")
+    should("""Option("hey") match {case None => false; case Some(x) => x.isEmpty }""")
+  }
+
+  @Test
+  def UseOptionForallNotPatMatch(): Unit = {
+    implicit val msg = "can be replaced with .forall"
+
+    should("""val o = Option(3); o match { case Some(x) => x % 2 == 0; case None => true }""")
+    should("""Option("hey") match {case None => true; case Some(x) => x.isEmpty }""")
   }
 
   @Test

@@ -131,7 +131,17 @@ object Warning {
     UnthrownException,
     SuspiciousMatches,
     IfDoWhile,
-    FloatingPointNumericRange
+    FloatingPointNumericRange,
+    UseGetOrElseNotPatMatch(""),
+    UseOrElseNotPatMatch(""),
+    UseOptionFlatMapNotPatMatch(""),
+    UseOptionMapNotPatMatch(""),
+    UseOptionFlattenNotPatMatch,
+    UseOptionForeachNotPatMatch(""),
+    UseOptionIsDefinedNotPatMatch,
+    UseOptionIsEmptyNotPatMatch,
+    UseOptionForallNotPatMatch(""),
+    UseOptionExistsNotPatMatch("")
   )
 
   final val AllNames = All.map(_.name)
@@ -367,3 +377,24 @@ case class UseLastOptionNotIf(varName: String) extends
   Warning(s"""if ($varName.nonEmpty) Some($varName.last) else None can be replaced by $varName.lastOption""")
 case class UseZipWithIndexNotZipIndices(varName: String) extends
   Warning(s"""$varName.zip($varName.indices) can be replaced with $varName.zipWithIndex""")
+case class UseGetOrElseNotPatMatch(expr: String) extends
+  Warning(s"""... match { Some(x) => x; None => $expr} can be replaced with .getOrElse($expr)""")
+
+case class UseOrElseNotPatMatch(expr: String) extends
+  Warning(s"""... match { Some(x) => Some(x); None => $expr} can be replaced with .orElse($expr)""")
+case class UseOptionFlatMapNotPatMatch(expr: String) extends
+  Warning(s"""... match { Some(x) => $expr; None => None} can be replaced with .flatMap($expr)""")
+case class UseOptionMapNotPatMatch(expr: String) extends
+  Warning(s"""... match { Some(x) => Some($expr); None => None} can be replaced with .map($expr)""")
+case object UseOptionFlattenNotPatMatch extends
+  Warning(s"""... match { Some(x) => x; None => None} can be replaced with .flatten""")
+case class UseOptionForeachNotPatMatch(expr: String) extends
+  Warning(s"""... match { Some(x) => $expr; None => {} } can be replaced with .foreach($expr)""")
+case object UseOptionIsDefinedNotPatMatch extends
+  Warning(s"""... match { Some(x) => true; None => false} can be replaced with .isDefined""")
+case object UseOptionIsEmptyNotPatMatch extends
+  Warning(s"""... match { Some(x) => false; None => true} can be replaced with .isEmpty""")
+case class UseOptionForallNotPatMatch(expr: String) extends
+  Warning(s"""... match { Some(x) => true; None => $expr} can be replaced with .forall($expr)""")
+case class UseOptionExistsNotPatMatch(expr: String) extends
+  Warning(s"""... match { Some(x) => false; None => $expr} can be replaced with .exists($expr)""")
