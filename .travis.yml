@@ -2,12 +2,15 @@ language: scala
  
 scala:
   - 2.10.6
-  - 2.11.7
+  - 2.11.8
+  - 2.12.0-M5
    
 matrix:
   fast_finish: true
   allow_failures:
-    - scala: 2.11.7
+    - scala:
+      - 2.11.8
+      - 2.12.0-M5
 
 jdk:
   - openjdk6

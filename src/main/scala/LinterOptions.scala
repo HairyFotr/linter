@@ -20,7 +20,7 @@ import scala.annotation.tailrec
 
 case class LinterOptions(disabledWarningNames: Seq[String] = Nil, printWarningNames: Boolean = false)
 
-object LinterOptions {
+final object LinterOptions {
   def parse(options: List[String]): Either[String, LinterOptions] = parse0(options, new LinterOptions)
 
   final val EnableOnlyArgument = "enable-only"
@@ -29,7 +29,7 @@ object LinterOptions {
   final val WarningNameDelimiter = "\\+"
   final val OptionKeyValueDelimiter = ":"
 
-  private def parseWarningList(fullOption: String): Either[String, Seq[String]] = fullOption.split(OptionKeyValueDelimiter) match {
+  private[this] def parseWarningList(fullOption: String): Either[String, Seq[String]] = fullOption.split(OptionKeyValueDelimiter) match {
     case Array(option, warningNames) =>
       val (validNames, invalidNames) = warningNames.split(WarningNameDelimiter).partition(Warning.NameToWarning.contains)
       if (validNames.nonEmpty && invalidNames.isEmpty) Right(validNames)
@@ -38,7 +38,7 @@ object LinterOptions {
   }
 
   @tailrec
-  private def parse0(options: List[String], linterOptions: LinterOptions): Either[String, LinterOptions] = options match {
+  private[this] def parse0(options: List[String], linterOptions: LinterOptions): Either[String, LinterOptions] = options match {
     case Nil => Right(linterOptions)
     case option :: xs if (option.startsWith(DisableArgument) || option.startsWith(EnableOnlyArgument)) => parseWarningList(option) match {
       case Right(warnings) if option.startsWith(EnableOnlyArgument) => parse0(xs, linterOptions.copy(disabledWarningNames = Warning.AllNames.diff(warnings)))

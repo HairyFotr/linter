@@ -19,7 +19,7 @@ package org.psywerx.hairyfotr
 import scala.collection.mutable
 import scala.tools.nsc.Global
 
-object Utils {
+final object Utils {
   var linterOptions = LinterOptions()
   val nowarnPositions = mutable.HashSet[Global#Position]()
   val nowarnMergeNestedIfsPositions = mutable.HashSet[Global#Position]() //TODO: hack
@@ -41,8 +41,8 @@ object Utils {
       // scalastyle:on regex
     }
   }
-  
-  def toBang(b: Boolean): String = if (b) "!" else ""  
+
+  def toBang(b: Boolean): String = if (b) "!" else ""
 }
 
 // Put only those that need the right global here:

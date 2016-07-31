@@ -48,7 +48,7 @@ final object Compiler {
   val stringWriter = new StringWriter()
 
   // This is deprecated in 2.9.x, but we need to use it for compatibility with 2.8.x
-  private val interpreter = new IMain(settings, new PrintWriter(stringWriter)) {
+  private[this] val interpreter = new IMain(settings, new PrintWriter(stringWriter)) {
     override protected def newCompiler(settings: Settings, reporter: Reporter) = {
       settings.outputDirs setSingleOutput virtualDirectory
       val compiler = super.newCompiler(settings, reporter)
@@ -142,29 +142,29 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     implicit val msg = "This else branch is unnecessary, as the then branch always returns"
 
     should("""
-      def test(): Any = { 
-        if(util.Random.nextBoolean) { 
-          println("foo"); return 5; println("foo2"); 
+      def test(): Any = {
+        if(util.Random.nextBoolean) {
+          println("foo"); return 5; println("foo2");
         } else {
-          println("foo3"); println("foo4"); 
-        } 
+          println("foo3"); println("foo4");
+        }
      }""")
     noLint("""
-      def test(): Any = { 
-        if(util.Random.nextBoolean) { 
-          println("foo"); println("foo2"); 
+      def test(): Any = {
+        if(util.Random.nextBoolean) {
+          println("foo"); println("foo2");
         } else {
-          println("foo3"); return 3; println("foo4"); 
-        } 
+          println("foo3"); return 3; println("foo4");
+        }
      }""")
     noLint("""
-      def test(): Any = { 
-        if(util.Random.nextBoolean) { 
-          println("foo"); 
+      def test(): Any = {
+        if(util.Random.nextBoolean) {
+          println("foo");
           if(util.Random.nextBoolean) return 5 else println("fds")
-          println("foo2"); 
+          println("foo2");
         } else {
-          println("foo3"); println("foo4"); 
+          println("foo3"); println("foo4");
         }
      }""")
   }
@@ -363,7 +363,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should(""" val a = Array(1,2,3); println(a.toString) """)
     should(""" def x(a: Array[Long]): String = a.toString """)
     noLint(""" val a = Seq(1,2,3); println(a.toString) """)
-  } 
+  }
 
   @Test
   def UnthrownException(): Unit = {
@@ -458,22 +458,22 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   def IfDoWhile(): Unit = {
     implicit val msg = "do-while"
 
-    should(""" 
+    should("""
       val a = util.Random.nextInt;
-      if(a > 5) do { 
+      if(a > 5) do {
         println("hello");
         println("world")
       } while(a > 5)
     """)
-    noLint(""" 
+    noLint("""
       val a = util.Random.nextInt;
-      if(a > 6) do { 
+      if(a > 6) do {
         println("hello");
         println("world")
       } while(a > 5)
     """)
     // This one's actually about the same, but meh
-    noLint(""" 
+    noLint("""
       val a = util.Random.nextInt;
       if(a > 5) while(a > 5) {
         println("hello");
@@ -486,37 +486,37 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   def TransformNotMap(): Unit = {
     implicit val msg = ".transform"
 
-    should(""" 
+    should("""
       var a = collection.mutable.ListBuffer(1,2,3);
       a = a.map{_ + 1}
     """)
-    should(""" 
+    should("""
       var a = Array("1","2","3");
       a = a.map{_ + 1}
     """)
 
-    noLint(""" 
+    noLint("""
       var a = collection.mutable.ListBuffer(1,2,3);
       a = a.map{_ + 1}.filter{_ > 1}
     """)
     //although this one could be flagged too... anything of the form a = a.(...).map
-    noLint(""" 
+    noLint("""
       var a = collection.mutable.ListBuffer(1,2,3);
       a = a.filter{_ > 1}.map{_ + 1}
     """)
-    noLint(""" 
+    noLint("""
       var a = collection.mutable.Set(1,2,3);
       a = a.map{_ + 1}
     """)
-    noLint(""" 
+    noLint("""
       var a = Seq(1,2,3);
       a = a.map{_ + 1}
     """)
-    noLint(""" 
+    noLint("""
       var a = List(1,2,3);
       a = a.map{_ + 1}
     """)
-    noLint(""" 
+    noLint("""
       var a = Vector(1,2,3);
       a = a.map{_ + 1}
     """)
@@ -526,32 +526,32 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   def UseCountNotFilterLength(): Unit = {
     implicit val msg = "Use a.count(...) instead of a.filter(...)."
 
-    should(""" 
+    should("""
       var a = Seq(1,2,3);
       val b = a.filter{ _ > 1 }.length
     """)
-    should(""" 
+    should("""
       var a = Seq(1,2,3);
       val b = a.filter{ _ > 1 }.size
     """)
-    should(""" 
+    should("""
       var a = Set(1,2,3);
       val b = a.filter{ _ > 1 }.size
     """)
     // FIXME
-    /*should(""" 
+    /*should("""
       var a = "abc";
       val b = a.filter{ _ > 'a' }.size
     """)*/
-    should(""" 
+    should("""
       var atte = Array(1,2,3);
       val b = atte.filter{ _ > 1 }.size
     """)("Use col.count(...) instead of col.filter(...).")
-    should(""" 
+    should("""
       var aaaa = Array(1,2,3);
       val b = aaaa.filter{ _ > 1 }.size
     """)("Use col.count(...) instead of col.filter(...).")
-    should(""" 
+    should("""
       var a = Array(1,2,3);
       val b = a.filter{ _ > 1 }.size
     """)("Use col.count(...) instead of col.filter(...).")
@@ -561,40 +561,40 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   def UseExistsNotCountCompare(): Unit = {
     implicit val msg = ".exists(...) instead of "
 
-    should(""" 
+    should("""
       var a = Seq(1,2,3);
       val b = a.count{ _ > 1 } > 0
     """)
-    should(""" 
+    should("""
       var a = Seq(1,2,3);
       val b = a.count{ _ > 1 } >= 1
     """)
-    should(""" 
+    should("""
       var a = Seq(1,2,3);
       val b = a.count{ _ > 1 } != 0
     """)
-    should(""" 
+    should("""
       var a = Set(1,2,3);
       val b = a.count{ _ > 1 } != 0
     """)
-    should(""" 
+    should("""
       var a = collection.mutable.ListBuffer(1,2,3);
       val b = a.count{ _ > 1 } != 0
     """)
-    should(""" 
+    should("""
       var a = Array(1,2,3);
       val b = a.count{ _ > 1 } != 0
     """)
-    should(""" 
+    should("""
       var a = Option(1);
       val b = a.count{ _ > 1 } != 0
     """)
 
-    noLint(""" 
+    noLint("""
       var a = Seq(1,2,3);
       val b = a.count{ _ > 1 } == 0
     """)
-    noLint(""" 
+    noLint("""
       var a = Seq(1,2,3);
       val b = a.count{ _ > 1 } >= 0
     """)
@@ -699,7 +699,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     }
   }
 
-  @Test 
+  @Test
   def CloseSourceFile(): Unit = {
     implicit val msg = "You should close the file stream after use."
 
@@ -733,9 +733,9 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
     should("""
       val a,b = util.Random.nextInt
-      if(a == b && b > 5) 
-        true 
-      else 
+      if(a == b && b > 5)
+        true
+      else
         false""")
     should("""
       val a,b = util.Random.nextInt
@@ -758,20 +758,20 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""
       val a,b = 10
       if(b > 4)
-        (1+1,a) 
+        (1+1,a)
       else
         (2,a)""")
     should("""
       val a,b = 4
       if(b > 4)
-        (1+1,a) 
+        (1+1,a)
       else if(b > 7)
         (2,a)""")
 
     noLint("""
       val a,b = scala.util.Random.nextInt
       if(b > 4)
-        (3,a) 
+        (3,a)
       else if(b > 7)
         (2,a)""")
   }
@@ -781,24 +781,24 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     implicit val msg = "neighbouring cases are identical"
     should("""
       val a = 7
-      a match { 
-        case 3 => println("hello") 
-        case 4 => println("hello") 
-        case 5 => println("hello") 
-        case _ => println("how low") 
+      a match {
+        case 3 => println("hello")
+        case 4 => println("hello")
+        case 5 => println("hello")
+        case _ => println("how low")
       }""")
     should("""
       val a = 7
       import scala.annotation.switch
-      (a: @switch) match { 
-        case 3 => println("hello") 
-        case 4 => println("hello") 
-        case 5 => println("hello") 
-        case _ => println("how low") 
+      (a: @switch) match {
+        case 3 => println("hello")
+        case 4 => println("hello")
+        case 5 => println("hello")
+        case _ => println("how low")
       }""")
     noLint("""
       val a = 7
-      a match { 
+      a match {
         case 3 => println("hello1")
         case 4 => println("hello2")
         case 5 => println("hello3")
@@ -806,13 +806,13 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       }""")
     noLint("""
       val a = 7
-      a match { 
-        case 3 => println("hello") 
-        case 4 if util.Random.nextBoolean => println("hello") 
-        case 5 if util.Random.nextBoolean => println("hello") 
-        case 6 if util.Random.nextBoolean => println("hello") 
-        case 7 => println("hello") 
-        case _ => println("how low") 
+      a match {
+        case 3 => println("hello")
+        case 4 if util.Random.nextBoolean => println("hello")
+        case 5 if util.Random.nextBoolean => println("hello")
+        case 6 if util.Random.nextBoolean => println("hello")
+        case 7 => println("hello")
+        case _ => println("how low")
       }""")
     noLint("""
       import scala.concurrent._
@@ -873,7 +873,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       trait A { def a(b:Int): Traversable[Int] }
       trait C extends A { def a(b: Int): List[Int] = { println; Nil } }
     """)
-    
+
     // Issue #38
     noLint("""case class b(c: Int) extends AnyVal { }""", thunked = false)
     should("""case class b(c: Int) extends AnyVal { def d(e: Int) = 3; }""", thunked = false)
@@ -1135,27 +1135,27 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""Seq(1,2,3).filterNot(_ == 2).isEmpty""")
     should("""Some(1).filter(_ > 1).isDefined""")
 
-    should(""" 
+    should("""
       var a = Seq(1,2,3);
       val b = a.filter{ _ > 1 }.nonEmpty
     """)
-    should(""" 
+    should("""
       var a = Seq(1,2,3);
       val b = !a.filter{ _ > 1 }.isEmpty
     """)
-    should(""" 
+    should("""
       var a = Set(1,2,3);
       val b = !a.filter{ _ > 1 }.isEmpty
     """)
-    should(""" 
+    should("""
       var a = Array(1,2,3);
       val b = !a.filter{ _ > 1 }.isEmpty
     """)
-    should(""" 
+    should("""
       var a = Option(1);
       val b = !a.filter{ _ > 1 }.isEmpty
     """)
-    should(""" 
+    should("""
       var a = "abc";
       val b = a.filter{ _ > 'a' }.nonEmpty
     """)
@@ -1350,7 +1350,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       a = a
     """)
     should("""
-      class t { 
+      class t {
         var a = 4d
         def k { a = a }
       }
@@ -1372,53 +1372,53 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
     should("""
       var a = "b"+util.Random.nextInt
-      if(a.size == 5) 
+      if(a.size == 5)
         println("hi")
-      else if(a.size == 5) 
+      else if(a.size == 5)
         println("hello")
     """)
     should("""
       var a = "b"+util.Random.nextInt
-      if(a.size == 5) 
+      if(a.size == 5)
         println("hi")
-      else if(a.size == 4) 
+      else if(a.size == 4)
         println("hello")
-      else if(a.size == 3) 
+      else if(a.size == 3)
         println("hell")
-      else if(a.size == 4) 
+      else if(a.size == 4)
         println("helo")
     """)
     should("""
       var a = 5
       a = util.Random.nextInt
-      val b = 
-        if(a == 4) 
+      val b =
+        if(a == 4)
           println("hi")
-        else if(a == 4) 
+        else if(a == 4)
           println("hello")
     """)
 
     noLint("""
       var a = "b" * util.Random.nextInt
-      if(a.size == 5) 
+      if(a.size == 5)
         println("hi")
-      else if(a.size != 5) 
+      else if(a.size != 5)
         println("hello")
     """)
     noLint("""
       var a = util.Random.nextInt
-      val b = 
-        if(a == 4) 
+      val b =
+        if(a == 4)
           println("hi")
-        else if(a == 5) 
+        else if(a == 5)
           println("hello")
     """)
     noLint("""
       import util.Random._
 
-      if(nextBoolean) 
+      if(nextBoolean)
         println("hi")
-      else if(nextBoolean) 
+      else if(nextBoolean)
         println("hello")
     """)
   }
@@ -1678,8 +1678,8 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
     should("""
       val a = 5
-      println(a) 
-      println(a) 
+      println(a)
+      println(a)
     """)
 
     noLint("""
@@ -1739,7 +1739,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     noLint(""" val a = 5; for(i <- 1 until a) 5 """)
   }
 
-  @Test 
+  @Test
   def UnextendedSealedTrait(): Unit = {
     implicit val msg = "This sealed trait is never"
 
@@ -1784,7 +1784,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     noLint("""var a = 5; var b = 1f + 1/a.toDouble + 1f""")
   }
 
-  @Test 
+  @Test
   def InvalidParamToRandomNextInt(): Unit = {
     implicit val msg = """The parameter of this .nextInt might be lower than 1 here."""
 
@@ -1795,7 +1795,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     noLint("""var a = new util.Random; a.nextInt(1)""")
   }
 
-  @Test 
+  @Test
   def ModuloByOne(): Unit = {
     implicit val msg = """Taking the modulo by one will return zero."""
 
@@ -2465,11 +2465,11 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       "5".length
     """)
 
-    noLint(""" 
+    noLint("""
       var a = "5"
       a.size
     """)
-    noLint(""" 
+    noLint("""
       var a = "5"
       a.length
     """)
@@ -2480,7 +2480,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   def string__processingConstant(): Unit = {
     implicit val msg = "Processing a constant string"
 
-    should(""" 
+    should("""
       "aBc".toLowerCase
     """)
 
@@ -2687,7 +2687,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     noLint("""def k(x:Int):Int = { val a = 0; val b = a+2; b+x }""")
   }
 
-  @Test 
+  @Test
   def optionChecks(): Unit = {
 
     should("""var a: String = null; if(a+"" == null) None else Some(a+"")""")("""Use Option(...), which automatically wraps null to None""")
@@ -2713,7 +2713,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   //stuff that doesn't work and I don't know why
-  @Test 
+  @Test
   def broken(): Unit = {
 
     ///this one works in the console, but doesn't if you put { } around it

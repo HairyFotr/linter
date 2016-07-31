@@ -8,17 +8,26 @@ scalacOptions ++= Seq(
   "-unchecked",
   "-Yrangepos",
   "-Xlint",
-  //"-Xdev",//2.11
   //"-Xcheckinit",
   //"-Xstrict-inference",
   "-Ywarn-adapted-args",
   "-Ywarn-dead-code",
   "-Ywarn-inaccessible",
-  //"-Ywarn-infer-any",//2.11
   "-Ywarn-nullary-override",
   "-Ywarn-nullary-unit",
   "-Ywarn-numeric-widen",
   "-Ywarn-value-discard")
+
+scalacOptions ++= {
+  CrossVersion.partialVersion(scalaVersion.value) match {
+    case Some((2, scalaMajor)) if scalaMajor >= 11 =>
+      Seq(
+        //"-Xdev",
+        "-Ywarn-infer-any")
+    case _ =>
+      Seq()
+  }
+}
 
 // Linter
 //resolvers += Resolver.sonatypeRepo("snapshots")

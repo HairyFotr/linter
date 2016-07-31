@@ -20,7 +20,7 @@ import scala.collection.mutable
 import scala.tools.nsc.plugins.{ Plugin, PluginComponent }
 import scala.tools.nsc.{ Global, Phase, Properties }
 
-class LinterPlugin(val global: Global) extends Plugin {
+final class LinterPlugin(val global: Global) extends Plugin {
   import org.psywerx.hairyfotr.Utils._
   import global._
 
@@ -45,7 +45,7 @@ class LinterPlugin(val global: Global) extends Plugin {
   val inferred = mutable.HashSet[Position]() // Used for a scala 2.9 hack (can't find out which types are inferred)
   val intLiteralDiv = mutable.HashSet[Position]()
 
-  private object PreTyperComponent extends PluginComponent {
+  private[this] object PreTyperComponent extends PluginComponent {
     val global = LinterPlugin.this.global
     import global._
 
@@ -53,10 +53,10 @@ class LinterPlugin(val global: Global) extends Plugin {
 
     val phaseName = "linter-parsed"
 
-    private val sealedTraits = mutable.Map.empty[Name, Tree]
-    private val usedTraits = mutable.Set.empty[Name]
-    private var inTrait = false
-    private def resetTraits(): Unit = {
+    private[this] val sealedTraits = mutable.Map.empty[Name, Tree]
+    private[this] val usedTraits = mutable.Set.empty[Name]
+    private[this] var inTrait = false
+    private[this] def resetTraits(): Unit = {
       sealedTraits.clear()
       usedTraits.clear()
       inTrait = false
@@ -208,7 +208,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     }
   }
 
-  private object PostTyperComponent extends PluginComponent {
+  private[this] object PostTyperComponent extends PluginComponent {
     val global = LinterPlugin.this.global
     import global._
 
@@ -337,16 +337,16 @@ class LinterPlugin(val global: Global) extends Plugin {
 
       def identOrDefault(tree: Tree, default: String): String = {
         tree match {
-          case Ident(_) if !tree.contains(".") => 
-          
+          case Ident(_) if !tree.contains(".") =>
+
             tree.toString
-            
-          case Apply(scala_Predef_augmentString, List(str @ Ident(name))) 
+
+          case Apply(scala_Predef_augmentString, List(str @ Ident(name)))
             if str.tpe <:< StringClass.tpe
             && (scala_Predef_augmentString endsWith "Predef.augmentString") =>
-            
+
             name.toString
-          
+
           case _ => default
         }
       }
@@ -1500,10 +1500,10 @@ class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, UseMinOrMaxNotSort(identOrCol(col), "sorted", func, replacement))
 
           case Select(_, _) if {
-          
+
             // TODO Possibly a bug - tried with regular class too
             import scala.language.reflectiveCalls
-          
+
             /// find(...).isDefined is better written as exists(...)
             case class FindIsDefined(col: String, isDefinedFunc: String, pos: Position) {
               def getReplacement(): (String, Boolean) = (
@@ -1519,13 +1519,13 @@ class LinterPlugin(val global: Global) extends Plugin {
               case Select(Apply(pos @ Select(col, Name("find")), _cond), isDefinedFunc)
                 if isDefinedFunc.isAny("isEmpty", "nonEmpty", "isDefined")
                 && col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe) =>
-              
+
                 FindIsDefined(identOrCol(col), isDefinedFunc.toString, pos.pos)
-                
+
               case Select(Apply(xArrayOps, List(Apply(pos @ Select(col, Name("find")), List(_cond)))), isDefinedFunc)
                 if isDefinedFunc.isAny("isEmpty", "nonEmpty", "isDefined")
                 && xArrayOps.containsAny("ArrayOps", "augmentString") =>
-             
+
                 FindIsDefined(identOrCol(col), isDefinedFunc.toString, pos.pos)
 
               case Select(Apply(Select(Apply(xArrayOps, List(pos @ col)), Name("find")), List(_cond)), isDefinedFunc)
@@ -1569,7 +1569,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               case Select(Select(Apply(pos @ Select(col, filterFunc), _cond), emptyFunc), nme.UNARY_!)
                 if allowedFuncs(filterFunc, emptyFunc)
                 && col.tpe.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || c.tpe =:= OptionClass.tpe) =>
-                  
+
                 FilterEmpty(identOrCol(col), true, filterFunc.toString, emptyFunc.toString, pos.pos)
 
               case Select(Apply(pos @ Select(col, filterFunc), _cond), emptyFunc)
@@ -1577,7 +1577,7 @@ class LinterPlugin(val global: Global) extends Plugin {
                 && col.tpe.baseClasses.exists(c => c.tpe =:= TraversableOnceClass.tpe || c.tpe =:= OptionClass.tpe) =>
 
                 FilterEmpty(identOrCol(col), false, filterFunc.toString, emptyFunc.toString, pos.pos)
-              
+
               case Select(Apply(Select(Apply(Select(Apply(xArrayOps, List(pos @ col)), filterFunc), List(_cond)), emptyFunc), List()), nme.UNARY_!)
                 if allowedFuncs(filterFunc, emptyFunc)
                 && xArrayOps.containsAny("ArrayOps", "augmentString") =>
@@ -1587,7 +1587,7 @@ class LinterPlugin(val global: Global) extends Plugin {
               case Select(Apply(xArrayOps, List(Apply(pos @ Select(col, filterFunc), List(_cond)))), emptyFunc)
                 if allowedFuncs(filterFunc, emptyFunc)
                 && xArrayOps.containsAny("ArrayOps", "augmentString") =>
-             
+
                 FilterEmpty(identOrCol(col), false, filterFunc.toString, emptyFunc.toString, pos.pos)
 
               case Select(Apply(Select(Apply(xArrayOps, List(pos @ col)), filterFunc), List(_cond)), emptyFunc)
@@ -1901,7 +1901,7 @@ class LinterPlugin(val global: Global) extends Plugin {
 
           case Select(Select(Select(col, Name("reverse")), Name("tail")), Name("reverse"))
             if col.tpe.widen.baseClasses.exists(c => c.tpe =:= TraversableClass.tpe) =>
-            
+
             warn(tree, UseInitNotReverseTailReverse(identOrCol(col)))
 
           case Select(Apply(xArrayOps0, List(Select(Apply(xArrayOps1, List(Select(Apply(xArrayOps2, List(col)), Name("reverse")))), Name("tail")))), Name("reverse"))
@@ -2081,7 +2081,7 @@ class LinterPlugin(val global: Global) extends Plugin {
   }
 
   //// Abstract Interpreter
-  private object PostTyperInterpreterComponent extends PluginComponent {
+  private[this] object PostTyperInterpreterComponent extends PluginComponent {
     val global = LinterPlugin.this.global
     import global._
 
@@ -4044,7 +4044,7 @@ class LinterPlugin(val global: Global) extends Plugin {
     }
   }
 
-  private object PostRefChecksComponent extends PluginComponent {
+  private[this] object PostRefChecksComponent extends PluginComponent {
     val global = LinterPlugin.this.global
     import global._
 
@@ -4076,7 +4076,7 @@ class LinterPlugin(val global: Global) extends Plugin {
         superTraverse = true
         tree match {
           /// Unused method parameters
-          case DefDef(mods: Modifiers, name, _, valDefs, _, body) 
+          case DefDef(mods: Modifiers, name, _, valDefs, _, body)
             //TODO: write tests for the special cases - isSynthetic might cover some
             //TODO: scalaz is a good codebase for finding interesting false positives
             //TODO: macro impl is special case?
@@ -4085,7 +4085,7 @@ class LinterPlugin(val global: Global) extends Plugin {
             && !mods.isSynthetic && !(mods.isOverride || tree.symbol.isOverridingSymbol) =>
 
             // Get the parameters, except the implicit/synthetic ones
-            val params = 
+            val params =
               valDefs
                 .flatMap(_.filterNot(valDef => valDef.mods.isImplicit || valDef.mods.isSynthetic || valDef.name.toString == "$this"))
                 .map(_.name.toString)

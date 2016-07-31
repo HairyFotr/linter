@@ -20,8 +20,8 @@ sealed abstract class Warning(val message: String) {
   def name: String = toString.takeWhile(_ != '(')
 }
 
-object Warning {
-  final val All = Seq[Warning](
+final object Warning {
+  val All = Seq[Warning](
     AssigningOptionToNull,
     AvoidOptionCollectionSize,
     AvoidOptionMethod("", ""),
@@ -144,9 +144,9 @@ object Warning {
     UseOptionExistsNotPatMatch("")
   )
 
-  final val AllNames = All.map(_.name)
+  val AllNames = All.map(_.name)
 
-  final val NameToWarning: Map[String, Warning] = All.map(w => w.name -> w).toMap
+  val NameToWarning: Map[String, Warning] = All.map(w => w.name -> w).toMap
 }
 
 case object UnextendedSealedTrait extends
@@ -387,13 +387,13 @@ case class UseOptionFlatMapNotPatMatch(expr: String) extends
 case class UseOptionMapNotPatMatch(expr: String) extends
   Warning(s"""... match { Some(x) => Some($expr); None => None} can be replaced with .map($expr)""")
 case object UseOptionFlattenNotPatMatch extends
-  Warning(s"""... match { Some(x) => x; None => None} can be replaced with .flatten""")
+  Warning("""... match { Some(x) => x; None => None} can be replaced with .flatten""")
 case class UseOptionForeachNotPatMatch(expr: String) extends
   Warning(s"""... match { Some(x) => $expr; None => {} } can be replaced with .foreach($expr)""")
 case object UseOptionIsDefinedNotPatMatch extends
-  Warning(s"""... match { Some(x) => true; None => false} can be replaced with .isDefined""")
+  Warning("""... match { Some(x) => true; None => false} can be replaced with .isDefined""")
 case object UseOptionIsEmptyNotPatMatch extends
-  Warning(s"""... match { Some(x) => false; None => true} can be replaced with .isEmpty""")
+  Warning("""... match { Some(x) => false; None => true} can be replaced with .isEmpty""")
 case class UseOptionForallNotPatMatch(expr: String) extends
   Warning(s"""... match { Some(x) => true; None => $expr} can be replaced with .forall($expr)""")
 case class UseOptionExistsNotPatMatch(expr: String) extends
