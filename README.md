@@ -26,6 +26,9 @@ Add Linter to your project by updating your `pom.xml` with a "compilerPlugin" se
         </compilerPlugin>
       </compilerPlugins>
     </configuration>
+    
+## Usage from Jenkins
+Use your usual building method and [Jenkins Warnings Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Warnings+Plugin).
 
 ## Manual usage
 Another possible way to use Linter is to manually download and use these jars:<br>
