@@ -26,7 +26,13 @@ final class LinterPlugin(val global: Global) extends Plugin {
 
   val name = "linter"
   val description = "a static analysis compiler plugin to help protect against bugs and style problems"
-  val components = List[PluginComponent](PreTyperComponent, PostTyperComponent, PostTyperInterpreterComponent, PostRefChecksComponent)
+  val components: List[PluginComponent] =
+    if (settings.isInstanceOf[scala.tools.nsc.doc.Settings]) {
+      inform("This is a scaladoc compilation, Linter is disabled.")
+      List()
+    } else {
+      List(PreTyperComponent, PostTyperComponent, PostTyperInterpreterComponent, PostRefChecksComponent)
+    }
 
   override val optionsHelp: Option[String] = Some(Seq(
     LinterOptions.DisableArgument+":plus+separated+warning+names",
