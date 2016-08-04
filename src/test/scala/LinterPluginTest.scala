@@ -724,9 +724,23 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""val x = List(4); x.contains("foo")""")
     // Contains not present on 2.11 Option
     if (Properties.versionString.contains("2.11")) {
-      should("""val x = Some(1); x.contains("foo")""") // Issue #45
+      // Issue #45
+      should("""val x = Some(1); x.contains("foo")""")
       should("""val x = Some("foo"); x.contains(1)""")
       noLint("""val x = Some("foo"); x.contains("ab")""")
+      // Issue #46
+      should("""val foo = Some(4); val bar = Some("bar"); foo.exists(str => bar.contains(str))""")
+      should("""val foo = Some(4); val bar = Some("bar"); foo.exists(bar.contains(_))""")
+      should("""val foo = List(4); val bar = List("bar"); foo.exists(str => bar.contains(str))""")
+      should("""val foo = Some("foo"); val bar = Some(4); foo.exists(str => bar.contains(str))""")
+      should("""val foo = Some("foo"); val bar = Some(4); foo.exists(bar.contains(_))""")
+      //TODO false negative
+      //should("""val foo = Some(4); val bar = Some("bar"); foo.exists(bar.contains)""")
+      //should("""val foo = Some("foo"); val bar = Some(4); foo.exists(bar.contains)""")
+
+      noLint("""val foo = Some("foo"); val bar = Some("bar"); foo.exists(str => bar.contains(str))""")
+      noLint("""val foo = Some("foo"); val bar = Some("bar"); foo.exists(bar.contains(_))""")
+      noLint("""val foo = Some("foo"); val bar = Some("bar"); foo.exists(bar.contains)""")
     }
 
     noLint("""val x = List(scala.util.Random.nextInt); x.contains(5)""")

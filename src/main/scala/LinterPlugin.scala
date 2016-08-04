@@ -259,7 +259,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
       def seqMemberType(seenFrom: Type): Type = {
         if (seenFrom.baseClasses.exists(_.tpe =:= SeqLikeClass.tpe))
           SeqLikeClass.tpe.typeArgs.head.asSeenFrom(seenFrom, SeqLikeClass)
-        else 
+        else
           OptionClass.tpe.typeArgs.head.asSeenFrom(seenFrom, OptionClass)
       }
 
@@ -788,12 +788,14 @@ final class LinterPlugin(val global: Global) extends Plugin {
           /// Collection.contains on different types: List(1, 2, 3).contains("2")
           case Apply(Select(col, Name("contains")), List(target))
             if !(target.tpe.widen weak_<:< seqMemberType(col.tpe.widen))
+            && !(target.tpe =:= AnyClass.tpe)
             && (col.tpe.baseClasses.exists(c => c.tpe =:= SeqClass.tpe || c.tpe =:= OptionClass.tpe)) =>
 
             warn(tree, ContainsTypeMismatch(col.tpe.widen.toString, target.tpe.widen.toString))
 
           case Apply(TypeApply(Select(col, Name("contains")), _), List(target))
             if !(target.tpe.widen weak_<:< seqMemberType(col.tpe.widen))
+            && !(target.tpe =:= AnyClass.tpe)
             && (col.tpe.baseClasses.exists(c => c.tpe =:= SeqClass.tpe || c.tpe =:= OptionClass.tpe)) =>
 
             warn(tree, ContainsTypeMismatch(col.tpe.widen.toString, target.tpe.widen.toString))
