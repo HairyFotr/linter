@@ -613,6 +613,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("Array(1,2,3).exists(a => a == 2) ")
     should("collection.mutable.ListBuffer(1,2,3).exists(a => a == 2) ")
 
+    // Exists not present on 2.11 Option
     if (Properties.versionString.contains("2.10")) {
       noLint("val b = 5; Option(2).exists(_ == b)")
       noLint("Option(2).exists(_ == 2)")
@@ -721,6 +722,12 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     implicit val msg = "will probably return false"
 
     should("""val x = List(4); x.contains("foo")""")
+    // Contains not present on 2.11 Option
+    if (Properties.versionString.contains("2.11")) {
+      should("""val x = Some(1); x.contains("foo")""") // Issue #45
+      should("""val x = Some("foo"); x.contains(1)""")
+      noLint("""val x = Some("foo"); x.contains("ab")""")
+    }
 
     noLint("""val x = List(scala.util.Random.nextInt); x.contains(5)""")
     // Number weak type eq

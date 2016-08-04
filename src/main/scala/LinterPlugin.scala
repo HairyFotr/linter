@@ -257,7 +257,10 @@ final class LinterPlugin(val global: Global) extends Plugin {
       val ToString: Symbol = AnyClass.info.member(nme.toString_)
 
       def seqMemberType(seenFrom: Type): Type = {
-        SeqLikeClass.tpe.typeArgs.head.asSeenFrom(seenFrom, SeqLikeClass)
+        if (seenFrom.baseClasses.exists(_.tpe =:= SeqLikeClass.tpe))
+          SeqLikeClass.tpe.typeArgs.head.asSeenFrom(seenFrom, SeqLikeClass)
+        else 
+          OptionClass.tpe.typeArgs.head.asSeenFrom(seenFrom, OptionClass)
       }
 
       def isSubtype(x: Tree, y: Tree): Boolean = { x.tpe.widen <:< y.tpe.widen }
@@ -783,15 +786,15 @@ final class LinterPlugin(val global: Global) extends Plugin {
             warn(pkg, "Wildcard imports should be avoided. Favor import selector clauses.")*/
 
           /// Collection.contains on different types: List(1, 2, 3).contains("2")
-          case Apply(TypeApply(Select(col, Name("contains")), _), List(target))
+          case Apply(Select(col, Name("contains")), List(target))
             if !(target.tpe.widen weak_<:< seqMemberType(col.tpe.widen))
-            && (col.tpe.baseClasses.exists(_.tpe =:= SeqClass.tpe)) =>
+            && (col.tpe.baseClasses.exists(c => c.tpe =:= SeqClass.tpe || c.tpe =:= OptionClass.tpe)) =>
 
             warn(tree, ContainsTypeMismatch(col.tpe.widen.toString, target.tpe.widen.toString))
 
-          case Apply(Select(col, Name("contains")), List(target))
+          case Apply(TypeApply(Select(col, Name("contains")), _), List(target))
             if !(target.tpe.widen weak_<:< seqMemberType(col.tpe.widen))
-            && (col.tpe.baseClasses.exists(_.tpe =:= SeqClass.tpe)) =>
+            && (col.tpe.baseClasses.exists(c => c.tpe =:= SeqClass.tpe || c.tpe =:= OptionClass.tpe)) =>
 
             warn(tree, ContainsTypeMismatch(col.tpe.widen.toString, target.tpe.widen.toString))
 
