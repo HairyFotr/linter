@@ -722,6 +722,10 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
     should("""val x = List(4); x.contains("foo")""")
 
+    noLint("""val x = List(scala.util.Random.nextInt); x.contains(5)""")
+    // Number weak type eq
+    noLint("""val x = List(4L, 5L); x.contains(5)""")
+
     // Set and Map have type-safe contains methods so we don't want to warn on those.
     noLint("""val x = Set(scala.util.Random.nextInt); x.contains(3)""")
     noLint("""val x = Map(4 -> 5); x.contains(3)""")

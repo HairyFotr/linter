@@ -783,11 +783,17 @@ final class LinterPlugin(val global: Global) extends Plugin {
             warn(pkg, "Wildcard imports should be avoided. Favor import selector clauses.")*/
 
           /// Collection.contains on different types: List(1, 2, 3).contains("2")
-          case Apply(contains @ Select(seq, _), List(target))
-            if methodImplements(contains.symbol, SeqLikeContains)
-            && !(target.tpe weak_<:< seqMemberType(seq.tpe)) =>
+          case Apply(TypeApply(Select(col, Name("contains")), _), List(target))
+            if !(target.tpe.widen weak_<:< seqMemberType(col.tpe.widen))
+            && (col.tpe.baseClasses.exists(_.tpe =:= SeqClass.tpe)) =>
 
-            warn(contains, ContainsTypeMismatch(seq.tpe.widen.toString, target.tpe.widen.toString))
+            warn(tree, ContainsTypeMismatch(col.tpe.widen.toString, target.tpe.widen.toString))
+
+          case Apply(Select(col, Name("contains")), List(target))
+            if !(target.tpe.widen weak_<:< seqMemberType(col.tpe.widen))
+            && (col.tpe.baseClasses.exists(_.tpe =:= SeqClass.tpe)) =>
+
+            warn(tree, ContainsTypeMismatch(col.tpe.widen.toString, target.tpe.widen.toString))
 
           /// Using toString on an Array
           case Apply(Select(array, Name("toString")), Nil)
