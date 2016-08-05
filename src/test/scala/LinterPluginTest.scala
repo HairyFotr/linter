@@ -722,7 +722,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     implicit val msg = "will probably return false"
 
     should("""val x = List(4); x.contains("foo")""")
-    // Contains not present on 2.11 Option
+    // Contains not present on 2.10 Option
     if (Properties.versionString.contains("2.11")) {
       // Issue #45
       should("""val x = Some(1); x.contains("foo")""")
@@ -730,22 +730,31 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       noLint("""val x = Some("foo"); x.contains("ab")""")
       // Issue #46
       should("""val foo = Some(4); val bar = Some("bar"); foo.exists(str => bar.contains(str))""")
-      should("""val foo = Some(4); val bar = Some("bar"); foo.exists(bar.contains(_))""")
-      should("""val foo = List(4); val bar = List("bar"); foo.exists(str => bar.contains(str))""")
       should("""val foo = Some("foo"); val bar = Some(4); foo.exists(str => bar.contains(str))""")
+      noLint("""val foo = Some("foo"); val bar = Some("bar"); foo.exists(str => bar.contains(str))""")
+
+      should("""val foo = Some(4); val bar = Some("bar"); foo.exists(bar.contains(_))""")
       should("""val foo = Some("foo"); val bar = Some(4); foo.exists(bar.contains(_))""")
-      //TODO false negative
+      noLint("""val foo = Some("foo"); val bar = Some("bar"); foo.exists(bar.contains(_))""")
+
+      //TODO false negatives
       //should("""val foo = Some(4); val bar = Some("bar"); foo.exists(bar.contains)""")
       //should("""val foo = Some("foo"); val bar = Some(4); foo.exists(bar.contains)""")
-
-      noLint("""val foo = Some("foo"); val bar = Some("bar"); foo.exists(str => bar.contains(str))""")
-      noLint("""val foo = Some("foo"); val bar = Some("bar"); foo.exists(bar.contains(_))""")
       noLint("""val foo = Some("foo"); val bar = Some("bar"); foo.exists(bar.contains)""")
     }
 
     noLint("""val x = List(scala.util.Random.nextInt); x.contains(5)""")
     // Number weak type eq
     noLint("""val x = List(4L, 5L); x.contains(5)""")
+    
+    // Issue #46
+    should("""val foo = List(4); val bar = List("bar"); foo.exists(str => bar.contains(str))""")
+    noLint("""val foo = List("foo"); val bar = List("bar"); foo.exists(str => bar.contains(str))""")
+    should("""val foo = List(4); val bar = List("bar"); foo.exists(bar.contains(_))""")
+    noLint("""val foo = List("foo"); val bar = List("bar"); foo.exists(bar.contains(_))""")
+    //TODO false negative
+    //should("""val foo = List(4); val bar = List("bar"); foo.exists(bar.contains)""")
+    noLint("""val foo = List("foo"); val bar = List("bar"); foo.exists(bar.contains)""")
 
     // Set and Map have type-safe contains methods so we don't want to warn on those.
     noLint("""val x = Set(scala.util.Random.nextInt); x.contains(3)""")
