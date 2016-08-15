@@ -3,20 +3,21 @@ import de.johoop.cpd4sbt.{OutputType => CPDOutputType, ReportType => CPDReportTy
 import de.johoop.findbugs4sbt._
 
 scalacOptions ++= Seq(
-  "-feature",
-  "-deprecation",
-  "-unchecked",
-  "-Yrangepos",
-  "-Xlint",
-  //"-Xcheckinit",
-  //"-Xstrict-inference",
-  "-Ywarn-adapted-args",
-  "-Ywarn-dead-code",
-  "-Ywarn-inaccessible",
-  "-Ywarn-nullary-override",
-  "-Ywarn-nullary-unit",
-  "-Ywarn-numeric-widen",
-  "-Ywarn-value-discard")
+   "-feature"
+  ,"-deprecation"
+  ,"-unchecked"
+  ,"-Yrangepos"
+  ,"-Xlint"
+//,"-Xcheckinit" //Adds runtime checks
+//,"-Xstrict-inference"
+  ,"-Ywarn-adapted-args"
+  ,"-Ywarn-dead-code"
+  ,"-Ywarn-inaccessible"
+  ,"-Ywarn-nullary-override"
+  ,"-Ywarn-nullary-unit"
+  ,"-Ywarn-numeric-widen"
+  ,"-Ywarn-value-discard"
+)
 
 scalacOptions ++= {
   CrossVersion.partialVersion(scalaVersion.value) match {
@@ -40,7 +41,7 @@ scalacOptions ++= {
 
 // Wartremover
 //wartremoverWarnings ++= Warts.unsafe
-//wartremoverWarnings ++= Seq(Wart.Any2StringAdd, Wart.Enumeration, Wart.Serializable, Wart.Product)
+//wartremoverWarnings ++= Warts.allBut(Wart.Any, Wart.Nothing, Wart.Equals, Wart.Null, Wart.While, Wart.Return, Wart.Throw, Wart.Overloading, Wart.Var, Wart.ToString, Wart.NonUnitStatements, Wart.DefaultArguments, Wart.MutableDataStructures, Wart.AsInstanceOf, Wart.IsInstanceOf, Wart.LeakingSealed, Wart.OptionPartial, Wart.FinalCaseClass/*Yes, but not in Warning*/, Wart.EitherProjectionPartial/*TODO*/, Wart.Option2Iterable/*TODO*/, Wart.ListOps/*TODO*/, Wart.NoNeedForMonad/*Crashes*/)
 
 // Scapegoat
 //scapegoatVersion := "1.2.1"

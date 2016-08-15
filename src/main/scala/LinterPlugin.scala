@@ -83,7 +83,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
     }
 
     class PreTyperTraverser(unit: CompilationUnit) extends Traverser {
-      implicit val unitt = unit
+      implicit val unitt: CompilationUnit = unit
 
       var superTraverse = true
       def catcher(): PartialFunction[Throwable, Unit] = {
@@ -232,7 +232,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
     }
 
     class PostTyperTraverser(unit: CompilationUnit) extends Traverser {
-      implicit val unitt = unit
+      implicit val unitt: CompilationUnit = unit
       import definitions.{ AnyClass, NothingClass, ObjectClass, Object_== }
       import definitions.{ OptionClass, SeqClass, TraversableClass, ListClass, StringClass }
       import definitions.{ DoubleClass, FloatClass, CharClass, ByteClass, ShortClass, IntClass, LongClass, BooleanClass }
@@ -2116,7 +2116,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
     }
 
     class PostTyperInterpreterTraverser(unit: CompilationUnit) extends Traverser {
-      implicit val unitt = unit
+      implicit val unitt: CompilationUnit = unit
       var treePosHolder: Tree = null
       import org.psywerx.hairyfotr.Utils._
       val utils = new Utils[global.type](global)
@@ -4077,7 +4077,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
     }
 
     class PostRefChecksTraverser(unit: CompilationUnit) extends Traverser {
-      implicit val unitt = unit
+      implicit val unitt: CompilationUnit = unit
 
       var superTraverse = true
       def catcher(): PartialFunction[Throwable, Unit] = {
