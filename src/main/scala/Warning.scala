@@ -95,7 +95,7 @@ final object Warning {
     UseMinOrMaxNotSort("", "", "", ""),
     UseMapNotFlatMap(""),
     UseFilterNotFlatMap(""),
-    UseFlattenNotFilterOption(""),
+    UseFlattenNotFilterOption("", "", ""),
     UseCountNotFilterLength("", ""),
     UseExistsNotCountCompare(""),
     UseGetOrElseOnOption(""),
@@ -278,13 +278,13 @@ case class TransformNotMap(varName: String) extends
 case object DuplicateKeyInMap extends
   Warning("This key has already been defined, and will override the previous mapping.")
 case class InefficientUseOfListSize(varName: String, replacement: String, func: String) extends
-  Warning(s"Use $varName.$replacement instead of comparing to $varName.$func. ($varName is a List, $func takes O(n) time)") // Cover length
+  Warning(s"Use $varName.$replacement instead of comparing to $varName.$func. ($varName is a List, $func takes O(n) time)")
 case object OnceEvaluatedStatementsInBlockReturningFunction extends
   Warning("You're passing a block that returns a function. The statements in this block, except the last one, will only be executed once.")
 case object IntDivisionAssignedToFloat extends
   Warning("Integer division detected in an expression assigned to a floating point variable.")
-case class UseFlattenNotFilterOption(varName: String) extends
-  Warning(s"Use $varName.flatten instead of $varName.filter(_.isDefined).map(_.get).") // Cover isEmpty, etc
+case class UseFlattenNotFilterOption(varName: String, func1: String, func2: String) extends
+  Warning(s"Use $varName.flatten instead of $varName.$func1(_.$func2).map(_.get).")
 case class UseCountNotFilterLength(varName: String, func: String) extends
   Warning(s"Use $varName.count(...) instead of $varName.filter(...).$func")
 case class UseExistsNotCountCompare(varName: String) extends

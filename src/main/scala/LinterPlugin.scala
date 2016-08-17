@@ -1889,12 +1889,14 @@ final class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, IntDivisionAssignedToFloat)
 
           /// col.flatten instead of col.filter(_.isDefined).map(_.get)
-          case Apply(TypeApply(Select(Apply(Select(col, Name("filter")), List(Function(List(ValDef(_, p1, _, _)), Select(p1_, Name("isDefined"))))), Name("map")), _), List(Function(List(ValDef(_, p2, _, _)), Select(p2_, Name("get")))))
+          case Apply(TypeApply(Select(Apply(Select(col, filter), List(Function(List(ValDef(_, p1, _, _)), Select(p1_, isDefinedEmpty)))), Name("map")), _), List(Function(List(ValDef(_, p2, _, _)), Select(p2_, Name("get")))))
             if col.tpe.widen.baseClasses.exists(_.tpe =:= TraversableClass.tpe)
+            && ((filter.is("filter") && isDefinedEmpty.isAny("isDefined", "nonEmpty"))
+              ||(filter.is("filterNot") && isDefinedEmpty.isAny("isEmpty")))
             && (p1.toString == p1_.toString) && (p1_.tpe.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe))
             && (p2.toString == p2_.toString) && (p2_.tpe.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe)) =>
 
-            warn(tree, UseFlattenNotFilterOption(identOrCol(col)))
+            warn(tree, UseFlattenNotFilterOption(identOrCol(col), filter.toString, isDefinedEmpty.toString))
 
           /// col.count(...) instead of col.filter(...).size/length (idea from pippi)
           case Select(Apply(Select(col, Name("filter")), List(_func)), size_length)

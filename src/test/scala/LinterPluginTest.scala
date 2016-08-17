@@ -1016,6 +1016,9 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     implicit val msg = ".flatten instead of "//.filter(_.isDefined).map(_.get)"
 
     should("""val a = List[Option[String]](Some("a"), None, Some("b")); a.filter(_.isDefined).map(_.get)""")
+    should("""val a = List[Option[String]](Some("a"), None, Some("b")); a.filter(_.nonEmpty).map(_.get)""")
+    should("""val a = List[Option[String]](Some("a"), None, Some("b")); a.filterNot(_.isEmpty).map(_.get)""")
+
   }
 
   @Test
