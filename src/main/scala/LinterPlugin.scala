@@ -828,7 +828,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
             && !(a.tpe.widen.toString == "Object" || tree.tpe.widen.toString == "Object")
             && !(a.tpe.widen.toString == "Null") =>
 
-            unit.war ning(tree.pos, pref+"The cast "+a.tpe.widen+".asInstanceOf["+tree.tpe.widen+"] is likely invalid.")*/
+            warn(tree.pos, pref+"The cast "+a.tpe.widen+".asInstanceOf["+tree.tpe.widen+"] is likely invalid.")*/
 
           /// Calling Option.get is potentially unsafe (disabled)
           //TODO: if (x.isDefined) func(x.get) / if (x.isEmpty) ... else func(x.get), etc. are false positives -- those could be detected in abs-interpreter
@@ -841,18 +841,28 @@ final class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, "Using null is considered dangerous, use Option.")*/
 
           /// TypeToType ... "hello".toString, 5.toInt, List(1, 2, 3).toList ...
-          case Select(tpe, toTpe)
-            if (toTpe.toString startsWith "to") && {
-              // toSet on mutable returns immutable, so only support immutable
-              val toTyp =
-                "to"+tpe.tpe.widen.toString.stripPrefix("scala.collection.immutable.")
+          case Select(fTpe, tTpe)
+            if (tTpe.toString startsWith "to") && {
+              val fromTpe = fTpe.tpe.widen.toString
+              val toTpe = tTpe.toString.drop(2)
 
-              //println((tpe.tpe.widen, toTpe.toString))
+              // TODO deal with false positives from this
+              if (fromTpe.startsWith("scala.") || Character.isUpperCase(fromTpe.head)) {
+                val matches = fromTpe.matches("(([^.]+)[.])*(Rich)?" + toTpe + "(Ops)?(\\[.*\\])?")
 
-              ((toTyp matches "to[A-Z][^.]+") && ((toTyp == toTpe.toString) || ((toTyp stripPrefix toTpe.toString) matches "\\[.*\\]")))
+                if (toTpe == "Set" || toTpe == "Map") {
+                  // on mutable Map and Set conversion returns immutable
+                  matches && fromTpe.startsWith("scala.collection.immutable.")
+                } else {
+                  matches
+                }
+              } else {
+                false
+              }
+
             } =>
 
-            warn(tree, TypeToType(toTpe.toString stripPrefix "to"))
+            warn(tree, TypeToType(tTpe.toString.stripPrefix("to")))
 
           //// String checks
           /// Repeated string literals (disabled)

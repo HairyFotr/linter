@@ -320,11 +320,14 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""val a = Seq(1,2,3); a.toSeq""")
     should("""val a = Set(1,2,3); a.toSet""")
     should("""val a = Vector(1,2,3); a.toVector""")
+    should("""val a = Array(1,2,3); a.toArray""")
+    should("""val a = collection.mutable.Seq(1,2,3); a.toSeq""")
     noLint("""val a = List(1,2,3); a.toSeq""")
     noLint("""val a = Seq(1,2,3); a.toList""")
     noLint("""val a = Seq(1,2,3); a.toVector""")
-    noLint("""val a = collection.mutable.Seq(1,2,3); a.toSeq""")
+    noLint("""val a = Array(1,2,3); a.toSeq""")
     noLint("""val a = collection.mutable.Set(1,2,3); a.toSet""")
+    noLint("""val a = collection.mutable.Map(1->2,3->4); a.toMap""")
   }
 
   @Test
@@ -524,7 +527,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
   @Test
   def UseCountNotFilterLength(): Unit = {
-    implicit val msg = "Use a.count(...) instead of a.filter(...)."
+    implicit val msg = /*"Use col*/".count(...) instead of "/*col.filter(...).*/
 
     should("""
       var a = Seq(1,2,3);
@@ -538,11 +541,14 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
       var a = Set(1,2,3);
       val b = a.filter{ _ > 1 }.size
     """)
-    // FIXME
-    /*should("""
+    should("""
+      var a = Array(1,2,3);
+      val b = a.filter{ _ > 1 }.length
+    """)
+    should("""
       var a = "abc";
       val b = a.filter{ _ > 'a' }.size
-    """)*/
+    """)
     should("""
       var atte = Array(1,2,3);
       val b = atte.filter{ _ > 1 }.size
@@ -746,7 +752,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     noLint("""val x = List(scala.util.Random.nextInt); x.contains(5)""")
     // Number weak type eq
     noLint("""val x = List(4L, 5L); x.contains(5)""")
-    
+
     // Issue #46
     should("""val foo = List(4); val bar = List("bar"); foo.exists(str => bar.contains(str))""")
     noLint("""val foo = List("foo"); val bar = List("bar"); foo.exists(str => bar.contains(str))""")
@@ -1036,13 +1042,23 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
   }
 
   @Test
-  def UnnecessaryMethodCall(): Unit = { //TODO: there's more
+  def UnnecessaryMethodCall(): Unit = {
     implicit val msg = "unnecessary."
+
+    should(""" "ffasd".mkString """)
+    noLint(""" List("ff", "asd").mkString """)
+
+    // TODO False negatives
+    //should(""" val a = "ffasgd"; a.take(100) """)
+    noLint(""" val a = "ffasgd"; a.take(1) """)
+    //should(""" val a = "ffasgd"; a.drop(0) """)
+    noLint(""" val a = "ffasgd"; a.drop(1) """)
 
     should(""" "ffasd".replace(" ", " ") """)
     should(""" "ffasd".replace("ff", "ff") """)
     noLint(""" "ffasd".replace(" ", "") """)
     noLint(""" "ffasd".replace("  ", " ") """)
+
   }
 
   @Test
@@ -1165,7 +1181,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     should("""Set(1,2,3).filter(_ == 2).isEmpty""")
     should("""Seq(1,2,3).filter(_ == 2).isEmpty""")
     should("""collection.mutable.HashSet(1,2,3).filter(_ == 2).isEmpty""")
-    //should("""Array(1,2,3).filter(_ == 2).isEmpty""") //TODO: gets wrapped probably...
+    should("""Array(1,2,3).filter(_ == 2).isEmpty""")
     should("""def a(x:Int) = x == 2; List(1,2,3).filter(a).isEmpty""")
 
     should("""Seq(1,2,3).filter(_ == 2).nonEmpty""")
