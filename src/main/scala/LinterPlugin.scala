@@ -620,7 +620,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
                 && (nextX.isAny("nextInt", "nextLong")) =>
 
                 val typeX = nextX.toString.stripPrefix("next")
-                warn(pos, UnsafeAbs(s"Use ${nextX}(${typeX}.MaxValue) instead."))
+                warn(pos, UnsafeAbs(s"Use ${nextX}(${typeX}.MaxValue) instead, as abs($typeX.MinValue) equals $typeX.MinValue"))
 
               case _ => //Ignore
             }
