@@ -140,7 +140,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
           //case DefDef(mods: Modifiers, name, _, valDefs, typeTree, body) =>
             //if (name.toString != "<init>" && !body.isEmpty && !mods.isAnyOverride) {
               /// Recursive call with exactly the same params
-              //TODO: Currenlty doesn't cover shadowing or mutable changes of params, or the method shadowing/overriding
+              //TODO: Currently doesn't cover shadowing or mutable changes of params, or the method shadowing/overriding
               /*for (
                 call @ Apply(Ident(funcCall), funcParams) <- body;
                 if (funcCall.toString == name.toString)

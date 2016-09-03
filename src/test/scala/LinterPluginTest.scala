@@ -139,7 +139,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
 
   @Test
   def UnnecessaryElseBranch(): Unit = {
-    implicit val msg = "This else branch is unnecessary, as the then branch always returns"
+    implicit val msg = "Since the if branch always returns, the code from the else branch can be moved out to reduce nesting."
 
     should("""
       def test(): Any = {
@@ -148,7 +148,14 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
         } else {
           println("foo3"); println("foo4");
         }
-     }""")
+      }""")
+    noLint("""
+      def test(): Any = {
+        if(util.Random.nextBoolean) {
+          println("foo"); println("foo2");
+        }
+        println("foo3"); println("foo4");
+      }""")
     noLint("""
       def test(): Any = {
         if(util.Random.nextBoolean) {
@@ -156,7 +163,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
         } else {
           println("foo3"); return 3; println("foo4");
         }
-     }""")
+      }""")
     noLint("""
       def test(): Any = {
         if(util.Random.nextBoolean) {
@@ -166,7 +173,7 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
         } else {
           println("foo3"); println("foo4");
         }
-     }""")
+      }""")
   }
 
   @Test

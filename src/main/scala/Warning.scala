@@ -206,7 +206,7 @@ case class UseConditionDirectly(negated: Boolean = false) extends
 case class UseIfExpression(varName: String) extends
   Warning(s"Assign the result of the if expression to variable $varName directly.")
 case object UnnecessaryElseBranch extends
-  Warning("This else branch is unnecessary, as the then branch always returns.")
+  Warning("Since the if branch always returns, the code from the else branch can be moved out to reduce nesting.")
 case object DuplicateIfBranches extends
   Warning("If statement branches have the same structure.")
 case object IdenticalIfElseCondition extends
