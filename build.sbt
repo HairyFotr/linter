@@ -5,27 +5,20 @@ homepage := Some(url("https://github.com/HairyFotr/linter"))
 //version := "0.1.14"
 
 scalaVersion := "2.10.6"
-crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.6", "2.11.8", "2.12.0-M5") }
-libraryDependencies <+= scalaVersion { (scalaVersion) =>
-  "org.scala-lang" % "scala-compiler"  % scalaVersion
-}
-libraryDependencies := {
-  CrossVersion.partialVersion(scalaVersion.value) match {
-    case Some((2, scalaMajor)) if scalaMajor >= 11 =>
-      libraryDependencies.value :+ "org.scala-lang.modules" %% "scala-xml" % "1.0.5"
-    case _ =>
-      libraryDependencies.value
-  }
-}
+crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.6", "2.11.8", "2.12.0-M5", "2.12.0-SNAPSHOT") }
+
+libraryDependencies <+= scalaVersion { "org.scala-lang" % "scala-compiler" % _ }
 
 resolvers ++= Seq("snapshots", "releases").map(Resolver.sonatypeRepo)
+
+// Testing
 libraryDependencies ++= Seq(
   "junit"          % "junit"           % "4.12" % Test,
   "com.novocode"   % "junit-interface" % "0.11" % Test
 )
 libraryDependencies := {
   CrossVersion.partialVersion(scalaVersion.value) match {
-    case Some((2, scalaMajor)) if scalaMajor <= 11 =>
+    case Some((2, 10)) | Some((2, 11)) =>
       libraryDependencies.value :+ "org.specs2" %% "specs2" % "2.4" % Test
     case _ =>
       // Tests won't work in Scala 2.12 for now
