@@ -1924,6 +1924,9 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     noLint("""
       val x: String = "foo"
       x == "bar" //linter:disable:InvariantReturn """)
+
+    // Issue https://gitter.im/HairyFotr/linter?at=57cf24611baa312a6bdc48eb
+    noLint(""" val x = new java.lang.Integer(7); x == 5 """)
   }
 
   @Test
