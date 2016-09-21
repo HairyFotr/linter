@@ -1171,7 +1171,8 @@ final class LinterPlugin(val global: Global) extends Plugin {
           case If(cond, Apply(Select(id1, setter1), List(_)), Apply(Select(id2, setter2), List(_)))
             if (setter1 endsWith "_$eq") && (setter2 endsWith "_$eq") && (id1.toString == id2.toString) && !(id1.toString contains ".this") =>
             warn(cond, UseIfExpression(id1.toString))
-          case If(cond, Block(block, ret), Block(_, _)) if isReturnStatement(ret) || (block exists isReturnStatement) => // Idea from oclint
+          // TODO showRaw hack - find flag for macro code instead
+          case If(cond, Block(block, ret), Block(_, _)) if (isReturnStatement(ret) || block.exists(isReturnStatement)) && !showRaw(tree).contains("$macro$") => // Idea from oclint
             warn(cond, UnnecessaryElseBranch)
           case If(_cond, a, b) if (a equalsStructure b) && (a.children.nonEmpty) =>
             //TODO: empty if statement (if (...) { }) triggers this - issue warning for that case?
