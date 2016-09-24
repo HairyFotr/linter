@@ -846,19 +846,31 @@ final class LinterPlugin(val global: Global) extends Plugin {
 
           /// TypeToType ... "hello".toString, 5.toInt, List(1, 2, 3).toList ...
           case Select(fTpe, tTpe)
-            if (tTpe.toString startsWith "to") && {
+            if !fTpe.isInstanceOf[This] // calling toX inside X
+            && tTpe.toString.startsWith("to") && {
               val fromTpe = fTpe.tpe.widen.toString
               val toTpe = tTpe.toString.drop(2)
+              val targetTpe = tree.tpe.widen.toString
 
-              // TODO deal with false positives from this
-              if (fromTpe.startsWith("scala.") || Character.isUpperCase(fromTpe.head)) {
-                val matches = fromTpe.matches("(([^.]+)[.])*(Rich)?" + toTpe + "(Ops)?(\\[.*\\])?")
+              // TODO deal with false positives from this, see commented test
+              // oh my...
+              /// Array.toArray: scala.collection.mutable.ArrayOps[Int] => [U >: Int](implicit evidence$1: scala.reflect.ClassTag[U])Array[U]
+              /// Map.toMap: scala.collection.mutable.Map[Int,Int] => [T, U](implicit ev: <:<[(Int, Int),(T, U)])scala.collection.immutable.Map[T,U])
+              def cleanTypeStr(tpeStr: String) =
+                (tpeStr
+                  .replaceFirst("^\\[.*?\\](=>)? ?", "")
+                  .replaceFirst("^\\(.*?\\)", "")
+                  .takeWhile(_ != '[')
+                  .replaceAll(".*[.]", "")
+                  .stripPrefix("Rich")
+                  .stripSuffix("Ops"))
 
+              if (toTpe == cleanTypeStr(targetTpe) && toTpe == cleanTypeStr(fromTpe)) {
                 if (toTpe == "Set" || toTpe == "Map") {
                   // on mutable Map and Set conversion returns immutable
-                  matches && fromTpe.startsWith("scala.collection.immutable.")
+                  !fromTpe.startsWith("scala.collection.mutable.")
                 } else {
-                  matches
+                  true
                 }
               } else {
                 false

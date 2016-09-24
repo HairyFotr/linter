@@ -314,9 +314,13 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     noLint(""" val a = 5; a.toString """)
 
     should("""5.toInt""")
+    noLint("""5.toLong""")
     noLint("""5.toShort""")
     noLint("""5.toLong""")
     noLint("""5.toDouble""")
+
+    should("""5L.toLong""")
+    noLint("""5L.toInt""")
 
     should("""5.0.toDouble""")
     noLint("""5.0.toFloat""")
@@ -335,6 +339,20 @@ final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults
     noLint("""val a = Array(1,2,3); a.toSeq""")
     noLint("""val a = collection.mutable.Set(1,2,3); a.toSet""")
     noLint("""val a = collection.mutable.Map(1->2,3->4); a.toMap""")
+
+    should("""class Wat { def toWat: Wat = new Wat; }; val w = new Wat; println(w.toWat)""")
+    noLint("""class Wat { def toWat: Int = 5; println(toWat) }""")
+    noLint("""class Wat { def toWat: Wat = new Wat; println(toWat) }""")
+
+    //TODO false positive
+    /*noLint("""
+      object X { class Wat { def toWat: Y.Wat = new Y.Wat; } }
+      object Y { class Wat { def toWat: X.Wat = new X.Wat; } }
+      val xw = new X.Wat
+      val yw = new Y.Wat
+      println(xw.toWat)
+      println(yw.toWat)
+    """)*/
   }
 
   @Test
