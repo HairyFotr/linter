@@ -5,7 +5,7 @@ homepage := Some(url("https://github.com/HairyFotr/linter"))
 //version := "0.1.15"
 
 scalaVersion := "2.10.6"
-crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.6", "2.11.8", "2.12.0-RC1") }
+crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.6", "2.11.8", "2.12.0-RC2") }
 
 libraryDependencies <+= scalaVersion { "org.scala-lang" % "scala-compiler" % _ }
 
