@@ -34,6 +34,7 @@ scalacOptions ++= {
 //resolvers += Resolver.sonatypeRepo("snapshots")
 //addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1-SNAPSHOT")
 //scalacOptions += "-P:linter:disable:UseHypot+CloseSourceFile"
+//scalacOptions += "-P:linter:printWarningNames:true"
 
 // or manually, e.g.
 

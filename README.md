@@ -53,6 +53,14 @@ Another possible way to use Linter is to manually download and use these jars:<b
 
 __Note:__ If you have instructions for another build tool or IDE, please make a pull request.
 
+## Displaying check names
+
+To display check names in the output use the printWarningNames switch:
+
+    scalacOptions += "-P:linter:printWarningNames:true"
+
+This may become the default in the next release.
+
 ## Enabling/Disabling checks
 
 Checks can be disabled using a plus-separated list of check names:
