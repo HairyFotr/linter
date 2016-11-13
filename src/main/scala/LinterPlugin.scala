@@ -849,7 +849,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, "Using null is considered dangerous, use Option.")*/
 
           /// TypeToType ... "hello".toString, 5.toInt, List(1, 2, 3).toList ...
-          case Select(fTpe, tTpe)
+          case Apply(Select(fTpe, tTpe), Nil)
             if !fTpe.isInstanceOf[This] // calling toX inside X
             && tTpe.toString.startsWith("to") && {
               val fromTpe = fTpe.tpe.widen.toString
