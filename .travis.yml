@@ -1,24 +1,19 @@
 language: scala
- 
+
 scala:
   - 2.10.6
   - 2.11.8
-   
+
 matrix:
-  fast_finish: true
   include:
-    - scala: 2.12.0-RC2
+    - scala: 2.12.0
       jdk: oraclejdk8
-  allow_failures:
-    - scala: 2.11.8
-    - scala: 2.12.0-RC2
 
 jdk:
-  - openjdk6
   - openjdk7
   - oraclejdk7
   - oraclejdk8
-  
+
 sudo: false
-   
+
 script: "sbt ++$TRAVIS_SCALA_VERSION stats scalastyle test"

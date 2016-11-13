@@ -1,9 +1,9 @@
 package org.psywerx.hairyfotr
 
 import org.junit.Test
-import org.specs2.matcher.JUnitMustMatchers
+import org.specs2.matcher.MustMatchers
 
-class WarningTest extends JUnitMustMatchers {
+class WarningTest extends MustMatchers {
   @Test
   def allIncludesAll(): Unit = {
     val count: Int = Warning.All.distinct.map {

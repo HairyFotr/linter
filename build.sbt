@@ -13,18 +13,10 @@ resolvers ++= Seq("snapshots", "releases").map(Resolver.sonatypeRepo)
 
 // Testing
 libraryDependencies ++= Seq(
-  "junit"          % "junit"           % "4.12" % Test,
-  "com.novocode"   % "junit-interface" % "0.11" % Test
+   "junit"         % "junit"           % "4.12"  % Test
+  ,"com.novocode"  % "junit-interface" % "0.11"  % Test
+  ,"org.specs2"   %% "specs2-core"     % "3.8.6" % Test
 )
-libraryDependencies := {
-  CrossVersion.partialVersion(scalaVersion.value) match {
-    case Some((2, 10)) | Some((2, 11)) =>
-      libraryDependencies.value :+ "org.specs2" %% "specs2" % "2.4" % Test
-    case _ =>
-      // Tests won't work in Scala 2.12 for now
-      libraryDependencies.value
-  }
-}
 
 // Enable linter in console
 scalacOptions in console in Compile <+= (packageBin in Compile) map { pluginJar => "-Xplugin:"+pluginJar }

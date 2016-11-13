@@ -37,6 +37,7 @@ final object Utils {
       // skip
     } else {
       // scalastyle:off regex
+      //TODO: after 2.10: CompilationUnit is deprecated, call global.reporter.warning
       unit.warning(tree.pos, if (linterOptions.printWarningNames) s"[${warning.name}] ${warning.message}" else warning.message)
       // scalastyle:on regex
     }

@@ -19,7 +19,7 @@ package org.psywerx.hairyfotr
 import java.io.{ PrintWriter, StringWriter }
 
 import org.junit.{ Ignore, Test }
-import org.specs2.matcher.{ JUnitMustMatchers, StandardMatchResults }
+import org.specs2.matcher.{ MustMatchers, StandardMatchResults }
 
 import scala.collection.mutable
 import scala.io.Source
@@ -72,7 +72,7 @@ final object Compiler {
   }
 }
 
-final class LinterPluginTest extends JUnitMustMatchers with StandardMatchResults {
+final class LinterPluginTest extends MustMatchers with StandardMatchResults {
   // A few hacks to scrap the boilerplate and better pinpoint the failing test
   def should(code: String, thunked: Boolean = true)(implicit expectedMsg: String, not: Boolean = false): Unit = {
     val unitResult = (expectedMsg, Compiler.compileAndLint(code, thunked)) must beLike {

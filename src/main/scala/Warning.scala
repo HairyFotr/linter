@@ -379,7 +379,6 @@ case class UseZipWithIndexNotZipIndices(varName: String) extends
   Warning(s"""$varName.zip($varName.indices) can be replaced with $varName.zipWithIndex""")
 case class UseGetOrElseNotPatMatch(expr: String) extends
   Warning(s"""... match { Some(x) => x; None => $expr} can be replaced with .getOrElse($expr)""")
-
 case class UseOrElseNotPatMatch(expr: String) extends
   Warning(s"""... match { Some(x) => Some(x); None => $expr} can be replaced with .orElse($expr)""")
 case class UseOptionFlatMapNotPatMatch(expr: String) extends
