@@ -239,6 +239,31 @@ final class LinterPluginTest extends MustMatchers with StandardMatchResults {
     noLint("""val x = util.Random.nextDouble; math.pow(20*x+1, 0.75)""")
     noLint("""val x = util.Random.nextDouble; math.pow(20*x+1, 0.25)""")
   }
+  def SuspiciousPow(): Unit = {
+    implicit val msg = "This use of pow is suspicious"
+
+    // -> 1
+    should("""val x = util.Random.nextDouble; math.pow(x, 0d)""")
+    should("""val x = util.Random.nextDouble; math.pow(x, 0f)""")
+    should("""val x = util.Random.nextDouble; math.pow(x, 0)""")
+
+    // -> x
+    should("""val x = util.Random.nextDouble; math.pow(x, 1d)""")
+    should("""val x = util.Random.nextDouble; math.pow(x, 1f)""")
+    should("""val x = util.Random.nextDouble; math.pow(x, 1)""")
+
+    // -> NaN
+    should("""val x = util.Random.nextDouble; math.pow(x, Double.NaN)""")
+    should("""val x = util.Random.nextDouble; math.pow(x, Float.NaN)""")
+
+    // -> NaN, except 0 -> 0
+    should("""val x = util.Random.nextDouble; math.pow(x, Double.PositiveInfinity)""")
+    should("""val x = util.Random.nextDouble; math.pow(x, Float.PositiveInfinity)""")
+
+    // -> NaN, except 0 -> PositiveInfinity
+    should("""val x = util.Random.nextDouble; math.pow(x, Double.NegativeInfinity)""")
+    should("""val x = util.Random.nextDouble; math.pow(x, Float.NegativeInfinity)""")
+  }
   @Test
   def UseExp(): Unit = {
     implicit val msg = "Use math.exp"
@@ -2122,6 +2147,19 @@ final class LinterPluginTest extends MustMatchers with StandardMatchResults {
 
     should("""val o = Option(3); o match { case Some(x) => x % 2 == 0; case None => true }""")
     should("""Option("hey") match {case None => true; case Some(x) => x.isEmpty }""")
+  }
+
+  @Test
+  def OperationAlwaysProducesZero(): Unit = {
+    implicit val msg = "will always return 0"
+
+    should("""val a = 1/2""")
+    should("""val a = math.pow(3, 1/2)""")
+
+    should("""val a = 3; val b = a - a""")
+    should("""val a = 3; val b = a ^ a""")
+
+    //TODO: tests for abstract interpreter!
   }
 
   @Test

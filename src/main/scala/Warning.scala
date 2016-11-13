@@ -84,6 +84,7 @@ final object Warning {
     UseLog10,
     UseCbrt,
     UseSqrt,
+    SuspiciousPow(0),
     UseExp,
     UseExpm1,
     UseAbsNotSqrtSquare,
@@ -165,6 +166,8 @@ case object UseCbrt extends
   Warning("Use math.cbrt(x), instead of pow(x, 1/3) for improved accuracy and performance.")
 case object UseSqrt extends
   Warning("Use math.sqrt(x), instead of pow(x, 1/2) for improved accuracy and performance.")
+case class SuspiciousPow(pow: Double) extends
+  Warning(s"This use of pow is suspicious, since the power is $pow.")
 case object UseExp extends
   Warning("Use math.exp(x), instead of pow(E, x) for improved performance.")
 case object UseAbsNotSqrtSquare extends
@@ -305,8 +308,8 @@ case class UnnecessaryMethodCall(method: String) extends
   Warning(s"This $method is always unnecessary.")
 case object ProducesEmptyCollection extends
   Warning("The resulting collection will always be empty.")
-case class OperationAlwaysProducesZero(operation: String) extends
-  Warning(s"Same values on both sides of $operation will return 0.")
+case class OperationAlwaysProducesZero(operation: String) extends // TODO: merge with InvariantReturn?
+  Warning(s"This $operation will always return 0.")
 case object ModuloByOne extends
   Warning("Taking the modulo by one will return zero.")
 case object DivideByOne extends

@@ -162,6 +162,12 @@ final class LinterPlugin(val global: Global) extends Plugin {
           case Apply(Select(Literal(Constant(_num: Int)), op), List(Literal(Constant(_denom: Int))))
             if (op == nme.DIV || op == nme.MOD) =>
 
+            if (op == nme.DIV && math.abs(_denom) > math.abs(_num)) {
+              //TODO: should also be implemented in absinterpreter, but keep here because of expression simplifier
+              //TODO: should all simplifiable expressions warn?
+              warn(tree, OperationAlwaysProducesZero("integer division"))
+            }
+
             intLiteralDiv += tree.pos
 
           /// Loss of precision on literals
@@ -563,17 +569,15 @@ final class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, UseHypot)
 
           /// Suggest using cbrt instead of pow(a, 1/3)
-          case Apply(pow, List(_num, Literal(Constant(third: Double))))
-            if (isMath(pow, "pow"))
-            && (third >= 0.3333332)
-            && (third <= 0.3333334) =>
-
-            warn(tree, UseCbrt)
-
           /// Suggest using sqrt instead of pow(a, 0.5)
-          case Apply(pow, List(_num, Literal(Constant(0.5)))) if isMath(pow, "pow") =>
+          /// Unnecessary power (zero or one)
+          case Apply(math_pow, List(_num, Literal(Constant(pow: Double)))) if isMath(math_pow, "pow") && {
+            if (pow >= 0.3333332 && pow <= 0.3333334) warn(tree, UseCbrt)
+            else if (pow == 0.5) warn(tree, UseSqrt)
+            else if (pow == 1 || pow == 0 || pow.isNaN || pow.isInfinite) warn(tree, SuspiciousPow(pow))
 
-            warn(tree, UseSqrt)
+            false
+          } => //Fallthrough
 
           /// Suggest using exp instead of pow(E, a)
           case Apply(pow, List(e, _num))

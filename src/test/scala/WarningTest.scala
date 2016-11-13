@@ -67,6 +67,7 @@ class WarningTest extends MustMatchers {
       case UseHypot => 1
       case UseCbrt => 1
       case UseSqrt => 1
+      case SuspiciousPow(_) => 1
       case UseExp => 1
       case UseLog10 => 1
       case UseAbsNotSqrtSquare => 1
