@@ -197,6 +197,8 @@ final class LinterPlugin(val global: Global) extends Plugin {
                     //println(treeLiteral.pos.lineContent)
                     //e.printStackTrace
                 }
+                // TODO: this is more correct, but needs some work
+                //("%.1080f".format(literal), token)
                 (literal.toString, token)
               }
 
@@ -208,7 +210,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
               && (strLiteral matches ".*[0-9].*") && (actualLiteral matches ".*[0-9].*")
               && cleanString(strLiteral) != cleanString(actualLiteral)
               && ((if (strLiteral.toDouble < 0) "-" else "") + actualLiteral) != strLiteral)
-                warn(treeLiteral, PossibleLossOfPrecision("Literal cannot be represented exactly by "+tpe+". ("+(if (strLiteral.toDouble < 0) "-" else "") + actualLiteral+" != "+strLiteral+")"))
+                warn(treeLiteral, PossibleLossOfPrecision("Literal cannot be represented exactly by "+tpe+". ("+(if (strLiteral.toDouble < 0) "-" else "") + actualLiteral+" != "+strLiteral.replaceAll("0+$", "0")+")"))
 
             } catch {
               case e: NumberFormatException => //Ignore
@@ -400,12 +402,12 @@ final class LinterPlugin(val global: Global) extends Plugin {
       def isMath(t: Tree, name: String): Boolean = t match {
         case field
           if (field is "scala.math.`package`."+name)
-          || (field is "java.this.lang.Math."+name)
-          || (field is "java.this.lang.StrictMath."+name) => true
+          || (field is staticSelect("java", "lang.Math."+name))
+          || (field is staticSelect("java", "lang.StrictMath."+name)) => true
         case Apply(func, _params)
           if (func is "scala.math.`package`."+name)
-          || (func is "java.this.lang.Math."+name)
-          || (func is "java.this.lang.StrictMath."+name) => true
+          || (func is staticSelect("java", "lang.Math."+name))
+          || (func is staticSelect("java", "lang.StrictMath."+name)) => true
         case Select(Apply(scala_Predef_xWrapper, List(_arg)), func)
           if (scala_Predef_xWrapper.toString endsWith "Wrapper") && (func is name)
           && (t.tpe.widen weak_<:< DoubleClass.tpe) => true
@@ -849,7 +851,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, "Using null is considered dangerous, use Option.")*/
 
           /// TypeToType ... "hello".toString, 5.toInt, List(1, 2, 3).toList ...
-          case Apply(Select(fTpe, tTpe), Nil)
+          case Select(fTpe, tTpe)
             if !fTpe.isInstanceOf[This] // calling toX inside X
             && tTpe.toString.startsWith("to") && {
               val fromTpe = fTpe.tpe.widen.toString
@@ -1363,7 +1365,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
 
               case (s1, s2)
                 if (s1 equalsStructure s2)
-                && !(s1 is "scala.this.Predef.println()")
+                && !(s1 is staticSelect("scala", "Predef.println()"))
                 && !(s1.toString contains "Next") && !(s1.toString contains "next") =>
 
                 nowarnPositions += s2.pos
@@ -1853,7 +1855,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
             val keys = args flatMap {
               case Apply(TypeApply(Select(Apply(arrowAssoc, List(lhs)), arrow), _), _rhs)
                 if (arrow.isAny("$minus$greater", "$u2192"))
-                && (arrowAssoc.toString matches "scala[.]this[.]Predef[.](any2)?ArrowAssoc.+")
+                && (arrowAssoc.toString matches "scala[.](this[.])?Predef[.](any2)?ArrowAssoc.+")
                 && (lhs.isInstanceOf[Literal] || lhs.isInstanceOf[Ident]) => //TODO: support pure functions someday
                 List(lhs)
 
@@ -2118,7 +2120,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
           /// Using the implicit ordering for Unit is probably wrong
           case Apply(Apply(TypeApply(Select(_, minMaxBy), _), List(Function(_, Block(_, u @ Literal(Constant(())))))), List(Select(scala_math_Ordering, unit)))
             if (minMaxBy.isAny("minBy", "maxBy"))
-            && (scala_math_Ordering is "math.this.Ordering")
+            && (scala_math_Ordering is staticSelect("math", "Ordering"))
             && (unit is "Unit") =>
 
             warn(u, UnitImplicitOrdering(minMaxBy.toString))
@@ -2641,7 +2643,10 @@ final class LinterPlugin(val global: Global) extends Plugin {
                 Values.empty
               }
             } else if (left.isValue && right.isValue) {
-              if (left.getValue == right.getValue && op == nme.SUB && !left.name.isEmpty) warn(treePosHolder, OperationAlwaysProducesZero("subtraction"))
+              if (left.getValue == right.getValue && !left.name.isEmpty) {
+                if (op == nme.SUB) warn(treePosHolder, OperationAlwaysProducesZero("subtraction"))
+                if (op == nme.XOR) warn(treePosHolder, OperationAlwaysProducesZero("exclusive or"))
+              }
               Values(func(left.getValue, right.getValue))
             } else if (!left.isValue && right.isValue) {
               left.map(a => func(a, right.getValue), rangeSafe = isRangeSafe)
@@ -2825,7 +2830,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
           //case Apply(Select(Select(scala, scala_Array), apply), genVals) if (scala_Array.toString == "Array") =>
 
           //TODO: is this for array or what?
-          case Select(Apply(arrayOps @ Select(_, _intArrayOps), List(expr)), op) if (arrayOps.toString == "scala.this.Predef.intArrayOps") =>
+          case Select(Apply(arrayOps @ Select(_, _intArrayOps), List(expr)), op) if (arrayOps.toString == staticSelect("scala", "Predef.intArrayOps")) =>
             computeExpr(expr).applyUnary(op)
 
           case Apply(TypeApply(t @ Select(_expr, _op), _), List(scala_math_Ordering_Int)) if scala_math_Ordering_Int.toString.endsWith("Int") => // .max .min
@@ -3514,7 +3519,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
                   trimmedMaxLength = math.max(e1.getTrimmedMaxLength, e2.getTrimmedMaxLength))
               }
 
-            case Apply(augmentString, List(expr)) if (augmentString.toString == "scala.this.Predef.augmentString") =>
+            case Apply(augmentString, List(expr)) if (augmentString.toString == staticSelect("scala", "Predef.augmentString")) =>
               StringAttrs(expr)
 
             // Implicit toString
@@ -4131,7 +4136,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
             //TODO: scalaz is a good codebase for finding interesting false positives
             //TODO: macro impl is special case?
             if (name.toString != "<init>" && !name.toString.contains("$default$"))
-            && !body.isEmpty && body.toString != "scala.this.Predef.???"
+            && !body.isEmpty && body.toString != staticSelect("scala", "Predef.???")
             && !mods.isSynthetic && !(mods.isOverride || tree.symbol.isOverridingSymbol) =>
 
             // Get the parameters, except the implicit/synthetic ones

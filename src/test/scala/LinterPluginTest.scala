@@ -19,7 +19,7 @@ package org.psywerx.hairyfotr
 import java.io.{ PrintWriter, StringWriter }
 
 import org.junit.{ Ignore, Test }
-import org.specs2.matcher.{ MustMatchers, StandardMatchResults }
+import org.specs2.matcher.{ MustThrownMatchers, ThrownStandardMatchResults }
 
 import scala.collection.mutable
 import scala.io.Source
@@ -39,12 +39,10 @@ final object Compiler {
   val loader = manifest[LinterPlugin].runtimeClass.getClassLoader
   settings.classpath.value = Source.fromURL(loader.getResource("app.class.path")).mkString
   settings.bootclasspath.append(Source.fromURL(loader.getResource("boot.class.path")).mkString)
-  //settings.deprecation.value = true // enable detailed deprecation warnings
+  settings.deprecation.value = true // enable detailed deprecation warnings
   //settings.unchecked.value = true // enable detailed unchecked warnings
-  settings.Xwarnfatal.value = true // warnings cause compile failures too
-  //settings.stopAfter.value = List("linter-refchecked")
-  //if (Properties.versionString contains "2.10") settings.stopAfter.value = List("linter-refchecked") // fails in 2.11
-
+  settings.Xwarnfatal.value = true // warnings cause compile failures
+  //settings.stopAfter.value = List("linter-refchecked") // fails, but would speed up things
   val stringWriter = new StringWriter()
 
   // This is deprecated in 2.9.x, but we need to use it for compatibility with 2.8.x
@@ -72,12 +70,16 @@ final object Compiler {
   }
 }
 
-final class LinterPluginTest extends MustMatchers with StandardMatchResults {
+final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatchResults {
   // A few hacks to scrap the boilerplate and better pinpoint the failing test
   def should(code: String, thunked: Boolean = true)(implicit expectedMsg: String, not: Boolean = false): Unit = {
-    val unitResult = (expectedMsg, Compiler.compileAndLint(code, thunked)) must beLike {
+    val compileResult = Compiler.compileAndLint(code, thunked)
+    val unitResult = (expectedMsg, compileResult) must beLike {
       case (expected, actual) if (not ^ actual.contains(expected)) => ok
-      case _ => ko((if (not) "false positive" else "false negative")+":\n" + code + "\n ")
+      case _ =>
+        val fail = s"""false ${if (not) "positive" else "negative"}:\nmsg: $expectedMsg\n$code\n"""
+        println(fail)
+        ko(fail)
     }
   }
 
@@ -297,6 +299,19 @@ final class LinterPluginTest extends MustMatchers with StandardMatchResults {
 
       should("""val x = 0.555555555f""")
       noLint("""val x = 0.555555555d""")
+
+      noLint("""val x = 0f""")
+      // TODO
+      /*
+      should("""val x = 0.1f""")
+      // Longest double
+      for (i <- 1 to 100) {
+        // These by definition generate actual floats, so there must be no lint
+        // If you were doing something else and this test fails... please report the number
+        noWarn(s"""val x = ${"%.1080f".format(util.Random.nextFloat)}""")
+        noWarn(s"""val x = ${"%.1080f".format(util.Random.nextDouble)}""")
+        noWarn(s"""val x = ${"%.1080f".format(util.Random.nextGaussian)}""")
+      }*/
     }
   }
 
@@ -338,19 +353,20 @@ final class LinterPluginTest extends MustMatchers with StandardMatchResults {
     should(""" val a = ""; a.toString """)
     noLint(""" val a = 5; a.toString """)
 
-    should("""5.toInt""")
-    noLint("""5.toLong""")
-    noLint("""5.toShort""")
-    noLint("""5.toLong""")
-    noLint("""5.toDouble""")
+    should("""val a = 5; a.toInt""")
+    noLint("""val a = 5; a.toLong""")
+    noLint("""val a = 5; a.toShort""")
+    noLint("""val a = 5; a.toLong""")
+    noLint("""val a = 5; a.toDouble""")
 
-    should("""5L.toLong""")
-    noLint("""5L.toInt""")
-
-    should("""5.0.toDouble""")
-    noLint("""5.0.toFloat""")
+    should("""val a = 5L; a.toLong""")
+    noLint("""val a = 5L; a.toInt""")
 
     should("""val a = 5.0; a.toDouble""")
+    noLint("""val a = 5.0; a.toFloat""")
+
+    should("""val a = 5.0f; a.toFloat""")
+    noLint("""val a = 5.0f; a.toDouble""")
 
     should("""val a = List(1,2,3); a.toList""")
     should("""val a = Seq(1,2,3); a.toSeq""")
@@ -365,7 +381,10 @@ final class LinterPluginTest extends MustMatchers with StandardMatchResults {
     noLint("""val a = collection.mutable.Set(1,2,3); a.toSet""")
     noLint("""val a = collection.mutable.Map(1->2,3->4); a.toMap""")
 
+
     should("""class Wat { def toWat: Wat = new Wat; }; val w = new Wat; println(w.toWat)""")
+    // TODO
+    //noLint("""class Wat { def toWat(a: Int): Wat = new Wat; }; val w = new Wat; println(w.toWat(4))""")
     noLint("""class Wat { def toWat: Int = 5; println(toWat) }""")
     noLint("""class Wat { def toWat: Wat = new Wat; println(toWat) }""")
 
@@ -904,12 +923,15 @@ final class LinterPluginTest extends MustMatchers with StandardMatchResults {
         case 7 => println("hello")
         case _ => println("how low")
       }""")
-    noLint("""
-      import scala.concurrent._
-      import ExecutionContext.Implicits.global
-      import scala.util.{Failure,Success}
-      future { 1+1 } andThen { case Success(a) => println("win") case Failure(s) => println("fail") }
-    """)
+    // Test fails in later versions because this future is deprecated
+    if (Properties.versionString.contains("2.10")) {
+      noLint("""
+        import scala.concurrent._
+        import ExecutionContext.Implicits.global
+        import scala.util.{Failure,Success}
+        future { 1+1 } andThen { case Success(a) => println("win") case Failure(s) => println("fail") }
+      """)
+    }
   }
 
   @Test
@@ -1048,9 +1070,19 @@ final class LinterPluginTest extends MustMatchers with StandardMatchResults {
       val a = 4d
       -2 + math.exp(a)
     """)
+    // TODO actually, that's should warn
     noLint("""
       val a = 4d
       -1 + math.expm1(a)
+    """)
+
+    should("""
+      val a = 4d
+      Math.expm1(a) - 1
+    """)
+    should("""
+      val a = 4d
+      StrictMath.expm1(a) - 1
     """)
   }
 
@@ -1119,6 +1151,8 @@ final class LinterPluginTest extends MustMatchers with StandardMatchResults {
     should("""math.sqrt(math.pow(15d, 2d))""")
     should("""val a = 14d; math.sqrt(math.pow(a, 2))""")
     should("""val a = 14d; math.sqrt(a*a)""")
+    should("""val a = 14d; Math.sqrt(a*a)""")
+    should("""val a = 14d; StrictMath.sqrt(a*a)""")
 
     noLint("""math.sqrt(math.pow(15, 3))""")
     //TODO: Bizarre IntDivisionAssignedToFloat FP, can't reproduce outside test
@@ -2335,6 +2369,8 @@ final class LinterPluginTest extends MustMatchers with StandardMatchResults {
     should(""" val a = util.Random.nextLong + util.Random.nextString(6); if(a.nonEmpty) "fdd" """)
     should(""" val a = " "; if(a.isEmpty) "foo" """)
     noLint(""" var b = " "; val a = (b + (if(util.Random.nextBoolean) " " else " "+b)).trim.toLowerCase; if(a.nonEmpty) "foo" """)
+    // TODO: Shadowing bug
+    //noLint(""" val a = "a"; def f(x: String, y: String): Unit = (x, y) match { case (a, b) => a.nonEmpty } """)
 
     msg = "string will always be empty"
 
@@ -2753,7 +2789,7 @@ final class LinterPluginTest extends MustMatchers with StandardMatchResults {
 
     noLint("""class x { def /(d: Int): Int = d }; val b = new x; b/0""")
 
-    noLint("""1/2""")
+    noWarn("""1/2""")
 
     should("""
       val a = 5

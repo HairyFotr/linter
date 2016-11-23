@@ -345,7 +345,7 @@ case object UnnecessaryStringNonEmpty extends
 case object UnnecessaryStringIsEmpty extends
   Warning("This string will always be empty.")
 case class PossibleLossOfPrecision(improvement: String) extends
-  Warning(s"Possible loss of precision. $improvement.")
+  Warning(s"Possible loss of precision. $improvement")
 case class UnsafeAbs(improvement: String) extends
   Warning(s"Possibly unsafe use of abs. $improvement.")
 case class TypeToType(tpe: String) extends

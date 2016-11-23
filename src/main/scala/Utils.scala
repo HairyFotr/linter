@@ -17,7 +17,7 @@
 package org.psywerx.hairyfotr
 
 import scala.collection.mutable
-import scala.tools.nsc.Global
+import scala.tools.nsc.{ Global, Properties }
 
 final object Utils {
   var linterOptions = LinterOptions()
@@ -44,6 +44,16 @@ final object Utils {
   }
 
   def toBang(b: Boolean): String = if (b) "!" else ""
+
+  def staticSelect(prefix: String, suffix: String): String = {
+    if (Properties.versionString.contains("2.10")
+    ||  Properties.versionString.contains("2.11")) {
+      s"$prefix.this.$suffix"
+    } else {
+      s"$prefix.$suffix"
+    }
+  }
+
 }
 
 // Put only those that need the right global here:
