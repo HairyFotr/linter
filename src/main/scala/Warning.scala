@@ -73,6 +73,7 @@ final object Warning {
     UndesirableTypeInference(""),
     UnextendedSealedTrait,
     UnlikelyEquality("lhs", "rhs", "=="),
+    UnnecessaryElseBranch,
     UnnecessaryMethodCall(""),
     UnnecessaryReturn,
     UnnecessaryStringIsEmpty,
