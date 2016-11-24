@@ -18,7 +18,7 @@ package org.psywerx.hairyfotr
 
 import scala.annotation.tailrec
 
-final case class LinterOptions(disabledWarningNames: Seq[String] = Nil, printWarningNames: Boolean = false)
+final case class LinterOptions(disabledWarningNames: Seq[String] = Nil, printWarningNames: Boolean = true)
 
 final object LinterOptions {
   def parse(options: List[String]): Either[String, LinterOptions] = parse0(options, new LinterOptions)

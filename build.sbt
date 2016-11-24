@@ -2,7 +2,7 @@ name := "linter"
 organization := "org.psywerx.hairyfotr"
 licenses := Seq("Apache License, Version 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt"))
 homepage := Some(url("https://github.com/HairyFotr/linter"))
-//version := "0.1.16"
+//version := "0.1.17"
 
 scalaVersion := "2.10.6"
 crossScalaVersions <<= scalaVersion { scalaVersion => Seq("2.10.6", "2.11.8", "2.12.0") }
