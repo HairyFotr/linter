@@ -40,15 +40,18 @@ scalacOptions ++= {
 
 //scalacOptions += "-Xplugin:lib/linter_2.11-0.1-SNAPSHOT.jar"
 
+// Abide
+//libraryDependencies ++= Seq("abide-core"/*, "abide-extra", "abide-akka"*/).map("com.typesafe" %% _ % "0.1-SNAPSHOT" % "abide")
+
 // Wartremover
 //wartremoverWarnings ++= Warts.unsafe
 //wartremoverWarnings ++= Warts.allBut(Wart.Any, Wart.Nothing, Wart.Equals, Wart.Null, Wart.While, Wart.Return, Wart.Throw, Wart.Overloading, Wart.Var, Wart.ToString, Wart.NonUnitStatements, Wart.DefaultArguments, Wart.MutableDataStructures, Wart.AsInstanceOf, Wart.IsInstanceOf, Wart.LeakingSealed, Wart.OptionPartial, Wart.FinalCaseClass/*Yes, but not in Warning*/, Wart.EitherProjectionPartial/*TODO*/, Wart.Option2Iterable/*TODO*/, Wart.ListOps/*TODO*/, Wart.NoNeedForMonad/*Crashes*/)
 
 // Scapegoat
-//scapegoatVersion := "1.2.1"
+//scapegoatVersion := "1.3.0"
 
 // Scalastyle
-scalastyleConfig <<= baseDirectory { base => base / "sca" / "scalastyle-config.xml" }
+scalastyleConfig := baseDirectory.value / "sca" / "scalastyle-config.xml"
 watchSources += baseDirectory.value / "sca" / "scalastyle-config.xml"
 
 // Findbugs (optionally put findbugs plugins (such as fb-contrib and findsecbugs) jars into ~/.findbugs/plugin)

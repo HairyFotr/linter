@@ -1,11 +1,13 @@
 package org.psywerx.hairyfotr
 
 import org.junit.Test
-import org.specs2.matcher.MustMatchers
+import org.specs2.matcher.MustThrownMatchers
 
-class WarningTest extends MustMatchers {
+class WarningTest extends MustThrownMatchers {
   @Test
   def allIncludesAll(): Unit = {
+    // TODO could do it with reflection
+    val knownCount = 122
     val count: Int = Warning.All.distinct.map {
       case AssigningOptionToNull => 1
       case AvoidOptionCollectionSize => 1
@@ -101,7 +103,7 @@ class WarningTest extends MustMatchers {
       case EmptyStringInterpolator => 1
       case UnlikelyToString(_) => 1
       case UnthrownException => 1
-      case SuspiciousMatches => 1
+      case SuspiciousMatches(_) => 1
       case UseFindNotFilterHead(_) => 1
       case IfDoWhile => 1
       case UseContainsNotExistsEquals(_, _, _, _) => 1
@@ -135,7 +137,8 @@ class WarningTest extends MustMatchers {
       // ------------------------------------------------------------------------------------------------------
     }.sum
 
-    val nonUnitResult = Warning.All.length must beEqualTo(count)
+    val nonUnitResult1 = Warning.All.length must beEqualTo(knownCount)
+    val nonUnitResult2 = Warning.All.length must beEqualTo(count)
   }
 
   @Test

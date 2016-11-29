@@ -1,9 +1,9 @@
 package org.psywerx.hairyfotr
 
 import org.junit.Test
-import org.specs2.matcher.MustMatchers
+import org.specs2.matcher.MustThrownMatchers
 
-class LinterOptionsTest extends MustMatchers {
+class LinterOptionsTest extends MustThrownMatchers {
   @Test
   def noOptionsResultsInNoneDisabled(): Unit = {
     val Right(linterOptions) = LinterOptions.parse(Nil)

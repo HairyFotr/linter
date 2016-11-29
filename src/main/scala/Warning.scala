@@ -131,7 +131,7 @@ final object Warning {
     EmptyStringInterpolator,
     UnlikelyToString(""),
     UnthrownException,
-    SuspiciousMatches,
+    SuspiciousMatches(""),
     IfDoWhile,
     FloatingPointNumericRange,
     UseGetOrElseNotPatMatch(""),
@@ -354,11 +354,11 @@ case class TypeToType(tpe: String) extends
 case object EmptyStringInterpolator extends
   Warning("This string interpolation has no arguments.")
 case class UnlikelyToString(tpe: String) extends
-  Warning(s"Using toString on type $tpe is likely unintended.")
+  Warning(s"Turning object of type $tpe into string is likely unintended.")
 case object UnthrownException extends
   Warning("This exception was likely meant to be thrown here.")
-case object SuspiciousMatches extends
-  Warning("This regex starts with ^ or ends with $. The matches method always matches the entire string.")
+case class SuspiciousMatches(msg: String) extends
+  Warning(msg)
 case object IfDoWhile extends
   Warning("The if and the do-while loop have the same condition. Use a while loop.")
 case object FloatingPointNumericRange extends

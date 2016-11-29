@@ -381,6 +381,7 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
     noLint("""val a = collection.mutable.Set(1,2,3); a.toSet""")
     noLint("""val a = collection.mutable.Map(1->2,3->4); a.toMap""")
 
+    should("""val a = "abc"; String.valueOf(a)""")
 
     should("""class Wat { def toWat: Wat = new Wat; }; val w = new Wat; println(w.toWat)""")
     // TODO
@@ -429,12 +430,15 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
 
   @Test
   def UnlikelyToString(): Unit = {
-    implicit val msg = "Using toString on type"
+    implicit val msg = "into string is likely unintended"
 
     should(""" Array("1").toString """)
     should(""" val a = Array(1,2,3); println(a.toString) """)
     should(""" def x(a: Array[Long]): String = a.toString """)
     noLint(""" val a = Seq(1,2,3); println(a.toString) """)
+
+    should(""" val a = Array(1,2,3); println(String.valueOf(a)) """)
+    noLint(""" val a = 5; println(String.valueOf(a)) """)
   }
 
   @Test
@@ -448,10 +452,9 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
 
   @Test
   def SuspiciousMatches(): Unit = {
-    implicit val msg = "matches the entire string"
+    implicit var msg = "matches the entire string"
 
     should(""" val a = util.Random.nextString(5) matches "^abc$" """)
-    noLint(""" val a = util.Random.nextString(5) matches "abc" """)
 
     should(""" val a = util.Random.nextString(5); val b = a matches (a+"$") """)
     should(""" val a = util.Random.nextString(5); val b = a matches ("fdsf$") """)
@@ -460,6 +463,20 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
     should(""" val a = util.Random.nextString(5); val b = a matches ("^"+a) """)
     noLint(""" val a = util.Random.nextString(5); a matches a """)
     should(""" if(List("") forall { _ matches "^[A-Za-z0-9_]{1,20}$" }) println""")
+
+    msg = "could be replaced by contains"
+    should(""" val a = util.Random.nextString(5); val b = a matches (".*ab.*") """)
+
+    msg = "could be replaced by startsWith"
+    should(""" val a = util.Random.nextString(5); val b = a matches ("ab.*") """)
+
+    msg = "could be replaced by endsWith"
+    should(""" val a = util.Random.nextString(5); val b = a matches (".*ab") """)
+
+    msg = "could be replaced by equals"
+    should(""" val a = util.Random.nextString(5); val b = a matches ("ab") """)
+    should(""" val a = util.Random.nextString(5); val b = a matches ("af235ud09q43fc9hrcxkb") """)
+
   }
 
   @Test

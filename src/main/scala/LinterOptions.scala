@@ -45,7 +45,7 @@ final object LinterOptions {
       case Right(warnings) => parse0(xs, linterOptions.copy(disabledWarningNames = warnings))
       case Left(errorMessage) => Left(errorMessage)
     }
-    case option :: xs if option.startsWith(PrintWarningNames) => option.split(OptionKeyValueDelimiter) match {
+    case option :: _ if option.startsWith(PrintWarningNames) => option.split(OptionKeyValueDelimiter) match {
       case Array(_, value @ ("true" | "false")) => Right(linterOptions.copy(printWarningNames = value.toBoolean))
       case Array(_) if option == PrintWarningNames => Right(linterOptions.copy(printWarningNames = true))
       case _ => Left(s"The '$option' option was not of the expected form")

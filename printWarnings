@@ -1,16 +1,31 @@
-#!/bin/sh
+#!/bin/bash
 
-warnings=$(grep -Po 'case (class|object) [a-zA-Z0-9_]+' src/main/scala/Warning.scala | cut -d' ' -f3 | tr '\n' ' ')
+warnings=$(grep -Po 'case (class|object) [A-Z][a-zA-Z0-9_]+' src/main/scala/Warning.scala | cut -d' ' -f3 | tr '\n' ' ')
+allWarnings=""
+missingTests=""
 i=0
+t=0
 for w in $warnings; do
     test=$(grep -Pn "def $w[(][)]" src/test/scala/LinterPluginTest.scala)
     if [ "$test" != "" ]; then
-        echo -n "[$w](src/test/scala/LinterPluginTest.scala#L$(echo $test | cut -d':' -f1)), "
+        allWarnings="${allWarnings}[$w](src/test/scala/LinterPluginTest.scala#L$(echo $test | cut -d':' -f1)), "
     else
-        echo -n "$w, "
+        allWarnings="${allWarnings}$w, "
+        missingTests="${missingTests}$w, "
+        t=$((t+1))
     fi
     i=$((i+1))
 done
 
 echo
 echo "## List of implemented checks ($i)"
+echo "$allWarnings"
+echo
+echo "Missing tests ($t): $missingTests"
+echo
+w1=$(grep -Po 'case (class|object) [A-Z][a-zA-Z0-9_]+' src/main/scala/Warning.scala | cut -d' ' -f3 | sort)
+w2=$(grep -Po '^    [A-Z][a-zA-Z0-9_]+' src/main/scala/Warning.scala | cut -d' ' -f5 | sort)
+w3=$(grep -Po 'case [A-Z][a-zA-Z0-9_]+' src/test/scala/WarningTest.scala | cut -d' ' -f2 | sort)
+diff <(echo "$w1") <(echo "$w2")
+diff <(echo "$w2") <(echo "$w3")
+
