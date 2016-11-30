@@ -3259,15 +3259,16 @@ final class LinterPlugin(val global: Global) extends Plugin {
             case f @ ("replaceAll"|"replaceFirst") if stringParams.size == 2 && stringParams.forall(_.exactValue.isDefined) =>
               val (p0, p1) = (stringParams(0).exactValue.get, stringParams(1).exactValue.get)
 
-              if (p1.isEmpty) {
-                //TODO: nopenopenopenope - matches the end of replaceX func, because this gets traversed multiple times with the wrong pos
-                val posFiltering = treePosHolder.toString matches (".*?[ .]"+ f + """ *[(].*, *("{2}|"{6}) *[)]""")
-
-                if (posFiltering && (p0.matches(PlainStringRegex+"\\$")))
+              //TODO: nopenopenopenope - matches the end of replaceX func, because this gets traversed multiple times with the wrong pos
+              val posFiltering = treePosHolder.toString matches (".*?[ .]"+ f + """ *[(].*, *("{2}|"{6}) *[)]""")
+              if (posFiltering && p1.isEmpty) {
+                if (p0.matches(PlainStringRegex+"\\$"))
                   warn(treePosHolder, RegexWarning(s"This $f can be substituted with stripSuffix", error = false))
-                if (posFiltering && (p0.matches("[\\^]"+PlainStringRegex)))
+                if (p0.matches("[\\^]"+PlainStringRegex))
                   warn(treePosHolder, RegexWarning(s"This $f can be substituted with stripPrefix", error = false))
               }
+              if (f == "replaceAll" && p0.matches(PlainStringRegex) && !p1.contains("$"))
+                warn(treePosHolder, RegexWarning(s"This $f can likely be substituted with replace", error = false))
 
               if (str.exactValue.isDefined) {
                 try {

@@ -497,12 +497,15 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
 
   @Test
   def RegexWarning(): Unit = {
-    implicit val msg = "Regex pattern"
+    implicit val msg = "RegexWarning"
 
     should(""" "ffasd".replaceFirst("/$", "") """)
     should(""" "ffasd".replaceAll("^/", "") """)
     should(""" "ffasd".replaceFirst("\\.git$", "") """)
     should(""" "ffasd".replaceFirst("^refs/heads/", "") """)
+
+    should(""" "ffasd".replaceAll("ff", "aa") """)
+    noLint(""" "ffasd".replaceAll("ff", "a$0a") """)
 
     should(""" "*+".r """)
     should(""" "[".r """)
