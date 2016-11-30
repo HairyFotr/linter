@@ -1106,7 +1106,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
             printCaseWarning()
 
             def orderOption(cases: List[CaseDef]) = cases match {
-              case List(none @ CaseDef(scala_None, EmptyTree, _), some) if scala_None is "scala.None" => List(some, none)
+              case List(none @ CaseDef(ScalaNone(), EmptyTree, _), some) => List(some, none)
               case x => x
             }
 
@@ -1117,8 +1117,8 @@ final class LinterPlugin(val global: Global) extends Plugin {
 
                 warn(tree, UseOptionFlattenNotPatMatch)
 
-              case List(CaseDef(Apply(scala_Some1 @ TypeTree(), List(Bind(x1, Ident(nme.WILDCARD)))), EmptyTree, Apply(TypeApply(Select(ScalaSome(), Name("apply")), _), List(x2))), CaseDef(ScalaNone(), EmptyTree, y))
-                if (scala_Some1.original is "scala.Some")
+              case List(CaseDef(Apply(scala_Some @ TypeTree(), List(Bind(x1, Ident(nme.WILDCARD)))), EmptyTree, Apply(TypeApply(Select(ScalaSome(), Name("apply")), _), List(x2))), CaseDef(ScalaNone(), EmptyTree, y))
+                if (scala_Some.original is "scala.Some")
                 && (x1.toString == x2.toString) =>
 
                 warn(tree, UseOrElseNotPatMatch(y.toString))
@@ -1129,8 +1129,8 @@ final class LinterPlugin(val global: Global) extends Plugin {
 
                 warn(tree, UseGetOrElseNotPatMatch(y.toString))
 
-              case List(CaseDef(Apply(scala_Some1 @ TypeTree(), List(Bind(_, Ident(nme.WILDCARD)))), EmptyTree, Apply(TypeApply(Select(ScalaSome(), Name("apply")), _), List(y))), CaseDef(ScalaNone(), EmptyTree, ScalaNone()))
-                if (scala_Some1.original is "scala.Some") =>
+              case List(CaseDef(Apply(scala_Some @ TypeTree(), List(Bind(_, Ident(nme.WILDCARD)))), EmptyTree, Apply(TypeApply(Select(ScalaSome(), Name("apply")), _), List(y))), CaseDef(ScalaNone(), EmptyTree, ScalaNone()))
+                if (scala_Some.original is "scala.Some") =>
 
                 warn(tree, UseOptionMapNotPatMatch(y.toString))
 
@@ -1139,8 +1139,8 @@ final class LinterPlugin(val global: Global) extends Plugin {
 
                 warn(tree, UseOptionFlatMapNotPatMatch(y.toString))
 
-              case List(CaseDef(Apply(scala_Some @ TypeTree(), List(Bind(_, Ident(nme.WILDCARD)))), EmptyTree, y), CaseDef(ScalaNone(), EmptyTree, unit))
-                if (scala_Some.original is "scala.Some") && (unit is "()") =>
+              case List(CaseDef(Apply(scala_Some @ TypeTree(), List(Bind(_, Ident(nme.WILDCARD)))), EmptyTree, y), CaseDef(ScalaNone(), EmptyTree, Literal(Constant(()))))
+                if (scala_Some.original is "scala.Some") =>
 
                 warn(tree, UseOptionForeachNotPatMatch(y.toString))
 
@@ -1521,14 +1521,14 @@ final class LinterPlugin(val global: Global) extends Plugin {
             if (elseCase equalsStructure Literal(Constant(null))) warn(opt2, UseOptionOrNull(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isEmpty"))
             else if (getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, UseOptionGetOrElse(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isEmpty"))
 
-          case If(Apply(Select(opt1, nme.NE), List(scala_None)), getCase @ Select(opt2, Name("get")), elseCase) //duplication
-            if (scala_None is "scala.None") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
+          case If(Apply(Select(opt1, nme.NE), List(ScalaNone())), getCase @ Select(opt2, Name("get")), elseCase) //duplication
+            if (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
 
             if (elseCase equalsStructure Literal(Constant(null))) warn(opt2, UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + "!= None"))
             else if (getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + "!= None"))
 
-          case If(Apply(Select(opt1, nme.EQ), List(scala_None)), elseCase, getCase @ Select(opt2, Name("get"))) //duplication
-            if (scala_None is "scala.None") && (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
+          case If(Apply(Select(opt1, nme.EQ), List(ScalaNone())), elseCase, getCase @ Select(opt2, Name("get"))) //duplication
+            if (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
 
             if (elseCase equalsStructure Literal(Constant(null))) warn(opt2, UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + "== None"))
             else if (getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + "== None"))
@@ -1786,10 +1786,8 @@ final class LinterPlugin(val global: Global) extends Plugin {
 
                 warn(tree, UseFilterNotFlatMap(identOrCol(col)))
 
-              case (Apply(_Option2Iterable1, List(none)), Apply(_Option2Iterable2, List(Apply(TypeApply(Select(some, Name("apply")), _), List(Ident(id))))))
-                if (none is "scala.None")
-                && (some is "scala.Some")
-                && (id.toString == param.toString) =>
+              case (Apply(_Option2Iterable1, List(ScalaNone())), Apply(_Option2Iterable2, List(Apply(TypeApply(Select(ScalaSome(), Name("apply")), _), List(Ident(id))))))
+                if (id.toString == param.toString) =>
 
                 warn(tree, UseFilterNotFlatMap(identOrCol(col)))
 
@@ -3005,8 +3003,9 @@ final class LinterPlugin(val global: Global) extends Plugin {
         // scalastyle:on magic.number
 
         //// Tries to execute string functions and returns either a String or Int representation
-        def stringFunc(string: Tree, func: Name, params: List[Tree] = List.empty[Tree]): Either[StringAttrs, Values] = {
+        def stringFunc(string: Tree, funcName: Name, params: List[Tree] = List.empty[Tree]): Either[StringAttrs, Values] = {
           val str = StringAttrs(string)
+          val func = funcName.toString
           val paramsSize = params.size
           lazy val intParam = if (paramsSize == 1 && params.head.tpe.widen <:< IntClass.tpe) computeExpr(params.head) else Values.empty
           lazy val intParams = if (params.forall(_.tpe.widen <:< IntClass.tpe)) params.map(computeExpr) else Nil //option?
@@ -3022,7 +3021,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
           //if (str == StringAttrs.empty) {
           //  Left(empty)
           //} else
-          func.toString match {
+          func match {
             case "size"|"length" if paramsSize == 0 =>
               Right(
                 str.exactValue
@@ -3198,8 +3197,6 @@ final class LinterPlugin(val global: Global) extends Plugin {
               lazy val string = str.exactValue.get //lazy to avoid None.get... didn't use monadic, because I was lazy
               val param: Seq[Int] = intParams.map(_.getValue)
 
-              //println((string, param))
-
               try f match {
                 case "substring" =>
                   if (str.exactValue.isDefined)
@@ -3217,7 +3214,8 @@ final class LinterPlugin(val global: Global) extends Plugin {
                     throw new IndexOutOfBoundsException
                   else
                     Left(empty)
-                case _ => Left(empty)
+                case _ =>
+                  Left(empty)
               } catch {
                 case _: IndexOutOfBoundsException =>
                   warn(params.head, LikelyIndexOutOfBounds("out of bounds"))
@@ -3228,18 +3226,19 @@ final class LinterPlugin(val global: Global) extends Plugin {
 
             // str.func(String)
             /// Try to verify String contains, startsWith, endsWith
-            case func @ ("contains"|"startsWith"|"endsWith"|"equals"|"$eq$eq"|"$bang$eq"|"matches") =>
-              val result = func match {
-                case "contains"   => (str contains stringParam)
-                case "startsWith" => (str startsWith stringParam)
-                case "endsWith"   => (str endsWith stringParam)
+            case ("contains"|"startsWith"|"endsWith"|"equals"|"$eq$eq"|"$bang$eq"|"matches") =>
+              for (result <- (func match {
+                case "contains"        => (str contains stringParam)
+                case "startsWith"      => (str startsWith stringParam)
+                case "endsWith"        => (str endsWith stringParam)
                 case "equals"|"$eq$eq" => (str equals stringParam)
-                case "$bang$eq" => (str nequals stringParam)
-                case "matches" => (str matches stringParam)
+                case "$bang$eq"        => (str nequals stringParam)
+                case "matches"         => (str matches stringParam)
                 case _ => None
+              })) {
+                val function = if (func == "$eq$eq") "equals" else if (func == "$bang$eq") "not equals" else func
+                warn(params.head, InvariantReturn(function, result.toString))
               }
-              val function = if (func == "$eq$eq") "equals" else if (func == "$bang$eq") "not equals" else func
-              if (result.isDefined) warn(params.head, InvariantReturn(function, result.get.toString))
 
               Left(empty)
 
@@ -3264,12 +3263,9 @@ final class LinterPlugin(val global: Global) extends Plugin {
                 //TODO: nopenopenopenope - matches the end of replaceX func, because this gets traversed multiple times with the wrong pos
                 val posFiltering = treePosHolder.toString matches (".*?[ .]"+ f + """ *[(].*, *("{2}|"{6}) *[)]""")
 
-                val special = """.\^$*+?()\[{\\|"""
-                val plainString = s"""([^$special]|[\\\\][$special])+"""
-
-                if (posFiltering && (p0 matches plainString+"\\$"))
+                if (posFiltering && (p0.matches(PlainStringRegex+"\\$")))
                   warn(treePosHolder, RegexWarning(s"This $f can be substituted with stripSuffix", error = false))
-                if (posFiltering && (p0 matches "\\^"+plainString))
+                if (posFiltering && (p0.matches("[\\^]"+PlainStringRegex)))
                   warn(treePosHolder, RegexWarning(s"This $f can be substituted with stripPrefix", error = false))
               }
 
@@ -3545,14 +3541,13 @@ final class LinterPlugin(val global: Global) extends Plugin {
           if ((s startsWith "^") || ((s endsWith "$") && !(s endsWith "\\$")))
             warn(treePosHolder, SuspiciousMatches("This regex starts with ^ or ends with $. The matches method always matches the entire string."))
 
-          val nonMeta = """[^.\[\]{}()*+?^$|\\]"""
-          if (s matches s"[.][*]${nonMeta}*[.][*]")
+          if (s.matches("[.][*]"+PlainStringRegex+"[.][*]"))
             warn(treePosHolder, SuspiciousMatches("This matches could be replaced by contains without .*"))
-          if (s matches s"[\\^]?${nonMeta}*[.][*]")
+          if (s.matches("[\\^]?"+PlainStringRegex+"[.][*]"))
             warn(treePosHolder, SuspiciousMatches("This matches could be replaced by startsWith"))
-          if (s matches s"[.][*]${nonMeta}*[$$]?")
+          if (s.matches("[.][*]"+PlainStringRegex+"[$]?"))
             warn(treePosHolder, SuspiciousMatches("This matches could be replaced by endsWith"))
-          if (s matches s"${nonMeta}*")
+          if (s.matches("[\\^]?"+PlainStringRegex+"[$]?"))
             warn(treePosHolder, SuspiciousMatches("This matches could be replaced by equals"))
 
           exactValue.map(_ matches s)

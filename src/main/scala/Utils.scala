@@ -47,12 +47,19 @@ final object Utils {
 
   def staticSelect(prefix: String, suffix: String): String = {
     if (Properties.versionString.contains("2.10")
-    ||  Properties.versionString.contains("2.11")) {
+    ||  Properties.versionString.contains("2.11"))
       s"$prefix.this.$suffix"
-    } else {
+    else
       s"$prefix.$suffix"
-    }
   }
+
+  // Regex matches either non meta characters, or escaped meta characters.
+  // Full list of Java regex meta characters is: `<([{\^-=$!|]})?*+.>`.
+  // Characters `<-=!>` are meta only inside groups, which the regex prevents.
+  // Closing brackets ] and } act as normal characters, if there is no opening brackets
+  // False positives: none that I know of
+  // False negatives: a[b]c, ...
+  val PlainStringRegex = """([^(\[{\\^$|)?*+.]|[\\][(\[{\\^$|)?*+.])*"""
 
 }
 
