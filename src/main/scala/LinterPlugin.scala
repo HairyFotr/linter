@@ -3046,24 +3046,23 @@ final class LinterPlugin(val global: Global) extends Plugin {
             case "intern" =>
               Left(str)
 
-            case f @ ("head"|"last") =>
-              if (str.maxLength == 0) {
-                warn(treePosHolder, DecomposingEmptyCollection(f, "string"))
-              }
+            case "head"|"last" =>
+              if (str.maxLength == 0)
+                warn(treePosHolder, DecomposingEmptyCollection(func, "string"))
 
               Left(empty)
 
-            case f @ ("init"|"tail") =>
+            case "init"|"tail" =>
               if (str.exactValue.isDefined) {
                 if (str.exactValue.get.isEmpty) {
-                  warn(treePosHolder, DecomposingEmptyCollection(f, "string"))
+                  warn(treePosHolder, DecomposingEmptyCollection(func, "string"))
                   Left(empty)
                 } else {
-                  Left(new StringAttrs(str.exactValue.map(a => if (f == "init") a.init else a.tail)))
+                  Left(new StringAttrs(str.exactValue.map(a => if (func == "init") a.init else a.tail)))
                 }
               } else {
                 if (str.maxLength == 0) {
-                  warn(treePosHolder, DecomposingEmptyCollection(f, "string"))
+                  warn(treePosHolder, DecomposingEmptyCollection(func, "string"))
                 }
 
                 Left(new StringAttrs(
@@ -3077,12 +3076,12 @@ final class LinterPlugin(val global: Global) extends Plugin {
             case "count"      if paramsSize == 1 =>
               val out = Values.empty.addCondition(_ >= 0)
               Right(if (str.getMaxLength != Int.MaxValue) out.addCondition(_ < str.getMaxLength) else out)
-            case ("filter" | "filterNot") if paramsSize == 1 =>
+            case "filter"|"filterNot" if paramsSize == 1 =>
               Left(str.removeExactValue.zeroMinLengths)
 
-            case f @ ("indexOf"|"lastIndexOf") if paramsSize == 1 =>
+            case "indexOf"|"lastIndexOf" if paramsSize == 1 =>
               if (str.exactValue.isDefined && stringParam.exactValue.isDefined) {
-                if (f == "indexOf")
+                if (func == "indexOf")
                   Right(Values(str.exactValue.get.indexOf(stringParam.exactValue.get)))
                 else
                   Right(Values(str.exactValue.get.lastIndexOf(stringParam.exactValue.get)))
@@ -3117,34 +3116,34 @@ final class LinterPlugin(val global: Global) extends Plugin {
             case "hashCode" if str.exactValue.isDefined =>
               Right(Values(str.exactValue.get.hashCode))
             /// String.to{Int, Long, Float, Double} conversion will likely fail (runtime exception)
-            case f @ "toInt" if str.exactValue.isDefined =>
+            case "toInt" if str.exactValue.isDefined =>
               try {
                 Right(Values(str.exactValue.get.toInt))
               } catch {
                 case _: NumberFormatException =>
-                  warn(treePosHolder, InvalidStringConversion(f))
+                  warn(treePosHolder, InvalidStringConversion(func))
                   Left(empty)
               }
-            case f @ ("toLong") if str.exactValue.isDefined =>
+            case "toLong" if str.exactValue.isDefined =>
               try {
                 str.exactValue.get.toLong
               } catch {
                 case _: NumberFormatException =>
-                  warn(treePosHolder, InvalidStringConversion(f))
+                  warn(treePosHolder, InvalidStringConversion(func))
               }
               Left(empty)
-            case f @ ("toDouble"|"toFloat") if str.exactValue.isDefined =>
+            case "toDouble"|"toFloat" if str.exactValue.isDefined =>
               try {
                 str.exactValue.get.toDouble
               } catch {
                 case _: NumberFormatException =>
-                  warn(treePosHolder, InvalidStringConversion(f))
+                  warn(treePosHolder, InvalidStringConversion(func))
               }
               Left(empty)
 
             // str.func(String)
-            case f @ ("charAt"|"codePointAt"|"codePointBefore"|"substring"
-                     |"apply"|"drop"|"take"|"dropRight"|"takeRight") if intParam.isValue =>
+            case "charAt"|"codePointAt"|"codePointBefore"|"substring"
+                |"apply"|"drop"|"take"|"dropRight"|"takeRight" if intParam.isValue =>
               val param = intParam.getValue
               lazy val string = str.exactValue.get //lazy to avoid None.get... didn't use monadic, because I was lazy
 
@@ -3152,7 +3151,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
 
               //TODO: use reflection maybe?
               //TODO: could do some prefix/suffix enhancements
-              try f match {
+              try func match {
                 case "charAt"|"apply" =>
                   if (str.exactValue.isDefined) { string.charAt(param); Left(empty) } else if (param < 0) throw new IndexOutOfBoundsException else Left(empty)
                 case "codePointAt" =>
@@ -3193,11 +3192,11 @@ final class LinterPlugin(val global: Global) extends Plugin {
               }
 
             //str.func(Int, Int)
-            case f @ ("substring"|"codePointCount") if intParams.size == 2 && intParams.forall(_.isValue) =>
+            case "substring"|"codePointCount" if intParams.size == 2 && intParams.forall(_.isValue) =>
               lazy val string = str.exactValue.get //lazy to avoid None.get... didn't use monadic, because I was lazy
               val param: Seq[Int] = intParams.map(_.getValue)
 
-              try f match {
+              try func match {
                 case "substring" =>
                   if (str.exactValue.isDefined)
                     Left(new StringAttrs(Some(string.substring(param(0), param(1)))))
@@ -3226,7 +3225,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
 
             // str.func(String)
             /// Try to verify String contains, startsWith, endsWith
-            case ("contains"|"startsWith"|"endsWith"|"equals"|"$eq$eq"|"$bang$eq"|"matches") =>
+            case "contains"|"startsWith"|"endsWith"|"equals"|"$eq$eq"|"$bang$eq"|"matches" =>
               for (result <- (func match {
                 case "contains"        => (str contains stringParam)
                 case "startsWith"      => (str startsWith stringParam)
@@ -3256,23 +3255,23 @@ final class LinterPlugin(val global: Global) extends Plugin {
                 Left(empty)
               }
 
-            case f @ ("replaceAll"|"replaceFirst") if stringParams.size == 2 && stringParams.forall(_.exactValue.isDefined) =>
+            case "replaceAll"|"replaceFirst" if stringParams.size == 2 && stringParams.forall(_.exactValue.isDefined) =>
               val (p0, p1) = (stringParams(0).exactValue.get, stringParams(1).exactValue.get)
 
               //TODO: nopenopenopenope - matches the end of replaceX func, because this gets traversed multiple times with the wrong pos
-              val posFiltering = treePosHolder.toString matches (".*?[ .]"+ f + """ *[(].*, *("{2}|"{6}) *[)]""")
+              val posFiltering = treePosHolder.toString matches (".*?[ .]"+ func + """ *[(].*, *("{2}|"{6}) *[)]""")
               if (posFiltering && p1.isEmpty) {
                 if (p0.matches(PlainStringRegex+"\\$"))
-                  warn(treePosHolder, RegexWarning(s"This $f can be substituted with stripSuffix", error = false))
+                  warn(treePosHolder, RegexWarning(s"""This $func("${p0}", "") can be substituted with stripSuffix("${cleanPlainRegex(p0.dropRight(1))}")""", error = false))
                 if (p0.matches("[\\^]"+PlainStringRegex))
-                  warn(treePosHolder, RegexWarning(s"This $f can be substituted with stripPrefix", error = false))
+                  warn(treePosHolder, RegexWarning(s"""This $func("${p0}", "") can be substituted with stripPrefix("${cleanPlainRegex(p0.drop(1))}")""", error = false))
               }
-              if (f == "replaceAll" && p0.matches(PlainStringRegex) && !p1.contains("$"))
-                warn(treePosHolder, RegexWarning(s"This $f can likely be substituted with replace", error = false))
+              if (func == "replaceAll" && p0.matches(PlainStringRegex) && !p1.contains("$"))
+                warn(treePosHolder, RegexWarning(s"""This $func("${p0}", "${p1}") can likely be substituted with replace("${cleanPlainRegex(p0)}", "${p1}")""", error = false))
 
               if (str.exactValue.isDefined) {
                 try {
-                  Left(new StringAttrs(Some(if (f == "replaceAll") str.exactValue.get.replaceAll(p0, p1) else str.exactValue.get.replaceFirst(p0, p1))))
+                  Left(new StringAttrs(Some(if (func == "replaceAll") str.exactValue.get.replaceAll(p0, p1) else str.exactValue.get.replaceFirst(p0, p1))))
                 } catch {
                   case e: java.util.regex.PatternSyntaxException =>
                     Left(empty)
@@ -3285,8 +3284,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
                 Left(empty)
               }
             /// String format checks (runtime exception)
-            case f @ "format"
-              if (params.nonEmpty) && !(params.head.tpe.widen <:< rootMirror.getClassByName(newTermName("java.util.Locale")).tpe) =>
+            case "format" if (params.nonEmpty) && !(params.head.tpe.widen <:< rootMirror.getClassByName(newTermName("java.util.Locale")).tpe) =>
               //TODO: see http://docs.oracle.com/javase/7/docs/api/java/util/Formatter.html
               // in some cases at least length could be inferred, but option parser would need to be implemented
 
@@ -3543,13 +3541,13 @@ final class LinterPlugin(val global: Global) extends Plugin {
             warn(treePosHolder, SuspiciousMatches("This regex starts with ^ or ends with $. The matches method always matches the entire string."))
 
           if (s.matches("[.][*]"+PlainStringRegex+"[.][*]"))
-            warn(treePosHolder, SuspiciousMatches("This matches could be replaced by contains without .*"))
+            warn(treePosHolder, SuspiciousMatches(s"""This matches("$s") could likely be replaced by contains("${cleanPlainRegex(s.drop(2).dropRight(2))}")"""))
           if (s.matches("[\\^]?"+PlainStringRegex+"[.][*]"))
-            warn(treePosHolder, SuspiciousMatches("This matches could be replaced by startsWith"))
+            warn(treePosHolder, SuspiciousMatches(s"""This matches("$s") could likely be replaced by startsWith("${cleanPlainRegex(s.stripPrefix("^").dropRight(2))}")"""))
           if (s.matches("[.][*]"+PlainStringRegex+"[$]?"))
-            warn(treePosHolder, SuspiciousMatches("This matches could be replaced by endsWith"))
+            warn(treePosHolder, SuspiciousMatches(s"""This matches("$s") could likely be replaced by endsWith("${cleanPlainRegex(s.drop(2).stripSuffix("$"))}")"""))
           if (s.matches("[\\^]?"+PlainStringRegex+"[$]?"))
-            warn(treePosHolder, SuspiciousMatches("This matches could be replaced by equals"))
+            warn(treePosHolder, SuspiciousMatches(s"""This matches("$s") could likely be replaced by equals("${cleanPlainRegex(s.stripPrefix("^").stripSuffix("$"))}")"""))
 
           exactValue.map(_ matches s)
         }

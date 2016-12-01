@@ -59,7 +59,8 @@ final object Utils {
   // Closing brackets ] and } act as normal characters, if there is no opening brackets
   // False positives: none that I know of
   // False negatives: a[b]c, ...
-  val PlainStringRegex = """([^(\[{\\^$|)?*+.]|[\\][(\[{\\^$|)?*+.])*"""
+  val PlainStringRegex = """([^(\[{\\^$|)?*+.]|[\\][(\[{\\^$|)?*+.]|\[[^\[\\^\]]\])*"""
+  def cleanPlainRegex(s: String): String = s.replaceAll("""[\\](.)""", "$1").replaceAll("""\[(.)\]""", "$1")
 
 }
 

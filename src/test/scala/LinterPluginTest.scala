@@ -463,25 +463,31 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
     noLint(""" val a = util.Random.nextString(5); a matches a """)
     should(""" if(List("") forall { _ matches "^[A-Za-z0-9_]{1,20}$" }) println""")
 
-    msg = "could be replaced by contains"
+    msg = "be replaced by contains"
     should(""" val a = util.Random.nextString(5); val b = a matches (".*ab.*") """)
     should(""" val a = util.Random.nextString(5); val b = a matches (".*a\\.b.*") """)
+    should(""" val a = util.Random.nextString(5); val b = a matches (".*a[b]c.*") """)
+    noLint(""" val a = util.Random.nextString(5); val b = a matches (".*a[bc]d.*") """)
 
-    msg = "could be replaced by startsWith"
+    msg = "be replaced by startsWith"
     should(""" val a = util.Random.nextString(5); val b = a matches ("ab.*") """)
+    should(""" val a = util.Random.nextString(5); val b = a matches ("a[b].*") """)
     should(""" val a = util.Random.nextString(5); val b = a matches ("ab\\..*") """)
     noLint(""" val a = util.Random.nextString(5); val b = a matches ("a.b.*") """)
 
-    msg = "could be replaced by endsWith"
+    msg = "be replaced by endsWith"
     should(""" val a = util.Random.nextString(5); val b = a matches (".*ab") """)
     should(""" val a = util.Random.nextString(5); val b = a matches (".*ab\\.") """)
     noLint(""" val a = util.Random.nextString(5); val b = a matches (".*a.b") """)
+    should(""" val a = util.Random.nextString(5); val b = a matches (".*a[b]c") """)
 
-    msg = "could be replaced by equals"
+    msg = "be replaced by equals"
     should(""" val a = util.Random.nextString(5); val b = a matches ("ab") """)
+    should(""" val a = util.Random.nextString(5); val b = a matches ("a[b]c") """)
     should(""" val a = util.Random.nextString(5); val b = a matches ("af235ud09q43fc9hrcxkb") """)
     should(""" val a = util.Random.nextString(5); val b = a matches ("fdsf\\$") """)
     should(""" val a = util.Random.nextString(5); val b = a matches ("fdsf\\\\$") """)
+    noLint(""" val a = util.Random.nextString(5); val b = a matches ("a[bc]d") """)
     noLint(""" val a = util.Random.nextString(5); val b = a matches ("a.b") """)
 
   }
@@ -505,6 +511,8 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
     should(""" "ffasd".replaceFirst("^refs/heads/", "") """)
 
     should(""" "ffasd".replaceAll("ff", "aa") """)
+    should(""" "ffasd".replaceAll("f[f]", "aa") """)
+    noLint(""" "ffasd".replaceAll("f[fa]", "aa") """)
     noLint(""" "ffasd".replaceAll("ff", "a$0a") """)
 
     should(""" "*+".r """)
