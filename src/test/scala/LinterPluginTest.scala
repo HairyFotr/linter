@@ -71,13 +71,26 @@ final object Compiler {
 }
 
 final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatchResults {
-  // A few hacks to scrap the boilerplate and better pinpoint the failing test
+  // A few hacks to avoid boilerplate and better pinpoint the failing test
   def should(code: String, thunked: Boolean = true)(implicit expectedMsg: String, not: Boolean = false): Unit = {
     val compileResult = Compiler.compileAndLint(code, thunked)
     val unitResult = (expectedMsg, compileResult) must beLike {
       case (expected, actual) if (not ^ actual.contains(expected)) => ok
       case _ =>
-        val fail = s"""false ${if (not) "positive" else "negative"}:\nmsg: $expectedMsg\n$code\n"""
+        val problem = s"""false ${if (not) "positive" else "negative"}"""
+        val trace =
+          Thread.currentThread.getStackTrace
+            .filter(_.getClassName == "org.psywerx.hairyfotr.LinterPluginTest")
+            .map(_.getMethodName)
+            .reverse.mkString(" -> ")
+
+        val fail = s"""|
+                       |problem: $problem:
+                       |message: $expectedMsg
+                       |  trace: $trace
+                       |   code: $code
+                       |""".stripMargin
+
         println(fail)
         ko(fail)
     }
