@@ -234,7 +234,7 @@ case class UndesirableTypeInference(inferredType: String) extends
 case object AssigningOptionToNull extends
   Warning("You probably meant None, not null.")
 case object WrapNullWithOption extends
-  Warning("Use Option(...), which automatically wraps null to None.")
+  Warning("Replace if with Option(...), which automatically wraps null to None.")
 case object AvoidOptionStringSize extends
   Warning("Did you mean to take the size of the string inside the Option?")
 case object AvoidOptionCollectionSize extends
@@ -359,6 +359,8 @@ case object UnthrownException extends
   Warning("This exception was likely meant to be thrown here.")
 case class SuspiciousMatches(msg: String) extends
   Warning(msg)
+case object PassingNullIntoOption extends
+  Warning("Passing null into an Option parameter is likely wrong.")
 case object IfDoWhile extends
   Warning("The if and the do-while loop have the same condition. Use a while loop.")
 case object FloatingPointNumericRange extends

@@ -1468,17 +1468,35 @@ final class LinterPlugin(val global: Global) extends Plugin {
             }) => //Ignore
 
           /// Null checking instead of Option wrapping
-          case If(Apply(Select(left, op), List(Literal(Constant(null)))), t, f)
-            if (op == nme.EQ && (t is "scala.None") && (f match {
-              case Apply(TypeApply(scala_Some_apply, _), List(some)) if (left equalsStructure some) && (scala_Some_apply startsWith "scala.Some.apply") => true
-              case _ => false
-            }))
-            || (op == nme.NE && (f is "scala.None") && (t match {
-              case Apply(TypeApply(scala_Some_apply, _), List(some)) if (left equalsStructure some) && (scala_Some_apply startsWith "scala.Some.apply") => true
-              case _ => false
-            })) =>
+          case If(Apply(Select(expr1, nme.EQ), List(Literal(Constant(null)))), ScalaNone(), Apply(TypeApply(Select(ScalaSome(), Name("apply")), List(TypeTree())), List(expr2)))
+            if (expr1 equalsStructure expr2) =>
 
             warn(tree, WrapNullWithOption)
+
+          case If(Apply(Select(expr1, nme.NE), List(Literal(Constant(null)))), Apply(TypeApply(Select(ScalaSome(), Name("apply")), List(TypeTree())), List(expr2)), ScalaNone())
+            if (expr1 equalsStructure expr2) =>
+
+            warn(tree, WrapNullWithOption)
+
+          /// Passing null into method param expecting Option
+          // TODO: only first parameter list is checked. Multiple is Apply(Apply(_ List(1)), List(2)), ... but has same fun.symbol
+          case Apply(fun, args) if args.nonEmpty && !fun.isInstanceOf[Apply] && {
+            val NullLiteral = Literal(Constant(null))
+            val params = fun.symbol.asMethod.paramss.head
+            for ((param, arg) <- params.zip(args)) {
+              if (arg equalsStructure NullLiteral) {
+                var paramType = param.typeSignature
+                if (paramType.baseClasses.head.fullName == "scala.<byname>") {
+                  paramType = paramType.typeArgs.head
+                }
+                if (paramType.baseClasses.head.tpe =:= OptionClass.tpe) {
+                  warn(arg, PassingNullIntoOption)
+                }
+              }
+            }
+
+            false
+          } => // Fallthrough
 
           /// Comparing Option to None instead of using isDefined (disabled)
           /*case Apply(Select(opt, op), List(scala_None)) if (op == nme.EQ || op == nme.NE) && (scala_None is "scala.None") =>
@@ -1490,10 +1508,9 @@ final class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, UseFindNotFilterHead(identOrCol(col)))
 
           /// orElse(Some(...)).get is better written as getOrElse(...)
-          case Select(Apply(TypeApply(Select(option, Name("orElse")), _), List(Apply(scala_Some_apply, List(_value)))), Name("get"))
-            if scala_Some_apply startsWith "scala.Some.apply" =>
+          case Select(Apply(TypeApply(Select(option, Name("orElse")), _), List(Apply(TypeApply(someApply @ Select(ScalaSome(), Name("apply")), List(TypeTree())), List(_value)))), Name("get")) =>
 
-            warn(scala_Some_apply, UseGetOrElseOnOption(identOrOpt(option)))
+            warn(someApply, UseGetOrElseOnOption(identOrOpt(option)))
 
           /// if (opt.isDefined) opt.get else something is better written as getOrElse(something) and similar warnings
           //TODO: improve the warning text, and curb the code duplication

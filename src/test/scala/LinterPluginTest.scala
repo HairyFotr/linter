@@ -1148,6 +1148,30 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
   }
 
   @Test
+  def WrapNullWithOption(): Unit = {
+    implicit val msg = "which automatically wraps null"
+
+    should(""" val a = if (util.Random.nextBoolean) null else "a"; if (a == null) None else Some(a) """)
+    should(""" val a = if (util.Random.nextBoolean) null else "a"; if (a != null) Some(a) else None """)
+  }
+  @Test
+  def UseGetOrElseOnOption(): Unit = {
+    implicit val msg = "UseGetOrElseOnOption"
+
+    should(""" val a = Option("a"); a.orElse(Some("b")).get """)
+  }
+
+  def PassingNullIntoOption(): Unit = {
+    implicit val msg = "PassingNullIntoOption"
+
+    should(""" val a = Option(""); a.orElse(null) """)
+
+    should(""" def a(a: String, b: Option[String], c: String) = ""+a+b+c; a("", null, "") """)
+    noLint(""" def a(a: String, b: Option[String], c: String) = ""+a+b+c; a(null, Some(""), "") """)
+    noLint(""" def a(b: Option[String], b: String)(c: String, d: Option[String]) = ""+a+b+c+d; a(Some(""), null)(null, Some("")) """)
+  }
+
+  @Test
   def UseFlattenNotFilterOption(): Unit = {
     implicit val msg = ".flatten instead of "//.filter(_.isDefined).map(_.get)"
 
@@ -2892,9 +2916,6 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
 
   @Test
   def optionChecks(): Unit = {
-
-    should("""var a: String = null; if(a+"" == null) None else Some(a+"")""")("""Use Option(...), which automatically wraps null to None""")
-    should("""var a: String = null; if(a+"" != null) Some(a+"") else None""")("""Use Option(...), which automatically wraps null to None""")
 
     should("""def a: Option[Int] = null""")("""You probably meant None, not null.""")
     should("""val a: Option[Int] = null""")("""You probably meant None, not null.""")
