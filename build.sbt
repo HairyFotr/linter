@@ -6,27 +6,20 @@ homepage := Some(url("https://github.com/HairyFotr/linter"))
 
 scalaVersion := "2.10.6"
 crossScalaVersions := Seq("2.10.6", "2.11.8", "2.12.0")
-
 libraryDependencies += "org.scala-lang" % "scala-compiler" % scalaVersion.value
 
 resolvers ++= Seq("snapshots", "releases").map(Resolver.sonatypeRepo)
 
 // Testing
 libraryDependencies ++= Seq(
-   "junit"         % "junit"           % "4.12"  % Test
-  ,"com.novocode"  % "junit-interface" % "0.11"  % Test
-  ,"org.specs2"   %% "specs2-core"     % "3.8.6" % Test
+  "com.novocode"  % "junit-interface" % "0.11"  % Test,
+  "org.specs2"   %% "specs2-core"     % "3.8.6" % Test
 )
 
 // Enable linter in console
-scalacOptions in console in Compile <+= (packageBin in Compile) map { pluginJar => "-Xplugin:"+pluginJar }
+scalacOptions in (Compile, console) += "-Xplugin:" + (packageBin in Compile).value
 
-publishTo := {
-  if (isSnapshot.value)
-    Some("snapshots" at "https://oss.sonatype.org/content/repositories/snapshots")
-  else
-    Some("releases"  at "https://oss.sonatype.org/service/local/staging/deploy/maven2")
-}
+publishTo := Some(Resolver.sonatypeRepo(if (isSnapshot.value) "snapshots" else "releases"))
 publishMavenStyle := true
 publishArtifact in Test := false
 pomIncludeRepository := { _ => false }

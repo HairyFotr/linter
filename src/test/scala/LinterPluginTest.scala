@@ -85,7 +85,7 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
             .reverse.mkString(" -> ")
 
         val fail = s"""|
-                       |problem: $problem:
+                       |problem: $problem
                        |message: $expectedMsg
                        |  trace: $trace
                        |   code: $code

@@ -90,7 +90,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
         case _: NullPointerException => //Ignore
         case _: NoSuchMethodError => //Ignore
         case _: StackOverflowError => superTraverse = false
-        case _: Exception => //TODO: Print details and ask user to report it
+        case e: Exception => //e.printStackTrace//TODO: Print details and ask user to report it
       }
       def finalizer(tree: Tree): Unit = {
         if (superTraverse) try { super.traverse(tree) } catch catcher
@@ -197,7 +197,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
                     //println(treeLiteral.pos.lineContent)
                     //e.printStackTrace
                 }
-                // TODO: this is more correct, but needs some work
+                //TODO: this is more correct, but needs some work
                 //("%.1080f".format(literal), token)
                 (literal.toString, token)
               }
@@ -241,6 +241,9 @@ final class LinterPlugin(val global: Global) extends Plugin {
 
     class PostTyperTraverser(unit: CompilationUnit) extends Traverser {
       implicit val unitt: CompilationUnit = unit
+      val utils = new Utils[global.type](global)
+      import utils._
+
       import definitions.{ AnyClass, NothingClass, ObjectClass, Object_== }
       import definitions.{ OptionClass, SeqClass, TraversableClass, ListClass, StringClass }
       import definitions.{ DoubleClass, FloatClass, CharClass, ByteClass, ShortClass, IntClass, LongClass, BooleanClass }
@@ -303,10 +306,6 @@ final class LinterPlugin(val global: Global) extends Plugin {
         (t.tpe.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe)
         && t.tpe.widen.typeArgs.exists(_.widen.baseClasses.exists(_.tpe =:= OptionClass.tpe)))
 
-      def isLiteral(t: Tree): Boolean = t match {
-        case Literal(_) => true
-        case _ => false
-      }
       def isIdent(t: Tree, recursive: Boolean = false): Boolean = t match {
         case Ident(_) => true
         case Select(t2, _TermName) if recursive => isIdent(t2, recursive)
@@ -338,23 +337,6 @@ final class LinterPlugin(val global: Global) extends Plugin {
 
         hasIntDiv && (isFloatConversion || hasIntOpFloat)
       }
-
-      // Just a way to make the Tree/Name-String comparisons more readable
-      //@deprecated("Replace with extractor object or elaborate pattern match", "0.1.17")
-      abstract class RichToStr[T](n: T) {
-        val nstr = n.toString
-        def is(str: String): Boolean = nstr == str
-        def isAny(strs: String*): Boolean = strs contains nstr
-        def startsWith(str: String): Boolean = nstr startsWith str
-        def startsWithAny(strs: String*): Boolean = strs.exists(nstr startsWith _)
-        def endsWith(str: String): Boolean = nstr endsWith str
-        def endsWithAny(strs: String*): Boolean = strs.exists(nstr endsWith _)
-        def contains(str: String): Boolean = nstr contains str
-        def containsAny(strs: String*): Boolean = strs.exists(nstr contains _)
-      }
-      implicit class richTree(n: Tree) extends RichToStr[Tree](n)
-      implicit class richName(n: Name) extends RichToStr[Name](n)
-
 
       def identOrDefault(tree: Tree, default: String): String = {
         tree match {
@@ -458,47 +440,10 @@ final class LinterPlugin(val global: Global) extends Plugin {
         case _: NullPointerException => //Ignore
         case _: NoSuchMethodError => //Ignore
         case _: StackOverflowError => superTraverse = false
-        case _: Exception => //TODO: Print details and ask user to report it
+        case e: Exception => //e.printStackTrace//TODO: Print details and ask user to report it
       }
       def finalizer(tree: Tree): Unit = {
         if (superTraverse) try { super.traverse(tree) } catch catcher
-      }
-
-      object Name {
-        def unapply(name: Name): Option[String] = Some(name.toString)
-      }
-
-      object HeadOrLastName {
-        def unapply(func: Name): Option[String] =
-          func.toString match {
-            case f @ ("head"|"last") => Some(f)
-            case _ => None
-          }
-      }
-
-      object SizeOrLengthName {
-        def unapply(func: Name): Option[String] =
-          func.toString match {
-            case f @ ("size"|"length") => Some(f)
-            case _ => None
-          }
-      }
-
-      object ScalaSome { def unapply(tree: Tree): Boolean = tree is "scala.Some" }
-      object ScalaNone { def unapply(tree: Tree): Boolean = tree is "scala.None" }
-
-      object ArrayOpsOrAugmentedString {
-        def unapply(tree: Tree): Boolean = tree.containsAny("ArrayOps", "augmentString")
-      }
-
-      object FloatingPointNumber {
-        def unapply(tree: Tree): Option[Tree] = {
-          tree match {
-            case Apply(xWrapper, List(FloatingPointNumber(x))) if xWrapper.toString endsWith "Wrapper" => Some(x)
-            case t if isSubtype(tree, DoubleClass.tpe) || isSubtype(tree, FloatClass.tpe) => Some(t)
-            case _ => None
-          }
-        }
       }
 
       override def traverse(tree: Tree): Unit = try {
@@ -892,7 +837,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
               val toTpe = tTpe.toString.drop(2)
               val targetTpe = tree.tpe.widen.toString
 
-              // TODO deal with false positives from this, see commented test
+              //TODO: deal with false positives from this, see commented test
               // oh my...
               /// Array.toArray: scala.collection.mutable.ArrayOps[Int] => [U >: Int](implicit evidence$1: scala.reflect.ClassTag[U])Array[U]
               /// Map.toMap: scala.collection.mutable.Map[Int,Int] => [T, U](implicit ev: <:<[(Int, Int),(T, U)])scala.collection.immutable.Map[T,U])
@@ -1163,6 +1108,8 @@ final class LinterPlugin(val global: Global) extends Plugin {
                 if (scala_Some.original is "scala.Some") =>
 
                 warn(tree, UseOptionForallNotPatMatch(y.toString))
+
+              case _ =>
             }
             matchOption(orderOption(cases))
           //// If checks
@@ -1211,7 +1158,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
           case If(cond, Apply(Select(id1, setter1), List(_)), Apply(Select(id2, setter2), List(_)))
             if (setter1 endsWith "_$eq") && (setter2 endsWith "_$eq") && (id1.toString == id2.toString) && !(id1.toString contains ".this") =>
             warn(cond, UseIfExpression(id1.toString))
-          // TODO showRaw hack - find flag for macro code instead
+          //TODO: showRaw hack - find flag for macro code instead
           case If(cond, Block(block, ret), Block(_, _)) if (isReturnStatement(ret) || block.exists(isReturnStatement)) && !showRaw(tree).contains("$macro$") => // Idea from oclint
             warn(cond, UnnecessaryElseBranch)
           case If(_cond, a, b) if (a equalsStructure b) && (a.children.nonEmpty) =>
@@ -1479,24 +1426,28 @@ final class LinterPlugin(val global: Global) extends Plugin {
             warn(tree, WrapNullWithOption)
 
           /// Passing null into method param expecting Option
-          // TODO: only first parameter list is checked. Multiple is Apply(Apply(_ List(1)), List(2)), ... but has same fun.symbol
-          case Apply(fun, args) if args.nonEmpty && !fun.isInstanceOf[Apply] && {
-            val NullLiteral = Literal(Constant(null))
-            val params = fun.symbol.asMethod.paramss.head
-            for ((param, arg) <- params.zip(args)) {
-              if (arg equalsStructure NullLiteral) {
-                var paramType = param.typeSignature
-                if (paramType.baseClasses.head.fullName == "scala.<byname>") {
-                  paramType = paramType.typeArgs.head
-                }
-                if (paramType.baseClasses.head.tpe =:= OptionClass.tpe) {
-                  warn(arg, PassingNullIntoOption)
+          //TODO: only first parameter list is checked. Multiple is Apply(Apply(_ List(1)), List(2)), ... but has same fun.symbol
+          case Apply(fun, args)
+            if args.nonEmpty
+            && !fun.isInstanceOf[Apply]
+            && fun.symbol.isMethod
+            && {
+              val NullLiteral = Literal(Constant(null))
+              val params = fun.symbol.asMethod.paramss.head
+              for ((param, arg) <- params.zip(args)) {
+                if (arg equalsStructure NullLiteral) {
+                  var paramType = param.typeSignature
+                  if (paramType.baseClasses.head.fullName == "scala.<byname>") {
+                    paramType = paramType.typeArgs.head
+                  }
+                  if (paramType.baseClasses.head.tpe =:= OptionClass.tpe) {
+                    warn(arg, PassingNullIntoOption)
+                  }
                 }
               }
-            }
 
-            false
-          } => // Fallthrough
+              false
+            } => // Fallthrough
 
           /// Comparing Option to None instead of using isDefined (disabled)
           /*case Apply(Select(opt, op), List(scala_None)) if (op == nme.EQ || op == nme.NE) && (scala_None is "scala.None") =>
@@ -1552,7 +1503,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
 
           case Select(qualifier, name) if {//#microcosm
 
-            // TODO Possibly a bug - tried with regular class too
+            //TODO: Possibly a bug - tried with regular class too
             import scala.language.reflectiveCalls
 
             object FilterFuncName {
@@ -1575,7 +1526,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
             }
 
             ///[!]filter[Not](cond).[is|non]Empty -> [!]seq.[exists|forall]([!]cond) ... o_O
-            // TODO parse cond for simple _ ==/!= x conditions to improve suggestions
+            //TODO: parse cond for simple _ ==/!= x conditions to improve suggestions
             def warnUseExistsNotFilterIsEmpty(col: String, stmtNegated: Boolean, filterFunc: String, emptyFunc: String, pos: Position): Unit = {
               val replacements = (
                 if (filterFunc == "filter") {
@@ -1741,7 +1692,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
             }
 
           /// col.map(...).map(...)
-          // TODO too noisy
+          //TODO: Too noisy e.g. col.map(_.x).map( more than 2 references to x ) would be uglier
           case Apply(TypeApply(Select(Apply(Apply(TypeApply(Select(col, Name("map")), _), List(Function(List(ValDef(_, _, _, _)), _))), List(_canBuildFrom)), Name("map")), _), List(Function(List(ValDef(_, _, _, _)), _)))
             if (col.tpe.baseClasses.exists(_.tpe =:= TraversableClass.tpe)) =>
 
@@ -2090,7 +2041,6 @@ final class LinterPlugin(val global: Global) extends Plugin {
     class PostTyperInterpreterTraverser(unit: CompilationUnit) extends Traverser {
       implicit val unitt: CompilationUnit = unit
       var treePosHolder: Tree = null
-      import org.psywerx.hairyfotr.Utils._
       val utils = new Utils[global.type](global)
       import utils._
 
@@ -2282,22 +2232,22 @@ final class LinterPlugin(val global: Global) extends Plugin {
                   }).addCondition(_ != value)
                 case nme.GT => new Values(
                     ranges.flatMap { case (low, high) => if (low > value) Some((low, high)) else if (high > value) Some((value+1, high)) else None },
-                    values.filter { _ > value },
+                    values.filter(_ > value),
                     Set(_ > value),
                     this.name)
                 case nme.GE => new Values(
                     ranges.flatMap { case (low, high) => if (low >= value) Some((low, high)) else if (high >= value) Some((value, high)) else None },
-                    values.filter { _ >= value },
+                    values.filter(_ >= value),
                     Set(_ >= value),
                     this.name)
                 case nme.LT => new Values(
                     ranges.flatMap { case (low, high) => if (high < value) Some((low, high)) else if (low < value) Some((low, value-1)) else None },
-                    values.filter { _ < value },
+                    values.filter(_ < value),
                     Set(_ < value),
                     this.name)
                 case nme.LE => new Values(
                     ranges.flatMap { case (low, high) => if (high <= value) Some((low, high)) else if (low <= value) Some((low, value)) else None },
-                    values.filter { _ <= value },
+                    values.filter(_ <= value),
                     Set(_ <= value),
                     this.name)
                 case _ =>
@@ -3735,14 +3685,10 @@ final class LinterPlugin(val global: Global) extends Plugin {
         case _: NullPointerException => //Ignore
         case _: NoSuchMethodError => //Ignore
         case _: StackOverflowError => superTraverse = false
-        case _: Exception => //TODO: Print details and ask user to report it
+        case e: Exception => //e.printStackTrace//TODO: Print details and ask user to report it
       }
       def finalizer(tree: Tree): Unit = {
         if (superTraverse) try { super.traverse(tree) } catch catcher else doNotTraverse += tree
-      }
-
-      object Name {
-        def unapply(name: Name): Option[String] = Some(name.toString)
       }
 
       override def traverse(tree: Tree): Unit = try {
@@ -4069,7 +4015,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
         case _: NullPointerException => //Ignore
         case _: NoSuchMethodError => //Ignore
         case _: StackOverflowError => superTraverse = false
-        case _: Exception => //TODO: Print details and ask user to report it
+        case e: Exception => //e.printStackTrace//TODO: Print details and ask user to report it
       }
       def finalizer(tree: Tree): Unit = {
         if (superTraverse) try { super.traverse(tree) } catch catcher

@@ -58,7 +58,7 @@ final object Utils {
   // Characters `<-=!>` are meta only inside groups, which the regex prevents.
   // Closing brackets ] and } act as normal characters, if there is no opening brackets
   // False positives: none that I know of
-  // False negatives: a[b]c, ...
+  // False negatives: none trivial enough to warrant inclusion, I guess
   val PlainStringRegex = """([^(\[{\\^$|)?*+.]|[\\][(\[{\\^$|)?*+.]|\[[^\[\\^\]]\])*"""
   def cleanPlainRegex(s: String): String = s.replaceAll("""[\\](.)""", "$1").replaceAll("""\[(.)\]""", "$1")
 
@@ -87,6 +87,56 @@ class Utils[G <: Global](val global: G) {
     for (Ident(id) <- tree) used += id.toString
     used
   }
+
+  object Name {
+    def unapply(name: Name): Option[String] = Some(name.toString)
+  }
+
+  object HeadOrLastName {
+    def unapply(func: Name): Option[String] = func match {
+      case Name("head"|"last") => Some(func.toString)
+      case _ => None
+    }
+  }
+
+  object SizeOrLengthName {
+    def unapply(func: Name): Option[String] = func match {
+      case Name("size"|"length") => Some(func.toString)
+      case _ => None
+    }
+  }
+
+  object ScalaSome { def unapply(tree: Tree): Boolean = tree is "scala.Some" }
+  object ScalaNone { def unapply(tree: Tree): Boolean = tree is "scala.None" }
+
+  object ArrayOpsOrAugmentedString {
+    def unapply(tree: Tree): Boolean = tree.containsAny("ArrayOps", "augmentString")
+  }
+
+  object FloatingPointNumber {
+    import definitions.{ DoubleClass, FloatClass }
+    def unapply(tree: Tree): Option[Tree] = tree match {
+      case Apply(xWrapper, List(FloatingPointNumber(x))) if xWrapper.toString endsWith "Wrapper" => Some(x)
+      case t if isSubtype(tree, DoubleClass.tpe) || isSubtype(tree, FloatClass.tpe) => Some(t)
+      case _ => None
+    }
+  }
+
+  // Just a way to make the Tree/Name-String comparisons more readable
+  //@deprecated("Replace with extractor object or elaborate pattern match", "0.1.17")
+  abstract class RichToStr[T](n: T) {
+    val nstr = n.toString
+    def is(str: String): Boolean = nstr == str
+    def isAny(strs: String*): Boolean = strs contains nstr
+    def startsWith(str: String): Boolean = nstr startsWith str
+    def startsWithAny(strs: String*): Boolean = strs.exists(nstr startsWith _)
+    def endsWith(str: String): Boolean = nstr endsWith str
+    def endsWithAny(strs: String*): Boolean = strs.exists(nstr endsWith _)
+    def contains(str: String): Boolean = nstr contains str
+    def containsAny(strs: String*): Boolean = strs.exists(nstr contains _)
+  }
+  implicit class richTree(n: Tree) extends RichToStr[Tree](n)
+  implicit class richName(n: Name) extends RichToStr[Name](n)
 
   import definitions.{ AnyClass, OptionClass }
   val JavaConversionsModule: Symbol = rootMirror.getModuleByName(newTermName("scala.collection.JavaConversions"))

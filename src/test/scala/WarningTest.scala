@@ -7,7 +7,7 @@ class WarningTest extends MustThrownMatchers {
   @Test
   def allIncludesAll(): Unit = {
     // TODO could do it with reflection
-    val knownCount = 122
+    val knownCount = 123
     val count: Int = Warning.All.distinct.map {
       case AssigningOptionToNull => 1
       case AvoidOptionCollectionSize => 1
@@ -87,6 +87,7 @@ class WarningTest extends MustThrownMatchers {
       case UseFlattenNotFilterOption(_, _, _) => 1
       case UseCountNotFilterLength(_, _) => 1
       case UseExistsNotCountCompare(_) => 1
+      case PassingNullIntoOption => 1
       case UseGetOrElseOnOption(_) => 1
       case UseIsNanNotNanComparison => 1
       case UseIsNanNotSelfComparison => 1

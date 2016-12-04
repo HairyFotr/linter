@@ -1,7 +1,3 @@
-//import de.johoop.cpd4sbt.CopyPasteDetector._
-//import de.johoop.cpd4sbt.{OutputType => CPDOutputType, ReportType => CPDReportType}
-//import de.johoop.findbugs4sbt._
-
 scalacOptions ++= Seq(
    "-feature"
   ,"-deprecation"
@@ -55,13 +51,16 @@ scalastyleConfig := baseDirectory.value / "sca" / "scalastyle-config.xml"
 watchSources += baseDirectory.value / "sca" / "scalastyle-config.xml"
 
 // Findbugs (optionally put findbugs plugins (such as fb-contrib and findsecbugs) jars into ~/.findbugs/plugin)
+//import de.johoop.findbugs4sbt._
 //findbugsSettings
 //findbugsEffort := Effort.Maximum
 //findbugsReportPath <<= baseDirectory { base => Some(base / "sca" / "findbugsoutput.xml") }
 
 // CPD
-//cpdSettings
-//cpdTargetPath <<= baseDirectory { base => base / "sca" }
+//import de.johoop.cpd4sbt.{OutputType => CPDOutputType, ReportType => CPDReportType}
+//enablePlugins(CopyPasteDetector)
+//cpdTargetPath := baseDirectory.value / "sca"
 //cpdReportName := "cpdoutput.txt"
 //cpdReportType := CPDReportType.Simple
 //cpdOutputType := CPDOutputType.Console
+//cpdMinimumTokens := 50

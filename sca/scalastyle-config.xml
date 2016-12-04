@@ -119,25 +119,28 @@
   </parameters>
  </check>
  <check level="warning" class="org.scalastyle.scalariform.ProcedureDeclarationChecker" enabled="true"/>
- 
+
 
  <!-- Custom rules -->
  <check level="error" class="org.scalastyle.scalariform.TokenChecker" enabled="true">
   <customMessage>Disallowed method: println</customMessage>
-  <parameters>
-   <parameter name="regex"><![CDATA[println]]></parameter>
-  </parameters>
+  <parameters><parameter name="regex"><![CDATA[println]]></parameter></parameters>
+ </check>
+ <check level="error" class="org.scalastyle.scalariform.TokenChecker" enabled="true">
+  <customMessage>Disallowed method: printStackTrace</customMessage>
+  <parameters><parameter name="regex"><![CDATA[printStackTrace]]></parameter></parameters>
  </check>
  <check level="error" class="org.scalastyle.file.RegexChecker" enabled="true">
   <customMessage>Disallowed method: unit.warning</customMessage>
-  <parameters>
-   <parameter name="regex"><![CDATA[unit[.]warning[(]]]></parameter>
-  </parameters>
+  <parameters><parameter name="regex"><![CDATA[unit[.]warning[(]]]></parameter></parameters>
  </check>
+
  <check level="warning" class="org.scalastyle.file.RegexChecker" enabled="true">
   <customMessage>Unindented comment</customMessage>
-  <parameters>
-   <parameter name="regex"><![CDATA[^//]]></parameter>
-  </parameters>
+  <parameters><parameter name="regex"><![CDATA[^//]]></parameter></parameters>
+ </check>
+ <check level="warning" class="org.scalastyle.file.RegexChecker" enabled="true">
+  <customMessage>Malformed TODO</customMessage>
+  <parameters><parameter name="regex"><![CDATA[/[/*] TODO|/[/*]TODO[^:*][^ /]]]></parameter></parameters>
  </check>
 </scalastyle>

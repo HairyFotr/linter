@@ -134,6 +134,7 @@ final object Warning {
     SuspiciousMatches(""),
     IfDoWhile,
     FloatingPointNumericRange,
+    PassingNullIntoOption,
     UseGetOrElseNotPatMatch(""),
     UseOrElseNotPatMatch(""),
     UseOptionFlatMapNotPatMatch(""),
@@ -309,7 +310,7 @@ case class UnnecessaryMethodCall(method: String) extends
   Warning(s"This $method is always unnecessary.")
 case object ProducesEmptyCollection extends
   Warning("The resulting collection will always be empty.")
-case class OperationAlwaysProducesZero(operation: String) extends // TODO: merge with InvariantReturn?
+case class OperationAlwaysProducesZero(operation: String) extends //TODO: merge with InvariantReturn?
   Warning(s"This $operation will always return 0.")
 case object ModuloByOne extends
   Warning("Taking the modulo by one will return zero.")
