@@ -1447,7 +1447,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
               }
 
               false
-            } => // Fallthrough
+            } => //Fallthrough
 
           /// Comparing Option to None instead of using isDefined (disabled)
           /*case Apply(Select(opt, op), List(scala_None)) if (op == nme.EQ || op == nme.NE) && (scala_None is "scala.None") =>
@@ -4043,7 +4043,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
               val used = for (Ident(name) <- tree if params contains name.toString) yield name.toString
               val unused = params -- used
 
-              if (unused.size > 0) {
+              if (unused.nonEmpty) {
                 warn(tree, UnusedParameter(unused, name.toString.stripSuffix("$extension")))
               }
             }

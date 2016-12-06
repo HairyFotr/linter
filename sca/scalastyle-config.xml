@@ -143,4 +143,8 @@
   <customMessage>Malformed TODO</customMessage>
   <parameters><parameter name="regex"><![CDATA[/[/*] TODO|/[/*]TODO[^:*][^ /]]]></parameter></parameters>
  </check>
+ <check level="warning" class="org.scalastyle.file.RegexChecker" enabled="true">
+  <customMessage>Malformed Fallthrough</customMessage>
+  <parameters><parameter name="regex"><![CDATA[(?<!(} =>|false) //)Fallthrough]]></parameter></parameters>
+ </check>
 </scalastyle>
