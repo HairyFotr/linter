@@ -99,7 +99,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
         superTraverse = true
         //if (showRaw(tree).contains("Hello"))println(showRaw(tree))
         tree match {
-          /// quick hack for nowarnMergeNestedIfsPositions, see issue #18
+          /// quick hack for nowarnMergeNestedIfsPositions //Issue #18
           case If(_, apply @ Apply(_, _), Literal(Constant(())))
             if !(linterOptions.disabledWarningNames contains MergeNestedIfs.name)
             && { nowarnMergeNestedIfsPositions += apply.pos; false } => //Fallthrough
@@ -1147,36 +1147,11 @@ final class LinterPlugin(val global: Global) extends Plugin {
 
             warn(tree, YodaConditions)
 
-          /// Unnecessary Ifs
-          case If(cond, Literal(Constant(true)), Literal(Constant(false))) =>
-            warn(cond, UseConditionDirectly())
-          case If(cond, Literal(Constant(false)), Literal(Constant(true))) =>
-            warn(cond, UseConditionDirectly(negated = true))
-          case If(cond, Assign(id1, _), Assign(id2, _)) //TODO: .this workaround for object-local variables sucks... false negatives
-            if (id1.toString == id2.toString) && !(id1.toString contains ".this") =>
-            warn(cond, UseIfExpression(id1.toString))
-          case If(cond, Apply(Select(id1, setter1), List(_)), Apply(Select(id2, setter2), List(_)))
-            if (setter1 endsWith "_$eq") && (setter2 endsWith "_$eq") && (id1.toString == id2.toString) && !(id1.toString contains ".this") =>
-            warn(cond, UseIfExpression(id1.toString))
-          //TODO: showRaw hack - find flag for macro code instead
-          case If(cond, Block(block, ret), Block(_, _)) if (isReturnStatement(ret) || block.exists(isReturnStatement)) && !showRaw(tree).contains("$macro$") => // Idea from oclint
-            warn(cond, UnnecessaryElseBranch)
-          case If(_cond, a, b) if (a equalsStructure b) && (a.children.nonEmpty) =>
-            //TODO: empty if statement (if (...) { }) triggers this - issue warning for that case?
-            //TODO: test if a single statement counts as children.nonEmpty
-            warn(a, DuplicateIfBranches)
-          case If(_cond1, a, If(_cond2, b, c))
-            if (a.children.nonEmpty && ((a equalsStructure b) || (a equalsStructure c)))
-            || (b.children.nonEmpty && (b equalsStructure c)) =>
-            //TODO: could be made recursive, but probably no need
-
-            warn(a, DuplicateIfBranches)
-
-          /// Find repeated (sub)conditions in if-else chains, that will never hold
-          // Caches conditions separated by OR, and checks all subconditions separated by either AND or OR
-          case If(_cond, t, e) if {
+          case If(cond, thenp, elsep) if {//Microcosm
+            /// Find repeated (sub)conditions in if-else chains, that will never hold
+            // Caches conditions separated by OR, and checks all subconditions separated by either AND or OR
             def getSubConds(cond: Tree)(op: Name): List[Tree] =
-              List(cond) ++ (cond match {
+              cond :: (cond match {
                 case Apply(Select(left, opp), List(right)) if op == opp =>
                   getSubConds(left)(op) ++ getSubConds(right)(op)
                 case _ =>
@@ -1213,23 +1188,52 @@ final class LinterPlugin(val global: Global) extends Plugin {
             }
             elseIf(tree)
 
+            (thenp, elsep) match {
+              /// Unnecessary Ifs
+              case (Literal(Constant(true)), Literal(Constant(false))) =>
+                warn(cond, UseConditionDirectly())
+              case (Literal(Constant(false)), Literal(Constant(true))) =>
+                warn(cond, UseConditionDirectly(negated = true))
+              case (Assign(id1, _), Assign(id2, _)) //TODO: .this workaround for object-local variables sucks... false negatives
+                if (id1.toString == id2.toString) && !(id1.toString contains ".this") =>
+                warn(cond, UseIfExpression(id1.toString))
+              case (Apply(Select(id1, setter1), List(_)), Apply(Select(id2, setter2), List(_)))
+                if (setter1 endsWith "_$eq") && (setter2 endsWith "_$eq") && (id1.toString == id2.toString) && !(id1.toString contains ".this") =>
+                warn(cond, UseIfExpression(id1.toString))
+              //TODO: showRaw hack - find flag for macro code instead
+              case (Block(block, ret), Block(_, _)) if (isReturnStatement(ret) || block.exists(isReturnStatement)) && !showRaw(tree).contains("$macro$") => // Idea from oclint
+                warn(cond, UnnecessaryElseBranch)
+              case (a, b) if (a.children.nonEmpty) && (a equalsStructure b) =>
+                //TODO: empty if statement (if (...) { }) triggers this - emit warning for that case?
+                //TODO: test if a single statement counts as children.nonEmpty
+                warn(a, DuplicateIfBranches)
+              case (a, If(_, b, c))
+                if (a.children.nonEmpty && ((a equalsStructure b) || (a equalsStructure c)))
+                || (b.children.nonEmpty && (b equalsStructure c)) =>
+                //TODO: could be made recursive, but probably no need
+
+                warn(a, DuplicateIfBranches)
+
+              /// if (cond1) { if (cond2) { ... } } is the same as if (cond1 && cond2) { ... }
+              case (iff @ If(_cond2, _body, else1), else2)
+                if (else1 equalsStructure else2)
+                && !(nowarnMergeNestedIfsPositions contains iff.pos) =>
+
+                warn(tree, MergeNestedIfs)
+
+              /// ifdowhile loop (idea by OpenSSL Valhalla Rampage) :)
+              case (LabelDef(doWhile1, List(), Block(_body, If(cond2, Apply(Ident(doWhile2), List()), Literal(Constant(()))))), Literal(Constant(())))
+                if (cond equalsStructure cond2)
+                && (doWhile1.toString startsWith "doWhile")
+                && (doWhile1.toString == doWhile2.toString) =>
+
+                warn(tree, IfDoWhile)
+
+              case _ =>
+            }
+
             false
           } => //Fallthrough
-
-          /// if (cond1) { if (cond2) { ... } } is the same as if (cond1 && cond2) { ... }
-          case If(_cond1, iff @ If(_cond2, _body, else1), else2)
-            if (else1 equalsStructure else2)
-            && !(nowarnMergeNestedIfsPositions contains iff.pos) =>
-
-            warn(tree, MergeNestedIfs)
-
-          /// ifdowhile loop (idea by OpenSSL Valhalla Rampage) :)
-          case If(cond1, LabelDef(doWhile1, List(), Block(_body, If(cond2, Apply(Ident(doWhile2), List()), Literal(Constant(()))))), Literal(Constant(())))
-            if (cond1 equalsStructure cond2)
-            && (doWhile1.toString startsWith "doWhile")
-            && (doWhile1.toString == doWhile2.toString) =>
-
-            warn(tree, IfDoWhile)
 
           //// Multiple-statement checks
           case Block(init, last) =>
@@ -1243,45 +1247,43 @@ final class LinterPlugin(val global: Global) extends Plugin {
             case object Used extends AssignStatus
 
             val assigns = mutable.HashMap[Name, AssignStatus]() withDefaultValue Unknown
-            def checkAssigns(tree: Tree, onlySetUsed: Boolean): Unit = {
-              tree match {
-                case ClassDef(_, _, _, _) | DefDef(_, _, _, _, _, _) =>
-                  // see issue 21 - skip assignments that are not executed immediately
+            def checkAssigns(tree: Tree, onlySetUsed: Boolean): Unit = tree match {
+              case ClassDef(_, _, _, _) | DefDef(_, _, _, _, _, _) =>
+                // skip assignments that are not executed immediately //Issue #21
 
-                //TODO: It could check if it gets set in all branches - Ignores currently
-                case If(_, _, _) | Match(_, _) =>
-                  for (t <- tree.children) checkAssigns(t, onlySetUsed = true)
+              //TODO: It could check if it gets set in all branches - Ignores currently
+              case If(_, _, _) | Match(_, _) =>
+                for (t <- tree.children) checkAssigns(t, onlySetUsed = true)
 
-                case ValDef(mods, id, _, right) if mods.isMutable =>
-                  //TODO: shadowing warning doesn't work, even if I make sure each tree is visited once, and even if I don't traverse inner Blocks
-                  //if (assigns contains id) warn(tree, "Variable "+id.toString+" is being shadowed here.")
-                  checkAssigns(right, onlySetUsed)
+              case ValDef(mods, id, _, right) if mods.isMutable =>
+                //TODO: shadowing warning doesn't work, even if I make sure each tree is visited once, and even if I don't traverse inner Blocks
+                //if (assigns contains id) warn(tree, "Variable "+id.toString+" is being shadowed here.")
+                checkAssigns(right, onlySetUsed)
 
-                  assigns(id) =
-                    if((right.tpe.widen weak_<:< DoubleClass.tpe)
-                    || (right.tpe.widen <:< BooleanClass.tpe)
-                    || (right.tpe.widen <:< StringClass.tpe)
-                    || (right isAny ("null", "scala.None")))
-                      Defined //Ignore these initial values
-                    else
-                      Unused
+                assigns(id) =
+                  if((right.tpe.widen weak_<:< DoubleClass.tpe)
+                  || (right.tpe.widen <:< BooleanClass.tpe)
+                  || (right.tpe.widen <:< StringClass.tpe)
+                  || (right isAny ("null", "scala.None")))
+                    Defined //Ignore these initial values
+                  else
+                    Unused
 
-                case Assign(Ident(id), right) =>
-                  checkAssigns(right, onlySetUsed)
-                  if (!onlySetUsed) assigns(id) match {
-                    case Unknown => //Ignore
-                    case Defined => assigns(id) = Unused
-                    case Used    => assigns(id) = Unused
-                    case Unused  => warn(tree, VariableAssignedUnusedValue(id.toString))
-                  }
+              case Assign(Ident(id), right) =>
+                checkAssigns(right, onlySetUsed)
+                if (!onlySetUsed) assigns(id) match {
+                  case Unknown => //Ignore
+                  case Defined => assigns(id) = Unused
+                  case Used    => assigns(id) = Unused
+                  case Unused  => warn(tree, VariableAssignedUnusedValue(id.toString))
+                }
 
-                case Ident(id) =>
-                  assigns(id) = Used
+              case Ident(id) =>
+                assigns(id) = Used
 
-                case tree =>
-                  //for (Ident(id) <- tree; if assigns(id) == Unused()) assigns(id) == Used()
-                  for (t <- tree.children) checkAssigns(t, onlySetUsed)
-              }
+              case _ =>
+                //for (Ident(id) <- tree; if assigns(id) == Unused()) assigns(id) == Used()
+                for (t <- tree.children) checkAssigns(t, onlySetUsed)
             }
 
             /// Warning on exiting a block with unused values (broken/disabled)
@@ -1414,17 +1416,6 @@ final class LinterPlugin(val global: Global) extends Plugin {
               case _ => false
             }) => //Ignore
 
-          /// Null checking instead of Option wrapping
-          case If(Apply(Select(expr1, nme.EQ), List(Literal(Constant(null)))), ScalaNone(), Apply(TypeApply(Select(ScalaSome(), Name("apply")), List(TypeTree())), List(expr2)))
-            if (expr1 equalsStructure expr2) =>
-
-            warn(tree, WrapNullWithOption)
-
-          case If(Apply(Select(expr1, nme.NE), List(Literal(Constant(null)))), Apply(TypeApply(Select(ScalaSome(), Name("apply")), List(TypeTree())), List(expr2)), ScalaNone())
-            if (expr1 equalsStructure expr2) =>
-
-            warn(tree, WrapNullWithOption)
-
           /// Passing null into method param expecting Option
           //TODO: only first parameter list is checked. Multiple is Apply(Apply(_ List(1)), List(2)), ... but has same fun.symbol
           case Apply(fun, args)
@@ -1432,17 +1423,14 @@ final class LinterPlugin(val global: Global) extends Plugin {
             && !fun.isInstanceOf[Apply]
             && fun.symbol.isMethod
             && {
-              val NullLiteral = Literal(Constant(null))
               val params = fun.symbol.asMethod.paramss.head
-              for ((param, arg) <- params.zip(args)) {
-                if (arg equalsStructure NullLiteral) {
-                  var paramType = param.typeSignature
-                  if (paramType.baseClasses.head.fullName == "scala.<byname>") {
-                    paramType = paramType.typeArgs.head
-                  }
-                  if (paramType.baseClasses.head.tpe =:= OptionClass.tpe) {
-                    warn(arg, PassingNullIntoOption)
-                  }
+              for ((param, arg @ Literal(Constant(null))) <- params.zip(args)) {
+                var paramType = param.typeSignature
+                if (paramType.baseClasses.head.fullName == "scala.<byname>") {
+                  paramType = paramType.typeArgs.head
+                }
+                if (paramType.baseClasses.head.tpe =:= OptionClass.tpe) {
+                  warn(arg, PassingNullIntoOption)
                 }
               }
 
@@ -1463,45 +1451,65 @@ final class LinterPlugin(val global: Global) extends Plugin {
 
             warn(someApply, UseGetOrElseOnOption(identOrOpt(option)))
 
-          /// if (opt.isDefined) opt.get else something is better written as getOrElse(something) and similar warnings
-          //TODO: improve the warning text, and curb the code duplication
-          case If(Select(opt1, Name("isDefined")), getCase @ Select(opt2, Name("get")), elseCase) //duplication
-            if (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
+          case If(cond, thenp, elsep) if {//Microcosm
 
-            if (elseCase equalsStructure Literal(Constant(null))) warn(opt2, UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + ".isDefined"))
-            else if (getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + ".isDefined"))
+            def warnOption(pos: Tree, getCase: Tree, otherCase: Tree, not: Boolean, tail: String): Unit = {
+              val ident = identOrOpt(pos)
+              if (otherCase equalsStructure Literal(Constant(null))) warn(pos, UseOptionOrNull(ident, ident + tail))
+              else if (getCase.tpe.widen <:< otherCase.tpe.widen)    warn(pos, UseOptionGetOrElse(ident, ident + tail))
+            }
 
-          case If(Select(Select(opt1, Name("isDefined")), nme.UNARY_!), elseCase, getCase @ Select(opt2, Name("get"))) //duplication
-            if (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
+            (cond, thenp, elsep) match {
+              /// Null checking instead of Option wrapping
+              case (Apply(Select(expr1, nme.EQ), List(Literal(Constant(null)))), ScalaNone(), Apply(TypeApply(Select(ScalaSome(), Name("apply")), List(TypeTree())), List(expr2)))
+                if (expr1 equalsStructure expr2) =>
 
-            if (elseCase equalsStructure Literal(Constant(null))) warn(opt2, UseOptionOrNull(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isDefined"))
-            else if (getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, UseOptionGetOrElse(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isDefined"))
+                warn(tree, WrapNullWithOption)
 
-          case If(Select(opt1, Name("isEmpty")), elseCase, getCase @ Select(opt2, Name("get"))) //duplication
-            if (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
+              case (Apply(Select(expr1, nme.NE), List(Literal(Constant(null)))), Apply(TypeApply(Select(ScalaSome(), Name("apply")), List(TypeTree())), List(expr2)), ScalaNone())
+                if (expr1 equalsStructure expr2) =>
 
-            if (elseCase equalsStructure Literal(Constant(null))) warn(opt2, UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + ".isEmpty"))
-            else if (getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + ".isEmpty"))
+                warn(tree, WrapNullWithOption)
 
-          case If(Select(Select(opt1, Name("isEmpty")), nme.UNARY_!), getCase @ Select(opt2, Name("get")), elseCase) //duplication
-            if (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
+              /// if (opt.isDefined) opt.get else something is better written as getOrElse(something) and similar warnings
+              //TODO: improve the warning text, and curb the code duplication
+              case (Select(opt1, Name("isDefined")), getCase @ Select(opt2, Name("get")), otherCase) //duplication
+                if (opt1 equalsStructure opt2) && !(otherCase.tpe.widen <:< NothingClass.tpe) =>
 
-            if (elseCase equalsStructure Literal(Constant(null))) warn(opt2, UseOptionOrNull(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isEmpty"))
-            else if (getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, UseOptionGetOrElse(identOrOpt(opt2), "!" + identOrOpt(opt2) + ".isEmpty"))
+                warnOption(opt2, getCase, otherCase, not = false, ".isDefined")
 
-          case If(Apply(Select(opt1, nme.NE), List(ScalaNone())), getCase @ Select(opt2, Name("get")), elseCase) //duplication
-            if (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
+              case (Select(Select(opt1, Name("isDefined")), nme.UNARY_!), otherCase, getCase @ Select(opt2, Name("get"))) //duplication
+                if (opt1 equalsStructure opt2) && !(otherCase.tpe.widen <:< NothingClass.tpe) =>
 
-            if (elseCase equalsStructure Literal(Constant(null))) warn(opt2, UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + "!= None"))
-            else if (getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + "!= None"))
+                warnOption(opt2, getCase, otherCase, not = true, ".isDefined")
 
-          case If(Apply(Select(opt1, nme.EQ), List(ScalaNone())), elseCase, getCase @ Select(opt2, Name("get"))) //duplication
-            if (opt1 equalsStructure opt2) && !(elseCase.tpe.widen <:< NothingClass.tpe) =>
+              case (Select(opt1, Name("isEmpty")), otherCase, getCase @ Select(opt2, Name("get"))) //duplication
+                if (opt1 equalsStructure opt2) && !(otherCase.tpe.widen <:< NothingClass.tpe) =>
 
-            if (elseCase equalsStructure Literal(Constant(null))) warn(opt2, UseOptionOrNull(identOrOpt(opt2), identOrOpt(opt2) + "== None"))
-            else if (getCase.tpe.widen <:< elseCase.tpe.widen)    warn(opt2, UseOptionGetOrElse(identOrOpt(opt2), identOrOpt(opt2) + "== None"))
+                warnOption(opt2, getCase, otherCase, not = false, ".isEmpty")
 
-          case Select(qualifier, name) if {//#microcosm
+              case (Select(Select(opt1, Name("isEmpty")), nme.UNARY_!), getCase @ Select(opt2, Name("get")), otherCase) //duplication
+                if (opt1 equalsStructure opt2) && !(otherCase.tpe.widen <:< NothingClass.tpe) =>
+
+                warnOption(opt2, getCase, otherCase, not = true, ".isEmpty")
+
+              case (Apply(Select(opt1, nme.NE), List(ScalaNone())), getCase @ Select(opt2, Name("get")), otherCase) //duplication
+                if (opt1 equalsStructure opt2) && !(otherCase.tpe.widen <:< NothingClass.tpe) =>
+
+                warnOption(opt2, getCase, otherCase, not = false, " != None")
+
+              case (Apply(Select(opt1, nme.EQ), List(ScalaNone())), otherCase, getCase @ Select(opt2, Name("get"))) //duplication
+                if (opt1 equalsStructure opt2) && !(otherCase.tpe.widen <:< NothingClass.tpe) =>
+
+                warnOption(opt2, getCase, otherCase, not = false, " == None")
+
+              case _ =>
+            }
+
+            false
+          } => //Fallthrough
+
+          case Select(qualifier, name) if {//Microcosm
 
             //TODO: Possibly a bug - tried with regular class too
             import scala.language.reflectiveCalls
@@ -1936,7 +1944,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
 
             warn(tree, UseLastNotApply(identOrCol(col)))
 
-          case If(cond, thenp, elsep) if {//#microcosm
+          case If(cond, thenp, elsep) if {//Microcosm
 
             def warnUseHeadOrLastOptionNotIf(headOrLast: String, col: Tree): Unit = {
               headOrLast match {

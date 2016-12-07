@@ -135,16 +135,22 @@
   <parameters><parameter name="regex"><![CDATA[unit[.]warning[(]]]></parameter></parameters>
  </check>
 
+ <!-- Commenting rules -->
+ <!-- TODO: FIXME, Ignore, Workaround, #microcosm, ///, ... :) -->
  <check level="warning" class="org.scalastyle.file.RegexChecker" enabled="true">
   <customMessage>Unindented comment</customMessage>
   <parameters><parameter name="regex"><![CDATA[^//]]></parameter></parameters>
  </check>
  <check level="warning" class="org.scalastyle.file.RegexChecker" enabled="true">
   <customMessage>Malformed TODO</customMessage>
-  <parameters><parameter name="regex"><![CDATA[/[/*] TODO|/[/*]TODO[^:*][^ /]]]></parameter></parameters>
+  <parameters><parameter name="regex"><![CDATA[/[/*] (TODO|ADD)|/[/*](TODO|ADD)[^:*][^ /]]]></parameter></parameters>
  </check>
  <check level="warning" class="org.scalastyle.file.RegexChecker" enabled="true">
   <customMessage>Malformed Fallthrough</customMessage>
   <parameters><parameter name="regex"><![CDATA[(?<!(} =>|false) //)Fallthrough]]></parameter></parameters>
+ </check>
+ <check level="warning" class="org.scalastyle.file.RegexChecker" enabled="true">
+  <customMessage>Malformed Issue reference</customMessage>
+  <parameters><parameter name="regex"><![CDATA[(?<!(See |//))[Ii]ssue]]></parameter></parameters>
  </check>
 </scalastyle>

@@ -1,17 +1,17 @@
 /**
- * Copyright 2012 Foursquare Labs, Inc.
+ *   Copyright 2012 Foursquare Labs, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
  */
 
 package org.psywerx.hairyfotr
@@ -35,15 +35,15 @@ import scala.tools.nsc.{ Properties, Settings }
 // * detect the non-compiling tests (they currently pass)
 
 final object Compiler {
-  private val settings = new Settings
-  val loader = manifest[LinterPlugin].runtimeClass.getClassLoader
+  private[this] val settings = new Settings
+  private[this] val loader = manifest[LinterPlugin].runtimeClass.getClassLoader
   settings.classpath.value = Source.fromURL(loader.getResource("app.class.path")).mkString
   settings.bootclasspath.append(Source.fromURL(loader.getResource("boot.class.path")).mkString)
   settings.deprecation.value = true // enable detailed deprecation warnings
   //settings.unchecked.value = true // enable detailed unchecked warnings
   settings.Xwarnfatal.value = true // warnings cause compile failures
   //settings.stopAfter.value = List("linter-refchecked") // fails, but would speed up things
-  val stringWriter = new StringWriter()
+  private[this] val stringWriter = new StringWriter()
 
   // This is deprecated in 2.9.x, but we need to use it for compatibility with 2.8.x
   private[this] val interpreter = new IMain(settings, new PrintWriter(stringWriter)) {
@@ -314,7 +314,7 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
       noLint("""val x = 0.555555555d""")
 
       noLint("""val x = 0f""")
-      // TODO
+      //TODO
       /*
       should("""val x = 0.1f""")
       // Longest double
@@ -397,12 +397,12 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
     should("""val a = "abc"; String.valueOf(a)""")
 
     should("""class Wat { def toWat: Wat = new Wat; }; val w = new Wat; println(w.toWat)""")
-    // TODO
+    //TODO: false positive
     //noLint("""class Wat { def toWat(a: Int): Wat = new Wat; }; val w = new Wat; println(w.toWat(4))""")
     noLint("""class Wat { def toWat: Int = 5; println(toWat) }""")
     noLint("""class Wat { def toWat: Wat = new Wat; println(toWat) }""")
 
-    //TODO false positive
+    //TODO: false positive
     /*noLint("""
       object X { class Wat { def toWat: Y.Wat = new Y.Wat; } }
       object Y { class Wat { def toWat: X.Wat = new X.Wat; } }
@@ -760,7 +760,7 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
     should(""" val a = List(true, true, false); a.reduceLeft((acc, n) => !n || acc) """)
     should(""" val a = Set(true, true, false); a.reduceLeft((acc, n) => !n || acc) """)
 
-    // Issue #42
+    //Issue #42
     noLint(""" class col { def foldLeft(a: Any)(b: Any) = a.toString+b.toString }; val a = new col; a.foldLeft(false)((acc: Boolean, n: Int) => n > 5 || acc) """)
   }
 
@@ -847,11 +847,11 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
     should("""val x = List(4); x.contains("foo")""")
     // Contains not present on 2.10 Option
     if (Properties.versionString.contains("2.11")) {
-      // Issue #45
+      //Issue #45
       should("""val x = Some(1); x.contains("foo")""")
       should("""val x = Some("foo"); x.contains(1)""")
       noLint("""val x = Some("foo"); x.contains("ab")""")
-      // Issue #46
+      //Issue #46
       should("""val foo = Some(4); val bar = Some("bar"); foo.exists(str => bar.contains(str))""")
       should("""val foo = Some("foo"); val bar = Some(4); foo.exists(str => bar.contains(str))""")
       noLint("""val foo = Some("foo"); val bar = Some("bar"); foo.exists(str => bar.contains(str))""")
@@ -860,7 +860,7 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
       should("""val foo = Some("foo"); val bar = Some(4); foo.exists(bar.contains(_))""")
       noLint("""val foo = Some("foo"); val bar = Some("bar"); foo.exists(bar.contains(_))""")
 
-      //TODO false negatives
+      //TODO: false negatives
       //should("""val foo = Some(4); val bar = Some("bar"); foo.exists(bar.contains)""")
       //should("""val foo = Some("foo"); val bar = Some(4); foo.exists(bar.contains)""")
       noLint("""val foo = Some("foo"); val bar = Some("bar"); foo.exists(bar.contains)""")
@@ -870,12 +870,12 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
     // Number weak type eq
     noLint("""val x = List(4L, 5L); x.contains(5)""")
 
-    // Issue #46
+    //Issue #46
     should("""val foo = List(4); val bar = List("bar"); foo.exists(str => bar.contains(str))""")
     noLint("""val foo = List("foo"); val bar = List("bar"); foo.exists(str => bar.contains(str))""")
     should("""val foo = List(4); val bar = List("bar"); foo.exists(bar.contains(_))""")
     noLint("""val foo = List("foo"); val bar = List("bar"); foo.exists(bar.contains(_))""")
-    //TODO false negative
+    //TODO: false negative
     //should("""val foo = List(4); val bar = List("bar"); foo.exists(bar.contains)""")
     noLint("""val foo = List("foo"); val bar = List("bar"); foo.exists(bar.contains)""")
 
@@ -1034,7 +1034,7 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
       trait C extends A { def a(b: Int): List[Int] = { println; Nil } }
     """)
 
-    // Issue #38
+    //Issue #38
     noLint("""case class b(c: Int) extends AnyVal { }""", thunked = false)
     should("""case class b(c: Int) extends AnyVal { def d(e: Int) = 3; }""", thunked = false)
     noLint("""case class b(c: Int) extends AnyVal { def d(e: Int) = e; }""", thunked = false)
@@ -1118,7 +1118,7 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
       val a = 4d
       -2 + math.exp(a)
     """)
-    // TODO actually, that's should warn
+    //TODO:actually, that's should warn
     noLint("""
       val a = 4d
       -1 + math.expm1(a)
@@ -1140,13 +1140,21 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
 
     should(""" val a = 5; Map(a -> 5, 2 -> 4, a -> 2) """)
     should(""" val a = 5; collection.mutable.HashMap(a -> 5, 2 -> 4, a -> 2) """)
-    should(""" val a = 5; Map((a,5), 2 -> 4, a → 2) """)
+    should(""" val a = 5; Map((a,5), 2 -> 4, a → 2) """) // scalastyle:ignore non.ascii.character.disallowed
 
     noLint(""" Map(1 -> 2, 2 -> 3, 3 -> 4) """)
     noLint(""" val a = 5; Map(a -> 5, 2 -> 4, (a+1) -> 2) """)
     noLint(""" val a = 5; collection.mutable.HashMap(a -> 5, 2 -> 4, (a-1) -> 2) """)
   }
 
+  @Test
+  def AssigningOptionToNull(): Unit = {
+    implicit val msg = "You probably meant None, not null."
+    should("""def a: Option[Int] = null""")
+    should("""val a: Option[Int] = null""")
+    should("""var a: Option[Int] = Some(6); println("Foo"); a = null""")
+
+  }
   @Test
   def WrapNullWithOption(): Unit = {
     implicit val msg = "which automatically wraps null"
@@ -1202,7 +1210,7 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
     should(""" "ffasd".mkString """)
     noLint(""" List("ff", "asd").mkString """)
 
-    // TODO False negatives
+    //TODO:False negatives
     //should(""" val a = "ffasgd"; a.take(100) """)
     noLint(""" val a = "ffasgd"; a.take(1) """)
     //should(""" val a = "ffasgd"; a.drop(0) """)
@@ -1804,7 +1812,7 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
     should("""{ var a = List(1, "2") }""")
     noLint("""{ var a = List[Any](1, "2") }""")
 
-    // Issue #24
+    //Issue #24
     should("""{ val base = scala.collection.mutable.Map("review_id" -> "abcd", "review_id2" -> 1) }""")
     noLint("""{ val base = scala.collection.mutable.Map[String, Any]("review_id" -> "abcd") }""")
   }
@@ -1849,7 +1857,7 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
       a = 3
     """)
 
-    // Issue #21
+    //Issue #21
     noLint("""
       var a = 0
 
@@ -2012,7 +2020,7 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
     should("""val a = 34; val b = a % 1""")
     should("""val a = 34L; val b = a % 1""")
 
-    noLint("""def f(x: Double) = x % 1""") // Issue #27
+    noLint("""def f(x: Double) = x % 1""") //Issue #27
     noLint("""val a = 34d; val b = a % 1""")
   }
 
@@ -2074,7 +2082,7 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
       val x: String = "foo"
       x == "bar" //linter:disable:InvariantReturn """)
 
-    // Issue https://gitter.im/HairyFotr/linter?at=57cf24611baa312a6bdc48eb
+    //Issue https://gitter.im/HairyFotr/linter?at=57cf24611baa312a6bdc48eb
     noLint(""" val x = new java.lang.Integer(7); x == 5 """)
   }
 
@@ -2441,7 +2449,7 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
     should(""" val a = util.Random.nextLong + util.Random.nextString(6); if(a.nonEmpty) "fdd" """)
     should(""" val a = " "; if(a.isEmpty) "foo" """)
     noLint(""" var b = " "; val a = (b + (if(util.Random.nextBoolean) " " else " "+b)).trim.toLowerCase; if(a.nonEmpty) "foo" """)
-    // TODO: Shadowing bug
+    //TODO: Shadowing bug
     //noLint(""" val a = "a"; def f(x: String, y: String): Unit = (x, y) match { case (a, b) => a.nonEmpty } """)
 
     msg = "string will always be empty"
@@ -2915,15 +2923,6 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
   }
 
   @Test
-  def optionChecks(): Unit = {
-
-    should("""def a: Option[Int] = null""")("""You probably meant None, not null.""")
-    should("""val a: Option[Int] = null""")("""You probably meant None, not null.""")
-    should("""var a: Option[Int] = Some(6); println("Foo"); a = null""")("""You probably meant None, not null.""")
-
-  }
-
-  @Test
   def absInterpreter(): Unit = {
     should("""{ val a = 5; { val a = 6; if(a == 6) "" } }""")("This condition will always hold.")
     should("""{ val a = 5; { val a = 6; if(a == 5) "" } }""")("This condition will never hold.")
@@ -2936,7 +2935,7 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
     should("""for(i <- 1 to 10) { for(j <- 1 to i-1) { }}""")("Use (low until high) instead of (low to high-1)")
   }
 
-  //stuff that doesn't work and I don't know why
+  //TODO: <stuff that doesn't work and I don't know why
   @Test
   def broken(): Unit = {
 
@@ -2946,47 +2945,6 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
     //should(""" "dfd"*(-5) """)
 
   }
-
-/*
-src/main/scala/LinterPlugin.scala:        if(maybeVals.nonEmpty) unit.warning(tree.pos, "[experimental] These vars might secretly be vals: grep -rnP --include=*.scala 'var ([(][^)]*)?("+maybeVals.mkString("|")+")'")
-src/main/scala/AbstractInterpretation.scala:      if(neverHold) unit.warning(condExpr.pos, "This condition will never hold.")
-src/main/scala/AbstractInterpretation.scala:      if(alwaysHold) unit.warning(condExpr.pos, "This condition will always hold.")
-src/main/scala/AbstractInterpretation.scala:        if(this.actualSize == 0) unit.warning(treePosHolder.pos, "Taking the "+head_last.toString+" of an empty collection.")
-src/main/scala/AbstractInterpretation.scala:          unit.warning(treePosHolder.pos, "Taking the "+tail_init.toString+" of an empty collection.")
-src/main/scala/AbstractInterpretation.scala:        unit.warning(treePosHolder.pos, "This condition will " + (if(this.actualSize == 0) "always" else "never") + " hold.")
-src/main/scala/AbstractInterpretation.scala:        unit.warning(treePosHolder.pos, "This condition will " + (if(this.actualSize > 0) "always" else "never") + " hold.")
-src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This contains always returns the same value: true")
-src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This contains will never return true")
-src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This max will always return the first value")
-src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This max will always return the second value")
-src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This max will always return the second value")
-src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This max will always return the first value")
-src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This min will always return the first value")
-src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This min will always return the second value")
-src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This min will always return the second value")
-src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This min will always return the first value")
-src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This take is always unnecessary.")
-src/main/scala/AbstractInterpretation.scala:            if(right.getValueForce <= 0) unit.warning(treePosHolder.pos, "This collection will always be empty.")
-src/main/scala/AbstractInterpretation.scala:            unit.warning(treePosHolder.pos, "This drop is always unnecessary.")
-src/main/scala/AbstractInterpretation.scala:            if(left.actualSize-right.getValueForce <= 0) unit.warning(treePosHolder.pos, "This collection will always be empty.")
-src/main/scala/AbstractInterpretation.scala:              unit.warning(treePosHolder.pos, "The parameter of this nextInt might be lower than 1 here.")
-src/main/scala/AbstractInterpretation.scala:      if(!isUsed(body, param) && func != "foreach") unit.warning(tree.pos, "Iterator value is not used in the body.")
-src/main/scala/AbstractInterpretation.scala:        unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
-src/main/scala/AbstractInterpretation.scala:        if(stringVals contains str) unit.warning(s.pos, "You have defined that string as a val already, maybe use that?")
-src/main/scala/AbstractInterpretation.scala:        unit.warning(pos.pos, "Possible division by zero.")
-src/main/scala/AbstractInterpretation.scala:        unit.warning(pos.pos, "You will likely use a too large index for a collection here.")
-src/main/scala/AbstractInterpretation.scala:        unit.warning(pos.pos, "You will likely use a negative index for a collection here.")
-src/main/scala/AbstractInterpretation.scala:            unit.warning(pos.pos, "This function always returns the same value.")
-
-src/main/scala/LinterPlugin.scala:            val warnMsg = "You should close the file stream after use."
-src/main/scala/LinterPlugin.scala:            //val warnMsg = "Exact comparison of floating point values is potentially unsafe."
-src/main/scala/LinterPlugin.scala:            val warnMsg = "Comparing with == on instances of different types (%s, %s) will probably return false."
-src/main/scala/LinterPlugin.scala:            val warnMsg = "%s.contains(%s) will probably return false."
-src/main/scala/LinterPlugin.scala:            val warnMsg = "This condition will always be "+a+"."
-src/main/scala/LinterPlugin.scala:            val warnMsg = "This part of boolean expression will always be false."
-src/main/scala/LinterPlugin.scala:            val warnMsg = "This part of boolean expression will always be true."
-src/main/scala/LinterPlugin.scala:            val warnMsg = "Did you mean to use the signum function here? (signum also avoids division by zero)"
-*/
 
 }
 
