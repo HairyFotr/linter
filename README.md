@@ -1,5 +1,7 @@
 # Linter Compiler Plugin [![Build Status](https://travis-ci.org/HairyFotr/linter.png)](https://travis-ci.org/HairyFotr/linter) [![Join the chat at https://gitter.im/HairyFotr/linter](https://badges.gitter.im/HairyFotr/linter.svg)](https://gitter.im/HairyFotr/linter?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) [![Analytics](https://ga-beacon.appspot.com/UA-77238175-2/HairyFotr/linter?pixel)](https://github.com/igrigorik/ga-beacon)
 
+[![Join the chat at https://gitter.im/HairyFotr/linter](https://badges.gitter.im/HairyFotr/linter.svg)](https://gitter.im/HairyFotr/linter?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Linter is a Scala static analysis compiler plugin which adds compile-time checks for various possible bugs, inefficiencies, and style problems.
 
 ## Donations
