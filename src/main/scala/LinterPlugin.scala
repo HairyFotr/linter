@@ -764,7 +764,7 @@ final class LinterPlugin(val global: Global) extends Plugin {
 
           /// Collection.contains on different types: List(1, 2, 3).contains("2")
           case Apply(Select(col, Name("contains")), List(target))
-            if !(target.tpe.widen weak_<:< seqMemberType(col.tpe.widen))
+            if !((target.tpe.widen weak_<:< seqMemberType(col.tpe.widen)) || (seqMemberType(col.tpe.widen) weak_<:< target.tpe.widen))
             && !(target.tpe =:= AnyClass.tpe)
             && (col.tpe.baseClasses.exists(c => c.tpe =:= SeqClass.tpe || c.tpe =:= OptionClass.tpe)) =>
 
