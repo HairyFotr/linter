@@ -879,6 +879,9 @@ final class LinterPluginTest extends MustThrownMatchers with ThrownStandardMatch
     //should("""val foo = List(4); val bar = List("bar"); foo.exists(bar.contains)""")
     noLint("""val foo = List("foo"); val bar = List("bar"); foo.exists(bar.contains)""")
 
+    // Issue #54
+    noLint("""class A; class B extends A; val b = new B; val a: A = b; List(b).contains(a)""")
+
     // Set and Map have type-safe contains methods so we don't want to warn on those.
     noLint("""val x = Set(scala.util.Random.nextInt); x.contains(3)""")
     noLint("""val x = Map(4 -> 5); x.contains(3)""")
